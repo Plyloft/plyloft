@@ -1798,7 +1798,11 @@ export type SetupActionId =
   | "setupgit.gh"
   | "refresh.gh"
   | "install.git"
-  | "install.node";
+  | "install.node"
+  /** 1.179.0 (C1): `claude auth login` / `logout` on one Claude account's
+   *  folder, named by `SetupArgs.account` (Rust derives the folder). */
+  | "login-account.claude"
+  | "logout-account.claude";
 
 /** A terminal run (`status.*` are `setupCheck` reads). */
 export type SetupRunActionId = Exclude<SetupActionId, "status.claude" | "status.codex">;
@@ -1808,9 +1812,11 @@ export type SetupRunActionId = Exclude<SetupActionId, "status.claude" | "status.
  *  `setup_run`). `setup_active` and `setup://progress` carry either. */
 export type SetupGuidedActionId = SetupRunActionId | "project.clone";
 
-/** The one structured argument: gh's host, which must be github.com. */
+/** The structured arguments: gh's host, which must be github.com, and
+ *  (1.179.0, C1) the Claude account an account step is on, by id only. */
 export interface SetupArgs {
   hostname?: "github.com";
+  account?: string;
 }
 
 export type SetupTool = "claude" | "codex" | "gh" | "git" | "node";
@@ -1829,7 +1835,9 @@ export type SetupWatch =
   | { kind: "claude-folder-trust" }
   | { kind: "answer" }
   /** OB-11: a clone's `.git` appeared and `gh repo clone` exited cleanly. */
-  | { kind: "cloned" };
+  | { kind: "cloned" }
+  /** 1.179.0 (C1): `logout-account.claude`: the exit code alone. */
+  | { kind: "exit-code" };
 
 export interface SetupStarted {
   runId: string;
@@ -2389,6 +2397,68 @@ export interface WorkspaceGithub {
  *  GitHub origin. Never a token. */
 export function githubAccountWorkspaces() {
   return invoke<WorkspaceGithub[]>("github_account_workspaces");
+}
+
+// ── 1.179.0 (C1): Claude accounts (`ai_accounts.rs`) ───────────────────
+// An account is named by its id only: Rust derives its folder, and no path
+// or command ever crosses from here. `aiAccounts` in settings is Rust's,
+// never written through `settings_set`.
+
+/** "unknown" is never "not signed in": Main reads it whenever no login
+ *  trace is found (an API key, a helper), as Diagnostics does. */
+export type ClaudeAccountSignedIn = "yes" | "no" | "unknown";
+
+export interface ClaudeAccountRow {
+  /** null: Main, the account Claude uses on its own. */
+  id: string | null;
+  /** The member's name for it; Main's is "Main" until renamed. */
+  name: string;
+  signedIn: ClaudeAccountSignedIn;
+  /** New sessions start on this account; exactly one row is. */
+  isCurrent: boolean;
+  /** Display only: Show folder goes through `aiAccountShowFolder`. null:
+   *  Main's home could not be told. */
+  folder: string | null;
+}
+
+export interface ClaudeAccountRemoved {
+  name: string;
+  signOut: boolean;
+  /** Whether Claude's own login for the account is still saved on this
+   *  computer, read after its folder went. */
+  loginLeft: ClaudeAccountSignedIn;
+}
+
+/** Main first, then the accounts in the order they were added. */
+export function aiAccountsList() {
+  return invoke<ClaudeAccountRow[]>("ai_accounts_list");
+}
+
+/** Makes the account's folder and lists it (signed in "no" until Setup's
+ *  `login-account.claude` runs for it). */
+export function aiAccountAdd(name: string) {
+  return invoke<ClaudeAccountRow>("ai_account_add", { name });
+}
+
+/** `id` null renames Main. */
+export function aiAccountRename(id: string | null, name: string) {
+  return invoke<ClaudeAccountRow>("ai_account_rename", { id, name });
+}
+
+/** The account new sessions start on (`id` null: Main); every row back. */
+export function aiAccountUseForNew(id: string | null) {
+  return invoke<ClaudeAccountRow[]>("ai_account_use_for_new", { id });
+}
+
+/** Main has no id, so it is never removed. `signOut`: the window ran
+ *  `logout-account.claude` first. */
+export function aiAccountRemove(id: string, signOut: boolean) {
+  return invoke<ClaudeAccountRemoved>("ai_account_remove", { id, signOut });
+}
+
+/** Opens the account's folder in Finder or File Explorer (`id` null: Main's). */
+export function aiAccountShowFolder(id: string | null) {
+  return invoke<null>("ai_account_show_folder", { id });
 }
 
 // ── OB-6: Setup's Git and identity step ────────────────────────────────

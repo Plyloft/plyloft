@@ -17,6 +17,7 @@ import {
   leaveSheet,
   switchedWords,
   isAiStepAction,
+  isAccountAction,
   looksLikeProxy,
   offlineError,
   PROXY_TEXT,
@@ -454,6 +455,17 @@ assert.equal(SETUP_TRUST.later, "Later (reviews wait)");
 assert.equal(leaveSheet(TRUST_ACTION).title, "Stop Claude?");
 assert.match(leaveSheet(TRUST_ACTION).body, /Settings › Setup and account › Diagnostics/);
 assert.match(leaveSheet(TRUST_ACTION).body, /Stop it, or keep going/, "the words name the sheet's own buttons");
+
+// 1.179.0 (C1): a Claude account's sign-in or sign-out is Settings' run,
+// never the AI step's own (it would otherwise read as `login.claude`'s).
+for (const id of ["login-account.claude", "logout-account.claude"]) {
+  assert.equal(isAccountAction(id), true, id);
+  assert.equal(toolOfAction(id), null, id);
+  assert.equal(isAiStepAction(id), false, id);
+  assert.equal(holdsAiStep(id), false, id);
+}
+assert.equal(isAccountAction("login.claude"), false);
+assert.equal(isAiStepAction("login.claude"), true);
 
 // 1.176.0 R4 (M3): a Repair's run is no AI step's install or sign-in.
 for (const id of ["repair-install.claude", "repair-chown.claude", "repair-npm-remove.codex", "repair-chown.codex"]) {

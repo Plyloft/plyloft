@@ -90,11 +90,19 @@ export interface RowView {
  *  answer its trust question (`setup_actions::ActionId::TrustClaude`). */
 export const TRUST_ACTION = "trust.claude" satisfies SetupRunActionId;
 
+/** 1.179.0 (C1): the steps on one Claude account (`login-account.claude`,
+ *  `logout-account.claude`). Settings › AI and models › Claude accounts
+ *  follows them; Setup's AI step never takes one for its own run. */
+export function isAccountAction(id: string): boolean {
+  return id === "login-account.claude" || id === "logout-account.claude";
+}
+
 /** The tool an action id is about (`install.claude` → claude). The trust
  *  run is not about installing or signing in: no row follows it. */
 export function toolOfAction(id: string): AiTool | null {
-  // 1.176.0 R4: a Repair's run is no step's install or sign-in.
-  if (id === TRUST_ACTION || isRepairAction(id)) return null;
+  // 1.176.0 R4: a Repair's run is no step's install or sign-in; nor
+  // (1.179.0, C1) a Claude account's, which Settings › AI and models starts.
+  if (id === TRUST_ACTION || isRepairAction(id) || isAccountAction(id)) return null;
   const tool = id.slice(id.indexOf(".") + 1);
   return tool === "claude" || tool === "codex" ? tool : null;
 }

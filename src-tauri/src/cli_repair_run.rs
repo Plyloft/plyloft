@@ -103,7 +103,8 @@ pub struct Roots {
     /// folder on Windows).
     pub install_dir: Option<PathBuf>,
     /// Folders never acted on as a whole: `~/.claude`, `~/.codex`,
-    /// `$CLAUDE_CONFIG_DIR`, `$CODEX_HOME`.
+    /// `$CLAUDE_CONFIG_DIR`, `$CODEX_HOME`, and (1.179.0) Plyloft's Claude
+    /// account folders.
     pub protected: Vec<PathBuf>,
 }
 
@@ -113,6 +114,9 @@ impl Roots {
         let mut protected = vec![home.join(".claude"), home.join(".codex")];
         protected.extend(inputs.claude_config_dir.clone().map(PathBuf::from));
         protected.extend(inputs.codex_home.clone().map(PathBuf::from));
+        // 1.179.0 (C1): Plyloft's Claude account folders, each a Claude
+        // config folder like `~/.claude` (`ai_accounts::protected_dirs`).
+        protected.extend(crate::ai_accounts::protected_dirs());
         Some(Self {
             windows: inputs.windows,
             install_dir: health::install_dir(tool, inputs).map(PathBuf::from),

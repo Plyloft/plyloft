@@ -24,6 +24,8 @@ const IDS: SetupGuidedActionId[] = [
   "install.git",
   "install.node",
   "trust.claude",
+  "login-account.claude",
+  "logout-account.claude",
 ];
 const OUTCOMES: SetupOutcome[] = [
   "succeeded",
@@ -121,6 +123,27 @@ assert.equal(oneTimeCode("released 2026-0927 and 1234-5678"), null, "digits only
 assert.equal(oneTimeCode("see https://github.com/login/device"), null);
 assert.equal(oneTimeCode("ABCD-EFGHIJ is too long"), null);
 assert.equal(oneTimeCode("XABCD-EFGH is inside a word"), null);
+
+// 1.179.0 (C1): a Claude account's sign-in reads as Claude Code's, and its
+// sign-out has its own words, never a sign-in's or the GitHub command's.
+assert.equal(
+  setupLine("login-account.claude", "running", null),
+  "Finish signing in in your browser. Plyloft notices when you're done.",
+);
+assert.equal(setupLine("login-account.claude", "done", "failed"), "Claude Code stopped with an error. Nothing was changed.");
+assert.equal(setupLine("login-account.claude", "done", "succeeded"), "Signed in.");
+assert.equal(showsCode("login-account.claude"), false);
+for (const phase of PHASES) {
+  assert.equal(setupLine("logout-account.claude", phase, null), "Signing out of Claude Code…", phase);
+}
+assert.equal(setupLine("logout-account.claude", "done", "succeeded"), "Signed out.");
+assert.equal(setupLine("logout-account.claude", "done", "cancelled"), "Stopped.");
+assert.equal(setupLine("logout-account.claude", "done", "failed"), "Claude Code's sign-out stopped with an error.");
+assert.equal(setupLine("logout-account.claude", "done", "timed-out"), "Claude Code's sign-out didn't finish.");
+for (const outcome of OUTCOMES) {
+  assert.doesNotMatch(setupLine("logout-account.claude", "done", outcome), /sign(ed|ing)? in|GitHub/i, outcome);
+}
+assert.equal(stopLabel("logout-account.claude"), "Stop");
 
 console.log("setupRun: ok");
 

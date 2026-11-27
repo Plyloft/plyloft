@@ -78,7 +78,7 @@ pub const STOPPED_BEFORE: &str = "Stopped before anything ran.";
 
 pub const NO_REVIEW_FOLDER: &str = "Plyloft couldn't find its review folder, so Claude wasn't opened.";
 
-fn busy(action: ActionId) -> String {
+pub(crate) fn busy(action: ActionId) -> String {
     format!(
         "Another setup step is still running ({}). Stop it or let it finish first.",
         action.id()
@@ -744,6 +744,60 @@ impl<R: Runtime> Observer for SystemObserver<R> {
             .app
             .try_state::<crate::review_capabilities::ReviewerCapabilityRegistry>();
         crate::commands::re_probe_and_forget(capabilities.as_deref());
+    }
+}
+
+/// 1.179.0 (C1): the observer of a step on one Claude account
+/// (`login-account.claude`): its sign-in is looked for on that account's
+/// folder only (`claude_auth::read_for_dir`: the keychain item keyed to the
+/// folder, attributes only, and a `stat` of its `.credentials.json`), never
+/// on Main's, whose login would otherwise read as this one's. Every other
+/// look is the system observer's.
+pub struct AccountObserver<R: Runtime> {
+    pub inner: SystemObserver<R>,
+    /// The folder the step's `CLAUDE_CONFIG_DIR` names, spelled the same.
+    pub dir: std::path::PathBuf,
+}
+
+impl<R: Runtime> AccountObserver<R> {
+    fn credential(&self) -> Observed {
+        let (keychain, file) = crate::claude_auth::read_for_dir(&self.dir);
+        claude_seen(keychain, file)
+    }
+}
+
+impl<R: Runtime> Observer for AccountObserver<R> {
+    fn baseline(&self, watch: Watch) -> Baseline {
+        if watch == Watch::ClaudeSignIn {
+            return Baseline {
+                credential_there: self.credential() == Observed::Yes,
+                ..Baseline::default()
+            };
+        }
+        self.inner.baseline(watch)
+    }
+
+    fn observe(&self, watch: Watch, baseline: &Baseline) -> Observed {
+        if watch == Watch::ClaudeSignIn {
+            return self.credential();
+        }
+        self.inner.observe(watch, baseline)
+    }
+
+    fn re_probe(&self) {
+        self.inner.re_probe();
+    }
+
+    fn installer_running(&self) -> Option<bool> {
+        self.inner.installer_running()
+    }
+
+    fn version(&self, tool: Tool) -> Option<String> {
+        self.inner.version(tool)
+    }
+
+    fn known_latest(&self, tool: Tool) -> Option<String> {
+        self.inner.known_latest(tool)
     }
 }
 
@@ -1709,8 +1763,25 @@ pub async fn setup_run(
 ) -> Result<SetupStarted, String> {
     tauri::async_runtime::spawn_blocking(move || {
         let env = crate::shell_env::get();
-        let mut plan =
-            setup_actions::plan_request(&action_id, args.as_ref(), &PlanFacts::read(&env))?;
+        // 1.179.0 (C1): the Claude accounts' folders, derived by Rust from
+        // the stored ids; an account step names one by id only.
+        let accounts = app
+            .try_state::<crate::settings::SettingsStore>()
+            .map(|store| crate::ai_accounts::setup_folders(&store.snapshot().ai_accounts.claude))
+            .unwrap_or_default();
+        let mut plan = setup_actions::plan_request_with(
+            &action_id,
+            args.as_ref(),
+            &PlanFacts::read(&env),
+            &accounts,
+        )?;
+        let account_dir = plan
+            .action
+            .is_account_step()
+            .then(|| args.as_ref().and_then(|a| a.account.as_deref()))
+            .flatten()
+            .and_then(|id| accounts.iter().find(|a| a.id == id))
+            .map(|a| a.dir.clone());
         // R4 (B2): never `claude update`/npm on a copy whose folders it
         // can't write; the copy judged is the one Plyloft runs.
         let copy = match plan.action {
@@ -1732,10 +1803,15 @@ pub async fn setup_run(
         if let Some(dir) = crate::setup_last_run::dir_of(&app) {
             runner.keep_records_in(dir);
         }
+        let system = SystemObserver { app: app.clone() };
+        let observer: Arc<dyn Observer> = match account_dir {
+            Some(dir) => Arc::new(AccountObserver { inner: system, dir }),
+            None => Arc::new(system),
+        };
         runner.start(
             &app,
             plan,
-            Arc::new(SystemObserver { app: app.clone() }),
+            observer,
             Timing::REAL,
             app_emit(&app),
             cols.unwrap_or(DEFAULT_COLS),

@@ -71,7 +71,21 @@ pub enum ActionId {
     RepairChownCodex,
     RepairNpmRemoveClaude,
     RepairNpmRemoveCodex,
+    /// 1.179.0 (C1): `claude auth login` with `CLAUDE_CONFIG_DIR` set to a
+    /// Claude account's own folder (`ai_accounts`). Parsed from its id, but
+    /// not in [`ALL_ACTIONS`]: it needs the account's id in [`SetupArgs`],
+    /// and only [`plan_request_with`] plans it, from the folders Rust derives
+    /// from the stored accounts. Watched as [`Watch::ClaudeSignIn`], on that
+    /// folder (`setup_run::AccountObserver`).
+    LoginAccountClaude,
+    /// 1.179.0 (C1): `claude auth logout` on an account's folder, before
+    /// *Sign out and remove*: the CLI removes its own login. Its exit code
+    /// says whether it ran ([`Watch::ExitCode`]).
+    LogoutAccountClaude,
 }
+
+/// 1.179.0 (C1): the steps on one Claude account, which take its id.
+pub const ACCOUNT_ACTIONS: [ActionId; 2] = [ActionId::LoginAccountClaude, ActionId::LogoutAccountClaude];
 
 pub const ALL_ACTIONS: [ActionId; 18] = [
     ActionId::InstallClaude,
@@ -134,12 +148,23 @@ impl ActionId {
             Self::RepairChownCodex => "repair-chown.codex",
             Self::RepairNpmRemoveClaude => "repair-npm-remove.claude",
             Self::RepairNpmRemoveCodex => "repair-npm-remove.codex",
+            Self::LoginAccountClaude => "login-account.claude",
+            Self::LogoutAccountClaude => "logout-account.claude",
         }
     }
 
     /// Exact match only: no trimming, no case folding.
     pub fn parse(id: &str) -> Option<Self> {
-        ALL_ACTIONS.iter().copied().find(|a| a.id() == id)
+        ALL_ACTIONS
+            .iter()
+            .chain(ACCOUNT_ACTIONS.iter())
+            .copied()
+            .find(|a| a.id() == id)
+    }
+
+    /// 1.179.0 (C1): a step on one Claude account (its id in [`SetupArgs`]).
+    pub fn is_account_step(self) -> bool {
+        ACCOUNT_ACTIONS.contains(&self)
     }
 
     /// `status.*`: a bounded read the AI step runs (D2, D4), not a terminal.
@@ -185,6 +210,10 @@ impl ActionId {
 pub struct SetupArgs {
     /// gh's host: only [`GITHUB_HOST`] (the default when absent).
     pub hostname: Option<String>,
+    /// 1.179.0 (C1): the Claude account a step is on, by id. Only the
+    /// account steps take it, and it is only ever compared with the stored
+    /// accounts' ids: the folder the CLI gets is Rust's, never this text.
+    pub account: Option<String>,
 }
 
 /// How Ply decides the action worked (spec §4 principle 4: observed, not
@@ -372,6 +401,9 @@ fn not_installed(tool: &str) -> String {
 /// Validate `args` for `action`: the host, or nothing at all.
 pub fn validate_args(action: ActionId, args: Option<&SetupArgs>) -> Result<&'static str, String> {
     let args = args.cloned().unwrap_or_default();
+    if args.account.is_some() {
+        return Err(ARGS_REFUSED.into());
+    }
     match args.hostname {
         None => Ok(GITHUB_HOST),
         Some(_) if !action.takes_hostname() => Err(ARGS_REFUSED.into()),
@@ -386,8 +418,69 @@ pub fn plan_request(
     args: Option<&SetupArgs>,
     facts: &PlanFacts,
 ) -> Result<RunPlan, String> {
+    plan_request_with(id, args, facts, &[])
+}
+
+/// 1.179.0 (C1): [`plan_request`] with the Claude accounts' folders, as
+/// Rust derives them from the stored ids (`ai_accounts::setup_folders`).
+pub fn plan_request_with(
+    id: &str,
+    args: Option<&SetupArgs>,
+    facts: &PlanFacts,
+    accounts: &[crate::ai_accounts::AccountFolder],
+) -> Result<RunPlan, String> {
     let action = ActionId::parse(id).ok_or_else(|| unknown_action(id))?;
+    if action.is_account_step() {
+        return plan_account(action, args, facts, accounts);
+    }
     plan(action, args, facts)
+}
+
+/// 1.179.0 (C1): `claude auth login` / `logout` on one account's folder.
+/// The account is named by id and must be one of `accounts`; the folder in
+/// `CLAUDE_CONFIG_DIR` is that entry's, built by Rust, so no string the
+/// frontend sent reaches the argv or the environment. No host is taken.
+pub fn plan_account(
+    action: ActionId,
+    args: Option<&SetupArgs>,
+    facts: &PlanFacts,
+    accounts: &[crate::ai_accounts::AccountFolder],
+) -> Result<RunPlan, String> {
+    let words: &[&str] = match action {
+        ActionId::LoginAccountClaude => &["auth", "login"],
+        ActionId::LogoutAccountClaude => &["auth", "logout"],
+        _ => return Err(unknown_action(action.id())),
+    };
+    let args = args.cloned().unwrap_or_default();
+    if args.hostname.is_some() {
+        return Err(ARGS_REFUSED.into());
+    }
+    let folder = args
+        .account
+        .as_deref()
+        .and_then(|wanted| accounts.iter().find(|a| a.id == wanted))
+        .ok_or_else(|| crate::ai_accounts::UNKNOWN_ACCOUNT.to_string())?;
+    let program = facts.claude.clone().ok_or_else(|| not_installed("claude"))?;
+    let mut argv = vec![program];
+    argv.extend(words.iter().map(|w| w.to_string()));
+    Ok(RunPlan {
+        action,
+        argv,
+        direct: false,
+        display: format!("claude {}", words.join(" ")),
+        watch: if action == ActionId::LoginAccountClaude {
+            Watch::ClaudeSignIn
+        } else {
+            Watch::ExitCode
+        },
+        env: vec![(
+            crate::ai_accounts::CONFIG_DIR_VAR.to_string(),
+            folder.dir.to_string_lossy().into_owned(),
+        )],
+        token: None,
+        clone: None,
+        cwd: None,
+    })
 }
 
 /// The allowlist (spec §6): `action` on this machine.
@@ -396,6 +489,10 @@ pub fn plan(
     args: Option<&SetupArgs>,
     facts: &PlanFacts,
 ) -> Result<RunPlan, String> {
+    // Without the accounts' folders no account step can be planned.
+    if action.is_account_step() {
+        return plan_account(action, args, facts, &[]);
+    }
     let host = validate_args(action, args)?;
     let w = facts.windows;
     let from_doctor = |cmd: &'static str, watch: Watch| -> Result<RunPlan, String> {
@@ -558,7 +655,9 @@ pub fn plan(
         | ActionId::RepairChownClaude
         | ActionId::RepairChownCodex
         | ActionId::RepairNpmRemoveClaude
-        | ActionId::RepairNpmRemoveCodex => Err(unknown_action(action.id())),
+        | ActionId::RepairNpmRemoveCodex
+        | ActionId::LoginAccountClaude
+        | ActionId::LogoutAccountClaude => Err(unknown_action(action.id())),
     }
 }
 
