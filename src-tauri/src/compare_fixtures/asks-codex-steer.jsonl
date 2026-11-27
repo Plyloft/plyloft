@@ -1,0 +1,13 @@
+{"timestamp": "2026-11-27T12:00:00.000Z", "type": "session_meta", "payload": {"id": "00000000-0000-4000-8000-000000000002", "cwd": "/Users/someone/notes-app", "originator": "codex-tui", "cli_version": "0.172.0", "source": "cli", "timestamp": "2026-11-27T12:00:00.000Z"}}
+{"timestamp": "2026-11-27T12:00:01.000Z", "type": "event_msg", "payload": {"type": "task_started", "turn_id": "turn_01", "collaboration_mode_kind": "default"}}
+{"timestamp": "2026-11-27T12:00:01.100Z", "type": "turn_context", "payload": {"cwd": "/Users/someone/notes-app", "approval_policy": "on-request", "model": "gpt"}}
+{"timestamp": "2026-11-27T12:00:01.200Z", "type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "<environment_context>\n  <cwd>/Users/someone/notes-app</cwd>\n  <shell>zsh</shell>\n  <current_date>2026-11-27</current_date>\n</environment_context>"}]}}
+{"timestamp": "2026-11-27T12:00:01.300Z", "type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "Review the list markup."}]}}
+{"timestamp": "2026-11-27T12:00:01.300Z", "type": "event_msg", "payload": {"type": "user_message", "message": "Review the list markup.", "images": []}}
+{"timestamp": "2026-11-27T12:00:05.000Z", "type": "response_item", "payload": {"type": "message", "role": "assistant", "phase": "commentary", "content": [{"type": "output_text", "text": "Reading index.html."}]}}
+{"timestamp": "2026-11-27T12:00:06.000Z", "type": "response_item", "payload": {"type": "function_call", "name": "shell", "arguments": "{}", "call_id": "call_01"}}
+{"timestamp": "2026-11-27T12:00:07.000Z", "type": "response_item", "payload": {"type": "function_call_output", "call_id": "call_01", "output": "<ul></ul>"}}
+{"timestamp": "2026-11-27T12:00:09.000Z", "type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "Check the heading too."}]}}
+{"timestamp": "2026-11-27T12:00:09.000Z", "type": "event_msg", "payload": {"type": "user_message", "message": "Check the heading too.", "images": []}}
+{"timestamp": "2026-11-27T12:00:20.000Z", "type": "response_item", "payload": {"type": "message", "role": "assistant", "phase": "final_answer", "content": [{"type": "output_text", "text": "The list has no heading. Add one."}]}}
+{"timestamp": "2026-11-27T12:00:21.000Z", "type": "event_msg", "payload": {"type": "task_complete", "turn_id": "turn_01", "last_agent_message": "The list has no heading. Add one.", "duration_ms": 20000}}

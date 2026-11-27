@@ -10,7 +10,7 @@ import { useTiles, type Tile } from "../store/tileStore";
 import { useWorkspaces, type Workspace } from "../store/workspaceStore";
 import { useUi } from "../store/uiStore";
 import { registerTileScreen, type TileScreenNow } from "../lib/tileScreen";
-import type { CompareAnswer } from "../lib/compareIpc";
+import type { CompareAnswer, ComparePreparedPaste } from "../lib/compareIpc";
 import type { ShellEnvInfo } from "../ipc";
 import { TILE_SHOWN_EVENT } from "../store/tileActions";
 import { act, renderUi, screen, waitFor } from "./render";
@@ -74,6 +74,15 @@ const plan: CompareAnswer = {
 };
 const none: CompareAnswer = { vendor: "codex", conversation: "unstarted", turn: "none", cut: false };
 
+/** What `compare_prepare_paste` gives (1.179.0: an object, no longer the bare text). */
+const prep = (text: string, over: Partial<ComparePreparedPaste> = {}): ComparePreparedPaste => ({
+  text,
+  questionCut: false,
+  questionLeftOut: false,
+  answerCut: false,
+  ...over,
+});
+
 function setup(extra: Record<string, unknown> = {}) {
   act(() => {
     useWorkspaces.setState({ workspaces: [ws], activeId: WS });
@@ -88,7 +97,7 @@ function setup(extra: Record<string, unknown> = {}) {
   const prepared = "PREPARED TEXT FROM THE BACKEND\nStep 1\nStep 2";
   const fixtures = {
     compare_tile_answer: ({ ptyId }: { ptyId: string }) => (ptyId === "pty-claude" ? plan : none),
-    compare_prepare_paste: () => prepared,
+    compare_prepare_paste: () => prep(prepared),
     tile_screen_block: () => null,
     pty_write: () => undefined,
     ...extra,
@@ -507,12 +516,12 @@ function deferred<T>() {
 
 describe("a press is bound to its composer (M1)", () => {
   async function pressSendWithSlowPrepare() {
-    const gate = deferred<string>();
+    const gate = deferred<ComparePreparedPaste>();
     const t = setup({ compare_prepare_paste: () => gate.promise });
     await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
     await t.user.click(await screen.findByRole("button", { name: /Send to Codex/ }));
     await waitFor(() => expect(t.tauri.callsOf("compare_prepare_paste")).toHaveLength(1));
-    return { t, release: () => gate.resolve(t.prepared) };
+    return { t, release: () => gate.resolve(prep(t.prepared)) };
   }
 
   it("writes nothing after Cancel", async () => {
@@ -674,7 +683,7 @@ describe("keys, focus and words (S1, S4, S5, N7)", () => {
   });
 
   it("says when the note makes the answer cut further (only with a note, at the cap), and passes it on the next press", async () => {
-    const t = setup({ compare_prepare_paste: () => "x".repeat(16_000) });
+    const t = setup({ compare_prepare_paste: () => prep("x".repeat(16_000), { answerCut: true }) });
     await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
     await t.user.type(await screen.findByPlaceholderText("Add a note of your own (optional)"), "careful");
     await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
@@ -686,7 +695,7 @@ describe("keys, focus and words (S1, S4, S5, N7)", () => {
   });
 
   it("never says the note cut it when there is no note, whatever cleaning did to the tail", async () => {
-    const t = setup({ compare_prepare_paste: () => "cleaned text without the tab-ended tail" });
+    const t = setup({ compare_prepare_paste: () => prep("cleaned text without the tab-ended tail") });
     await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
     await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
     await waitFor(() => expect(t.tauri.callsOf("pty_write")).toHaveLength(1));
@@ -1040,7 +1049,7 @@ describe("round 2", () => {
   });
 
   it("R2-11: a press that is no longer wanted leaves its composer free", async () => {
-    const gate = deferred<string>();
+    const gate = deferred<ComparePreparedPaste>();
     const t = setup({ compare_prepare_paste: () => gate.promise });
     await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
     await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
@@ -1048,7 +1057,7 @@ describe("round 2", () => {
     // Still the same composer, but the pair no longer matches (no reconcile): not wanted.
     const other = mkTile("codex");
     act(() => useCompare.getState().choose(WS, "codex", other.id));
-    gate.resolve(t.prepared);
+    gate.resolve(prep(t.prepared));
     await waitFor(() => expect(useCompare.getState().byWorkspace[WS]?.composer?.busy ?? false).toBe(false));
     expect(written(t)).toHaveLength(0);
   });
@@ -1056,7 +1065,7 @@ describe("round 2", () => {
 
 describe("round 3", () => {
   it("R3-1: after an ordinary ⌘+Enter (released before the send completes) the keyboard goes to the target tile", async () => {
-    const gate = deferred<string>();
+    const gate = deferred<ComparePreparedPaste>();
     const t = setup({ compare_prepare_paste: () => gate.promise });
     const shown: string[] = [];
     const on = (e: Event) => shown.push((e as CustomEvent<string>).detail);
@@ -1076,7 +1085,7 @@ describe("round 3", () => {
     fireEvent.keyDown(note, { key: "Enter", metaKey: true, ctrlKey: true });
     await waitFor(() => expect(t.tauri.callsOf("compare_prepare_paste")).toHaveLength(1));
     fireEvent.keyUp(note, { key: "Enter", metaKey: true, ctrlKey: true }); // released while the send is under way
-    gate.resolve(t.prepared);
+    gate.resolve(prep(t.prepared));
     await waitFor(() => expect(written(t)).toHaveLength(1));
     // After a send the keyboard goes to the target tile (F1).
     await waitFor(() => expect(shown).toEqual([t.codex.id]), { timeout: 1000 });
@@ -1578,5 +1587,213 @@ describe("walk round 5: the live screen decides, and its edges re-read the answe
     t.screens[t.claude.id] = idleScreen({ decision: false, working: false });
     await waitFor(() => expect(t.tauri.callsOf("compare_tile_answer").length).toBeGreaterThan(before), { timeout: 3000 });
     await waitFor(() => expect((screen.getByRole("button", { name: /Pass to Claude/ }) as HTMLButtonElement).disabled).toBe(false), { timeout: 3000 });
+  });
+});
+
+// ── 1.179.0 "Include my question" ────────────────────────────────────────
+
+describe("Include my question", () => {
+  const QUESTION = "Plan the login page";
+  const PREPARED_QUESTION = "Plan the login page, as the backend cleaned it";
+  const withAsks = (turnAsks: CompareAnswer["turnAsks"]): CompareAnswer => ({ ...plan, turnAsks });
+  const known = (text = QUESTION): CompareAnswer["turnAsks"] => ({ status: "known", messages: [{ text, kind: "prompt" }], cut: false });
+  type Parts = { question?: string; questionLabel?: string; questionCut?: boolean };
+  const partsOf = (t: ReturnType<typeof setup>) => t.tauri.callsOf("compare_prepare_paste").map((c) => c.args.parts as Parts);
+
+  /** The backend: a question goes as `PREPARED_QUESTION`; the text says
+   *  whether one was given. */
+  function setupAsked(answer: CompareAnswer, over: Partial<ComparePreparedPaste> = {}) {
+    return setup({
+      compare_tile_answer: ({ ptyId }: { ptyId: string }) => (ptyId === "pty-claude" ? answer : none),
+      compare_prepare_paste: ({ parts }: { parts: Parts }) =>
+        parts.question ? prep("WITH THE QUESTION", { question: PREPARED_QUESTION, ...over }) : prep("WITHOUT A QUESTION"),
+    });
+  }
+
+  it("is on by default when the turn holds a question; the preview shows the backend's question; Send sends it", async () => {
+    const t = setupAsked(withAsks(known()));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    const sw = await screen.findByRole("switch", { name: "Include my question" });
+    expect(sw.getAttribute("aria-checked")).toBe("true");
+    expect((sw as HTMLButtonElement).disabled).toBe(false);
+    await t.user.click(screen.getByRole("button", { name: "Show" }));
+    // The question as the backend prepared it, under its label, above the answer.
+    expect(await screen.findByText(PREPARED_QUESTION)).toBeTruthy();
+    expect(screen.getByText("My question to Claude:")).toBeTruthy();
+    expect(screen.getByText(`${[...PREPARED_QUESTION].length} characters`)).toBeTruthy();
+    expect(partsOf(t)[0]).toMatchObject({ question: QUESTION, questionLabel: "My question to Claude:" });
+    await t.user.click(screen.getByRole("button", { name: /Send to Codex/ }));
+    await waitFor(() => expect(written(t)).toHaveLength(1));
+    expect(written(t)[0]).toBe("\x1b[200~WITH THE QUESTION\x1b[201~\r");
+    const last = partsOf(t).slice(-1)[0];
+    expect(last).toMatchObject({ question: QUESTION, questionLabel: "My question to Claude:" });
+    expect(last.questionCut).toBeUndefined();
+    const p = useCompare.getState().byWorkspace[WS].history[0];
+    expect(p).toMatchObject({ question: QUESTION, withQuestion: true, sent: "WITH THE QUESTION" });
+  });
+
+  it("the hint says what it adds", async () => {
+    const t = setupAsked(withAsks(known()));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    const sw = await screen.findByRole("switch", { name: "Include my question" });
+    expect(sw.closest("[title]")?.getAttribute("title")).toBe("Adds what you asked Claude in that turn, before its answer.");
+    // Closed before its preview is asked for: nothing is left to fire later.
+    await t.user.click(screen.getByRole("button", { name: /Cancel/ }));
+  });
+
+  it("switched off, Send and Put send no question, and the preview goes", async () => {
+    const t = setupAsked(withAsks(known()));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    await t.user.click(await screen.findByRole("switch", { name: "Include my question" }));
+    expect(screen.getByRole("switch", { name: "Include my question" }).getAttribute("aria-checked")).toBe("false");
+    await t.user.click(screen.getByRole("button", { name: "Show" }));
+    expect(screen.queryByText(PREPARED_QUESTION)).toBeNull();
+    expect(screen.queryByText("My question to Claude:")).toBeNull();
+    await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
+    await waitFor(() => expect(written(t)).toHaveLength(1));
+    expect(written(t)[0]).toBe("\x1b[200~WITHOUT A QUESTION\x1b[201~");
+    expect(partsOf(t).slice(-1)[0].question).toBeUndefined();
+    expect(partsOf(t).slice(-1)[0].questionLabel).toBeUndefined();
+    expect(useCompare.getState().byWorkspace[WS].history[0]).toMatchObject({ withQuestion: false });
+    expect(useCompare.getState().byWorkspace[WS].history[0].question).toBeUndefined();
+  });
+
+  it("Put sends the question when the switch is on", async () => {
+    const t = setupAsked(withAsks(known()));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    await screen.findByRole("switch", { name: "Include my question" });
+    await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
+    await waitFor(() => expect(written(t)).toHaveLength(1));
+    expect(written(t)[0]).toBe("\x1b[200~WITH THE QUESTION\x1b[201~");
+    expect(partsOf(t).slice(-1)[0]).toMatchObject({ question: QUESTION });
+  });
+
+  it("the member's off lasts for that composer only", async () => {
+    const t = setupAsked(withAsks(known()));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    await t.user.click(await screen.findByRole("switch", { name: "Include my question" }));
+    await t.user.click(screen.getByRole("button", { name: /Cancel/ }));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    expect((await screen.findByRole("switch", { name: "Include my question" })).getAttribute("aria-checked")).toBe("true");
+    await t.user.click(screen.getByRole("button", { name: /Cancel/ }));
+  });
+
+  it.each([
+    ["start-not-read", "Can't tell where Claude's turn started, so your question is left out."],
+    ["queued-start", "Can't tell where Claude's turn started, so your question is left out."],
+    ["compacted", "Can't tell where Claude's turn started, so your question is left out."],
+    ["command", "Claude's turn didn't start with a message of yours, so there's no question to add."],
+    ["not-typed", "Claude's turn didn't start with a message of yours, so there's no question to add."],
+    ["feedback-unread", "Can't read your answer to Claude's plan menu, so your question is left out."],
+    ["unknown-message", "Can't tell your words from the text you passed, so your question is left out."],
+  ] as const)("off and disabled when the backend can't tell (%s), with its reason, and nothing of it is sent", async (why, words) => {
+    const t = setupAsked(withAsks({ status: "unknown", why }));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    const sw = await screen.findByRole("switch", { name: "Include my question" });
+    expect(sw.getAttribute("aria-checked")).toBe("false");
+    expect((sw as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(words)).toBeTruthy();
+    await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
+    await waitFor(() => expect(written(t)).toHaveLength(1));
+    expect(partsOf(t).every((p) => p.question === undefined)).toBe(true);
+  });
+
+  it("off and disabled when the turn holds only what was passed to Claude", async () => {
+    const passed = " From Codex:\nLooks right.";
+    const t = setupAsked(withAsks(known("From Codex:\nLooks right.")));
+    act(() =>
+      useCompare.setState((s) => ({
+        byWorkspace: {
+          ...s.byWorkspace,
+          [WS]: {
+            ...s.byWorkspace[WS],
+            history: [{ n: 1, from: "codex", to: "claude", ask: "just-pass", withNote: false, at: Date.now() - 600_000, mode: "send", sent: passed, answer: "Looks right.", cut: false }],
+          },
+        },
+      })),
+    );
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    const sw = await screen.findByRole("switch", { name: "Include my question" });
+    expect((sw as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("That turn holds only what you passed to Claude. There's no question of yours to add.")).toBeTruthy();
+  });
+
+  it("an edited pass: Compare's labels with no pass in memory leave the question out", async () => {
+    const t = setupAsked(withAsks(known("From Codex:\nLooks right, but\n\nmy own words")));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    const sw = await screen.findByRole("switch", { name: "Include my question" });
+    expect((sw as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Can't tell your words from the text you passed, so your question is left out.")).toBeTruthy();
+  });
+
+  it("says when the backend cut the question to fit", async () => {
+    const t = setupAsked(withAsks(known()), { questionCut: true });
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    expect(await screen.findByText("Your question is cut to fit 16,000 characters.")).toBeTruthy();
+    expect(screen.queryByText("Your question is left out: the answer takes the 16,000 characters.")).toBeNull();
+  });
+
+  it("says when the backend left the question out for room", async () => {
+    const t = setup({
+      compare_tile_answer: ({ ptyId }: { ptyId: string }) => (ptyId === "pty-claude" ? withAsks(known()) : none),
+      compare_prepare_paste: () => prep("ONLY THE ANSWER", { questionLeftOut: true }),
+    });
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    expect(await screen.findByText("Your question is left out: the answer takes the 16,000 characters.")).toBeTruthy();
+    await t.user.click(screen.getByRole("button", { name: "Show" }));
+    expect(screen.queryByText("My question to Claude:")).toBeNull();
+  });
+
+  it("the history row says 'with your question', and Pass it again carries the same question", async () => {
+    const t = setupAsked(withAsks(known()));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    await screen.findByRole("switch", { name: "Include my question" });
+    await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
+    await waitFor(() => expect(written(t)).toHaveLength(1));
+    await t.user.click(await screen.findByRole("button", { name: "1 pass" }));
+    const row = await screen.findByText(/Claude → Codex/);
+    expect(row.parentElement?.textContent).toContain("with your question");
+    await t.user.click(row);
+    await t.user.click(await screen.findByRole("button", { name: "Pass it again" }));
+    const sw = await screen.findByRole("switch", { name: "Include my question" });
+    expect(sw.getAttribute("aria-checked")).toBe("true");
+    const before = partsOf(t).length;
+    await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
+    await waitFor(() => expect(written(t)).toHaveLength(2));
+    const again = partsOf(t).slice(before).slice(-1)[0];
+    expect(again).toMatchObject({ question: QUESTION, questionLabel: "My question to Claude:" });
+  });
+
+  it("a pass without a question: no 'with your question', and Pass it again offers no switch", async () => {
+    const t = setupAsked(withAsks(known()));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    await t.user.click(await screen.findByRole("switch", { name: "Include my question" }));
+    await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
+    await waitFor(() => expect(written(t)).toHaveLength(1));
+    await t.user.click(await screen.findByRole("button", { name: "1 pass" }));
+    const row = await screen.findByText(/Claude → Codex/);
+    expect(row.parentElement?.textContent).not.toContain("with your question");
+    await t.user.click(row);
+    await t.user.click(await screen.findByRole("button", { name: "Pass it again" }));
+    expect(await screen.findByText("Claude's plan to Codex")).toBeTruthy();
+    expect(screen.queryByRole("switch", { name: "Include my question" })).toBeNull();
+  });
+
+  it("logs nothing of the question, and no other command carries it", async () => {
+    const spies = (["log", "info", "warn", "error", "debug"] as const).map((m) => vi.spyOn(console, m));
+    try {
+      const t = setupAsked(withAsks(known()));
+      await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+      await screen.findByRole("switch", { name: "Include my question" });
+      await t.user.click(screen.getByRole("button", { name: /Send to Codex/ }));
+      await waitFor(() => expect(written(t)).toHaveLength(1));
+      for (const s of spies) {
+        for (const call of s.mock.calls) expect(call.map((a) => String(a)).join(" ")).not.toContain(QUESTION);
+      }
+      const others = t.tauri.calls.filter((c) => c.cmd !== "compare_prepare_paste" && c.cmd !== "pty_write" && c.cmd !== "compare_tile_answer");
+      for (const c of others) expect(JSON.stringify(c.args ?? {})).not.toContain(QUESTION);
+    } finally {
+      for (const s of spies) s.mockRestore();
+    }
   });
 });

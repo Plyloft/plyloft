@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { ShellEnvInfo, TerminalSession } from "../ipc";
 import {
+  KIND_WORD,
   conversationTitle,
   reopenButtonWords,
   reopenLine,
@@ -14,6 +15,8 @@ import { dismissReopen, useReopen } from "../store/reopenStore";
 import { pushToast } from "../store/toastStore";
 import { useTiles } from "../store/tileStore";
 import { CBtn } from "./ux";
+import { useClaudeAccountRows } from "../store/claudeAccountsStore";
+import { shownAccountName, tileAccountWords } from "../lib/claudeAccountNames";
 
 const NONE: TerminalSession[] = [];
 
@@ -75,6 +78,8 @@ export function useReopenOffer(workspaceId: string, env: ShellEnvInfo | null | u
           cliSessionId: r.cliSessionId!,
           title: r.title ?? null,
           titleSource: r.titleSource ?? null,
+          // 1.179.0 (C2): it goes on where its conversation is kept.
+          account: r.account ?? null,
         },
         env,
       ).catch(() => ({ kind: "failed" as const, message: "Plyloft couldn't open it. Try Resume… for it." }));
@@ -109,9 +114,14 @@ export function ReopenSessionsOffer({
   offer: ReopenOffer;
 }) {
   const { offered, busy, reopen, dismiss } = offer;
+  // 1.179.0 (C2): with more than one Claude account, each names its own.
+  const accountRows = useClaudeAccountRows();
   if (offered.length === 0) return null;
   const titles = offered.map(conversationTitle);
-  const list = reopenList(offered);
+  const list = reopenList(offered, (r) => {
+    const name = r.kind === "claude" ? shownAccountName(accountRows, r.account) : null;
+    return name ? tileAccountWords(name) : KIND_WORD[r.kind];
+  });
   const lineId = `tile-reopen-line-${variant}-${workspaceId}`;
   return (
     <div className={`tile-reopen tile-reopen--${variant}`} role="region" aria-label="Sessions open when Plyloft quit">

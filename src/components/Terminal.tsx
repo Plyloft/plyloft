@@ -66,8 +66,9 @@ import {
   choiceMenuInView,
 } from "../lib/attention";
 import { useCompare } from "../store/compareStore";
+import { comparePassNow } from "../store/compareActions";
 import { effectiveCenterMode, useUi } from "../store/uiStore";
-import { codexScreenFacts, liveScreenFacts, noteTileInput, registerTileScreen, workStamp } from "../lib/tileScreen";
+import { codexScreenFacts, liveScreenFacts, noteTileInput, registerTileScreen, screenShape, workStamp } from "../lib/tileScreen";
 import { inputRowCells } from "../lib/inputRow";
 import { DictationController } from "../lib/dictationController";
 import {
@@ -170,6 +171,10 @@ type Props = {
    *  (`cliFreshCheck`) and spawned as that CLI. Read once when the terminal
    *  is created; a tile's kind never changes. */
   cli?: TileCli;
+  /** 1.179.0 (C2): the Claude account to spawn a Claude tile on (an
+   *  `ai_accounts_list` id); absent: the backend's choice. Read once when
+   *  the terminal is created, like `tryTarget`. */
+  account?: string;
   /** 1.176.0 R7: a Claude or Codex tile whose CLI didn't start (the rule in
    *  `lib/startFailure.ts`), told before `onExit`. */
   onStartFailed?: (failure: StartFailure) => void;
@@ -209,6 +214,7 @@ export function Terminal({
   readiness: readinessKind,
   tryTarget,
   cli,
+  account,
   onStartFailed,
   screenTileId,
 }: Props) {
@@ -500,10 +506,13 @@ export function Terminal({
       // 1.177.0 (N3): Compare's chord is the app's only while Compare is on
       // here; off, Ctrl+Shift+Y stays the program's as before.
       const formId = terminalFormShortcut(e);
+      // 1.179.0: with two pairs, only inside a paired place (the tile with
+      // the keyboard is this one); outside both it stays the program's.
       if (formId && (formId !== "comparePass" ||
           (workspaceId &&
             useCompare.getState().byWorkspace[workspaceId]?.on &&
-            effectiveCenterMode(useUi.getState().centerMode, workspaceId) === "terminals"))) {
+            effectiveCenterMode(useUi.getState().centerMode, workspaceId) === "terminals" &&
+            comparePassNow(workspaceId).swallow))) {
         return false;
       }
       const action = terminalKeyAction(e, term.hasSelection());
@@ -584,6 +593,7 @@ export function Terminal({
               lastDrawnAt: lastDrawnStamp > 0 ? lastDrawnStamp : null,
               lastInputAt,
               holds: (text) => (vendor === "codex" ? codexComposerHoldsPaste(settledTail(rows, 20).join("\n"), text) : null),
+              shape: screenShape(rows),
             };
           }, () => (lastDataStamp > 0 ? lastDataStamp : null), () => {
             // Round 8 (review M2): the member's text written straight to the PTY.
@@ -922,6 +932,7 @@ export function Terminal({
           tryTarget: tryTarget ?? null,
           cli: cli ?? null,
           id: wantedId,
+          account: cli === "claude" ? (account ?? null) : null,
         });
         if (cancelled && ptyId) {
           gate.close();

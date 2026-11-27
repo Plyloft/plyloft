@@ -34,7 +34,37 @@ export type CompareAnswer = {
    *  give back, so no answer is offered (never an older plan). Absent when
    *  not. */
   planUnread?: boolean;
+  /** 1.179.0, "Include my question": the member's own messages of the
+   *  answer's turn, raw (text Compare passed is still in them: the window
+   *  takes it out against its passes). Memory only: never logged, never
+   *  persisted. Absent when there is no answer. */
+  turnAsks?: CompareTurnAsks;
 };
+
+/** Rust `compare::TurnAsks`. `known`: the messages in order, together at
+ *  most 16,000 characters (`cut`: more were there, and are left out).
+ *  `unknown`: the question must be left out, for `why`. */
+export type CompareTurnAsks =
+  | { status: "known"; messages: CompareTurnAsk[]; cut: boolean }
+  | { status: "unknown"; why: CompareAsksUnknown };
+
+/** One message of the member's (Rust `compare::Ask`). */
+export type CompareTurnAsk = {
+  text: string;
+  /** When the CLI's file stamped it (ms since the epoch), when it says. */
+  atMs?: number;
+  kind: "prompt" | "queued" | "steer" | "plan-feedback" | "feedback";
+};
+
+/** Why the question is left out (Rust `compare::AsksUnknown`). */
+export type CompareAsksUnknown =
+  | "start-not-read"
+  | "command"
+  | "not-typed"
+  | "queued-start"
+  | "feedback-unread"
+  | "compacted"
+  | "unknown-message";
 
 /** The pieces in the frontend's own words (Rust `compare::PasteParts`). */
 export type ComparePasteParts = {
@@ -43,6 +73,28 @@ export type ComparePasteParts = {
   answer: string;
   note?: string;
   noteLabel: string;
+  /** 1.179.0: the member's words, passed text already taken out. Absent or
+   *  blank: no question block, and the text exactly as before. */
+  question?: string;
+  /** `My question to Claude:` / `My question to Codex:`. */
+  questionLabel?: string;
+  /** `turnAsks.cut`: the question goes with its cut line whatever its room. */
+  questionCut?: boolean;
+};
+
+/** What `compare_prepare_paste` gives (Rust `compare::PreparedPaste`): the
+ *  text written and what it holds, so the preview and the write match. */
+export type ComparePreparedPaste = {
+  /** What is written; empty when the answer is blank once cleaned. */
+  text: string;
+  /** The question exactly as it goes (cleaned, cut), without its label;
+   *  absent when none was given, it was blank, or it was left out. */
+  question?: string;
+  questionCut: boolean;
+  /** A question was given but left out for room. */
+  questionLeftOut: boolean;
+  /** The lead, labels and note made the backend cut the answer. */
+  answerCut: boolean;
 };
 
 /** The tile's conversation looked at again, then its last finished answer. */
@@ -50,8 +102,8 @@ export function compareTileAnswer(ptyId: string): Promise<CompareAnswer> {
   return invoke<CompareAnswer>("compare_tile_answer", { ptyId });
 }
 
-/** One text, cleaned and capped at 16,000 characters, starting with a space;
- *  an empty string when the answer is blank once cleaned. */
-export function comparePreparePaste(parts: ComparePasteParts): Promise<string> {
-  return invoke<string>("compare_prepare_paste", { parts });
+/** One text, cleaned and capped at 16,000 characters, starting with a space
+ *  (`text` empty when the answer is blank once cleaned), and what it holds. */
+export function comparePreparePaste(parts: ComparePasteParts): Promise<ComparePreparedPaste> {
+  return invoke<ComparePreparedPaste>("compare_prepare_paste", { parts });
 }

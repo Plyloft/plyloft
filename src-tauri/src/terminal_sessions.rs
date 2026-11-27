@@ -89,6 +89,12 @@ pub struct SessionRow {
     /// resumed. An older Plyloft keeps it as an unknown key.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub open_at_quit: Option<i64>,
+    /// 1.179.0: the Claude account the tile ran on (`ai_accounts`; `None`:
+    /// Main, every Codex row and every row before it). Its conversation is
+    /// in that account's folder: titles, Resume… and History look there,
+    /// and a resume runs on it. An older Plyloft keeps it as an unknown key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
     /// Keys a newer Plyloft wrote: kept as they are.
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -221,6 +227,43 @@ pub fn claude_args_with_session(mut args: Vec<String>) -> (Vec<String>, Option<S
     }
 }
 
+/// 1.179.0: the conversation a Claude tile's args resume (`--resume <id>`,
+/// `-r <id>`, `--resume=<id>`): it is kept on the account it ran on. `None`
+/// for a new conversation, `--session-id` and `--continue` included.
+pub fn claude_resumed_session(args: &[String]) -> Option<String> {
+    args.iter().enumerate().find_map(|(i, a)| {
+        if let Some(v) = a.strip_prefix("--resume=") {
+            return Some(v.to_string());
+        }
+        if a == "--resume" || a == "-r" {
+            return args.get(i + 1).filter(|v| !v.starts_with('-')).cloned();
+        }
+        None
+    })
+}
+
+/// 1.179.0: the Claude account conversation `id` is kept on, for a tile that
+/// resumes it: the account of its latest row in the workspace's record;
+/// for one the record doesn't have (a conversation of the member's own),
+/// the account whose folder holds its transcript from `cwd`, Main first.
+/// `None`: Main.
+pub fn account_of_conversation(config_dir: &Path, workspace_id: &str, homes: &CliHomes, cwd: &Path, id: &str) -> Option<String> {
+    let rows = load(&path_for(config_dir, workspace_id)).file.sessions;
+    let recorded = rows
+        .iter()
+        .filter(|r| r.kind == SessionKind::Claude && r.cli_session_id.as_deref() == Some(id))
+        .max_by_key(|r| r.started_at);
+    if let Some(row) = recorded {
+        return row.account.clone();
+    }
+    let name = format!("{id}.jsonl");
+    homes
+        .claude_all()
+        .into_iter()
+        .find(|(_, dir)| claude_project_dirs(dir, cwd).iter().any(|d| d.join(&name).is_file()))
+        .and_then(|(account, _)| account)
+}
+
 /// Codex's `resume <id>` (Resume…, P4): the conversation a Codex tile
 /// continues. `None` for a new one, whose id is looked up after its first
 /// turn.
@@ -292,6 +335,19 @@ pub fn record_start(
     cwd: &str,
     cli_session_id: Option<String>,
 ) -> Result<String, String> {
+    record_start_on(config_dir, workspace_id, pty_id, kind, cwd, cli_session_id, None)
+}
+
+/// [`record_start`] of a tile on Claude account `account` (`None`: Main).
+pub fn record_start_on(
+    config_dir: &Path,
+    workspace_id: &str,
+    pty_id: &str,
+    kind: SessionKind,
+    cwd: &str,
+    cli_session_id: Option<String>,
+    account: Option<String>,
+) -> Result<String, String> {
     let path = path_for(config_dir, workspace_id);
     let row = SessionRow {
         id: uuid::Uuid::new_v4().to_string(),
@@ -306,6 +362,7 @@ pub fn record_start(
         resumed_from: None,
         passed_name: None,
         open_at_quit: None,
+        account,
         extra: Map::new(),
     };
     let id = row.id.clone();
@@ -341,6 +398,7 @@ pub fn record_start(
 /// A tile's PTY ended (its exit thread): the row's end time. Nothing when
 /// the PTY was not a recorded tile.
 pub fn record_end(pty_id: &str) {
+    entered().lock().remove(pty_id);
     let mut guard = store().lock();
     let Some((path, row_id)) = guard.live.remove(pty_id) else { return };
     let at = now_ms();
@@ -498,15 +556,15 @@ pub fn reopen_offer_resumable(config_dir: &Path, workspace_id: &str, homes: &Cli
             s.row
                 .cli_session_id
                 .as_deref()
-                .is_some_and(|id| has_conversation(homes, s.row.kind, Path::new(&s.row.cwd), id))
+                .is_some_and(|id| has_conversation(homes, s.row.kind, s.row.account.as_deref(), Path::new(&s.row.cwd), id))
         })
         .collect()
 }
 
 /// Whether conversation `id` from `cwd` has anything to resume: its
 /// transcript is there and holds a message the member typed or a name.
-fn has_conversation(homes: &CliHomes, kind: SessionKind, cwd: &Path, id: &str) -> bool {
-    let Some(path) = transcript_from(homes, kind, cwd, id) else { return false };
+fn has_conversation(homes: &CliHomes, kind: SessionKind, account: Option<&str>, cwd: &Path, id: &str) -> bool {
+    let Some(path) = transcript_from(homes, kind, account, cwd, id) else { return false };
     let found = match kind {
         SessionKind::Claude => crate::session_titles::read_claude(&path),
         SessionKind::Codex => {
@@ -578,6 +636,10 @@ pub struct TileTitle {
     /// title (a fresh one after `/clear` never has).
     #[serde(default)]
     pub conversation_named: bool,
+    /// 1.179.0: the Claude account the tile runs on (`None`: Main), for its
+    /// header ("Claude · Work").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
 }
 
 impl TileTitle {
@@ -589,6 +651,7 @@ impl TileTitle {
             cli_session_id: row.cli_session_id.clone(),
             followed: false,
             conversation_named: false,
+            account: row.account.clone(),
         }
     }
 }
@@ -596,7 +659,9 @@ impl TileTitle {
 /// Where the CLIs keep their files, so tests can point elsewhere.
 #[derive(Debug, Clone)]
 pub struct CliHomes {
-    /// Claude Code's config dir (`~/.claude`, or `CLAUDE_CONFIG_DIR`).
+    /// Main's Claude Code config dir (`~/.claude`, or `CLAUDE_CONFIG_DIR`).
+    /// 1.179.0: a row on another Claude account reads that account's own
+    /// folder instead ([`Self::claude_for`]).
     pub claude: Option<PathBuf>,
     /// Codex's home (`~/.codex`).
     pub codex: Option<PathBuf>,
@@ -604,26 +669,45 @@ pub struct CliHomes {
 
 impl CliHomes {
     pub fn real() -> Self {
-        CliHomes { claude: crate::claude_session::claude_config_dir(), codex: Some(crate::codex_home::real_codex_home()) }
+        CliHomes { claude: crate::ai_accounts::claude_dir(None), codex: Some(crate::codex_home::real_codex_home()) }
+    }
+
+    /// 1.179.0: the Claude folder of a row recorded on `account`: Main's
+    /// (`claude`), or the account's own while it is there — `None` once the
+    /// account was removed, so nothing of it is looked for elsewhere.
+    pub fn claude_for(&self, account: Option<&str>) -> Option<PathBuf> {
+        match account {
+            None => self.claude.clone(),
+            Some(_) => crate::ai_accounts::recorded_claude_dir(account),
+        }
+    }
+
+    /// 1.179.0: every Claude folder a list of all conversations covers:
+    /// Main's first, then each account's (`ai_accounts::account_dirs`).
+    pub fn claude_all(&self) -> Vec<(Option<String>, PathBuf)> {
+        let mut all: Vec<(Option<String>, PathBuf)> = self.claude.clone().map(|main| (None, main)).into_iter().collect();
+        all.extend(crate::ai_accounts::account_dirs());
+        all
     }
 }
 
 /// The Claude conversation a live Claude process is in now, from Claude
 /// Code's own per-process file (`sessions/<pid>.json`, undocumented: only a
-/// hint — absent or unreadable means "unchanged").
-fn claude_current_session(homes: &CliHomes, pid: Option<u32>) -> Option<String> {
-    let path = homes.claude.as_ref()?.join("sessions").join(format!("{}.json", pid?));
+/// hint — absent or unreadable means "unchanged"), in the folder of the
+/// account the tile runs on.
+fn claude_current_session(homes: &CliHomes, account: Option<&str>, pid: Option<u32>) -> Option<String> {
+    let path = homes.claude_for(account)?.join("sessions").join(format!("{}.json", pid?));
     let v: Value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
     v.get("sessionId").and_then(Value::as_str).map(str::to_string)
 }
 
-/// What the CLI's files say about a conversation.
-fn read_title(homes: &CliHomes, kind: SessionKind, id: &str) -> Option<crate::session_titles::Found> {
+/// What the CLI's files say about a conversation (a Claude one in the
+/// folder of the account it ran on).
+fn read_title(homes: &CliHomes, kind: SessionKind, account: Option<&str>, id: &str) -> Option<crate::session_titles::Found> {
     let found = match kind {
         SessionKind::Claude => homes
-            .claude
-            .as_ref()
-            .and_then(|dir| crate::claude_session::find_transcript(dir, id))
+            .claude_for(account)
+            .and_then(|dir| crate::claude_session::find_transcript(&dir, id))
             .map(|t| crate::session_titles::read_claude(&t)),
         SessionKind::Codex => homes.codex.as_ref().and_then(|home| {
             let rollout = crate::codex_sessions::rollout_for(&home.join("sessions"), id)?;
@@ -663,12 +747,190 @@ fn codex_claim(homes: &CliHomes, rows: &[SessionRow], row: &SessionRow, live: &H
     let claimed: HashSet<&str> = rows.iter().filter_map(|r| r.cli_session_id.as_deref()).collect();
     // Review round 2 (R2-M1): Plyloft's own Codex card intake runs in the
     // project folder too; it is never a tile's.
-    let mut mine = crate::codex_sessions::rollouts_for_folder(&root, Path::new(&row.cwd), Some(row.started_at))
+    let mine: Vec<String> = crate::codex_sessions::rollouts_for_folder(&root, Path::new(&row.cwd), Some(row.started_at))
         .into_iter()
         .filter(|(started, id, _)| *started >= row.started_at && *started < until && !claimed.contains(id.as_str()))
-        .filter(|(_, _, path)| !crate::intake::rollout_is_intake(path));
-    let first = mine.next()?;
-    mine.next().is_none().then_some(first.1)
+        .filter(|(_, _, path)| !crate::intake::rollout_is_intake(path))
+        .map(|(_, id, _)| id)
+        .collect();
+    match mine.len() {
+        0 => {}
+        1 => return mine.into_iter().next(),
+        _ => return None,
+    }
+    // 1.179.0 Windows walk (step 14): the tile's first action was Codex's own
+    // `/resume` of an older session, so no session began after it. An older
+    // session of its folder that got new lines after a look since the tile
+    // started (`codex_appended_since`: the length, not the file's time, which
+    // stays put on Windows) is the one it resumed only when:
+    //  - this tile's own PTY took an Enter after it started and no later than
+    //    the look that saw the growth (a `codex` outside Plyloft or a card's
+    //    Builder writing there never gives this tile an Enter);
+    //  - no other Codex tile runs in that folder, in any workspace (two
+    //    waiting tiles can't be told apart, and a running tile that resumed
+    //    that session itself holds only its own first id);
+    //  - no running tile holds it, and no tile that held it ended after the
+    //    look before the growth (its own last lines);
+    //  - it is the only such session.
+    // A tile that held it and closed before that doesn't stop it. Every
+    // rollout is stat'ed (the lengths stay current); only the grown ones are
+    // opened.
+    if waiting.len() != 1 {
+        return None;
+    }
+    let paths = crate::codex_sessions::rollout_paths(&root);
+    // Forget the lengths of this folder's rollouts that are gone.
+    let here: HashSet<&PathBuf> = paths.iter().collect();
+    codex_seen().lock().retain(|p, _| !p.starts_with(&root) || here.contains(p));
+    let grown: Vec<(PathBuf, (i64, i64))> = paths
+        .iter()
+        .filter_map(|path| codex_appended_since(path, row.started_at).map(|window| (path.clone(), window)))
+        .collect();
+    if grown.is_empty() {
+        return None;
+    }
+    let enter_at = row.pty_id.as_deref().and_then(last_enter);
+    let cwd = Path::new(&row.cwd);
+    if other_live_codex_in(&folder, &row.id) {
+        return None;
+    }
+    let held = live_cli_ids();
+    let ended = ended_codex_claims(rows);
+    let mut resumed = grown.into_iter().filter_map(|(path, (after, by))| {
+        if !enter_at.is_some_and(|at| at >= row.started_at && at <= by) {
+            return None;
+        }
+        let (id, started) = crate::codex_sessions::session_of(&path, cwd)?;
+        if ended.get(&id).is_some_and(|&end| end >= after) {
+            return None;
+        }
+        (started < row.started_at && !held.contains(&id) && !crate::intake::rollout_is_intake(&path)).then_some(id)
+    });
+    let first = resumed.next()?;
+    resumed.next().is_none().then_some(first)
+}
+
+/// 1.179.0: what the looks saw of one Codex rollout (in memory only).
+#[derive(Clone, Copy)]
+struct Seen {
+    /// Its length at the latest look.
+    len: u64,
+    /// When that look was.
+    looked: i64,
+    /// The time of its last complete line at this length; `None`: not read.
+    last: Option<Option<i64>>,
+    /// The latest look that saw it shorter: it grew after that time.
+    grew_after: Option<i64>,
+    /// The look that first saw that growth: it grew no later than this.
+    grew_seen: Option<i64>,
+}
+
+fn codex_seen() -> &'static Mutex<HashMap<PathBuf, Seen>> {
+    static SEEN: OnceLock<Mutex<HashMap<PathBuf, Seen>>> = OnceLock::new();
+    SEEN.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Stats a rollout and notes its length: its mtime (unix ms) and what the
+/// looks have seen of it now. `None` when it can't be read.
+fn codex_look(path: &Path) -> Option<(Option<i64>, Seen)> {
+    let meta = std::fs::metadata(path).ok()?;
+    let modified = meta
+        .modified()
+        .ok()
+        .and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64);
+    let len = meta.len();
+    let now = now_ms();
+    let mut map = codex_seen().lock();
+    let seen = match map.get(path).copied() {
+        Some(s) if s.len == len => Seen { looked: now, ..s },
+        Some(s) => Seen { len, looked: now, last: None, grew_after: Some(s.looked), grew_seen: Some(now) },
+        None => Seen { len, looked: now, last: None, grew_after: None, grew_seen: None },
+    };
+    map.insert(path.to_path_buf(), seen);
+    Some((modified, seen))
+}
+
+/// 1.179.0: whether a Codex rollout was written at or after `since` (unix
+/// ms). Its mtime says so where it follows the writes (macOS). On Windows it
+/// can stay at the file's creation while Codex appends (measured), so a
+/// rollout that grew between two looks is dated by its last complete line
+/// instead (`codex_sessions::last_line_at`: its tail only, read once per
+/// length). One first seen with an older mtime isn't read: nothing says it
+/// grew. Each look stats every rollout, which keeps the lengths current.
+fn codex_written_since(path: &Path, since: i64) -> bool {
+    let Some((modified, seen)) = codex_look(path) else { return false };
+    if modified.is_some_and(|m| m >= since) {
+        return true;
+    }
+    if seen.grew_after.is_none() {
+        return false;
+    }
+    let last = match seen.last {
+        Some(last) => last,
+        None => {
+            let last = crate::codex_sessions::last_line_at(path);
+            if let Some(s) = codex_seen().lock().get_mut(path) {
+                if s.len == seen.len {
+                    s.last = Some(last);
+                }
+            }
+            last
+        }
+    };
+    last.is_some_and(|at| at >= since)
+}
+
+/// 1.179.0: a Codex rollout a look at or after `since` saw, that has grown
+/// since: lines were appended to a file that was already there, after
+/// `since`. Its growth window: after the first time, no later than the
+/// second. `None` for a file first seen already written (a session begun
+/// elsewhere before the tile and written meanwhile can't be told from one
+/// the tile resumed by its file alone).
+fn codex_appended_since(path: &Path, since: i64) -> Option<(i64, i64)> {
+    let (_, seen) = codex_look(path)?;
+    match (seen.grew_after, seen.grew_seen) {
+        (Some(after), Some(by)) if after >= since => Some((after, by)),
+        _ => None,
+    }
+}
+
+/// 1.179.0 (review of the resume fallback): when each PTY last took an
+/// Enter (in memory only; gone when the PTY ends).
+fn entered() -> &'static Mutex<HashMap<String, i64>> {
+    static ENTERED: OnceLock<Mutex<HashMap<String, i64>>> = OnceLock::new();
+    ENTERED.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Bytes written to PTY `pty_id` (`PtyRegistry::write`: the member's keys,
+/// Plyloft's own writes): an Enter, a carriage return outside a bracketed
+/// paste, is noted with its time. A Codex tile only submits a `/resume`
+/// or a turn with one.
+pub fn note_input(pty_id: &str, data: &[u8]) {
+    if data.contains(&b'\r') && !data.windows(6).any(|w| w == b"\x1b[200~") {
+        entered().lock().insert(pty_id.to_string(), now_ms());
+    }
+}
+
+/// When PTY `pty_id` last took an Enter.
+fn last_enter(pty_id: &str) -> Option<i64> {
+    entered().lock().get(pty_id).copied()
+}
+
+/// A running Codex tile other than row `row_id`, in any workspace, whose
+/// folder is `folder` (normalized).
+fn other_live_codex_in(folder: &Path, row_id: &str) -> bool {
+    let live: Vec<(PathBuf, String)> = store().lock().live.values().cloned().collect();
+    let mut files: HashMap<PathBuf, Vec<SessionRow>> = HashMap::new();
+    live.into_iter().any(|(path, id)| {
+        if id == row_id {
+            return false;
+        }
+        let rows = files.entry(path.clone()).or_insert_with(|| load(&path).file.sessions);
+        rows.iter().find(|r| r.id == id).is_some_and(|r| {
+            r.kind == SessionKind::Codex && crate::codex_sessions::normalized(Path::new(&r.cwd)) == folder
+        })
+    })
 }
 
 /// P2: look at a live tile's conversation again — follow a `/clear` to the
@@ -692,7 +954,7 @@ pub fn refresh_title(pty_id: &str, pid: Option<u32>, homes: &CliHomes) -> Option
     let mut follow: Option<String> = None;
     let mut adopt: Option<String> = None;
     if row.kind == SessionKind::Claude {
-        if let Some(now_in) = claude_current_session(homes, pid) {
+        if let Some(now_in) = claude_current_session(homes, row.account.as_deref(), pid) {
             match row.cli_session_id.as_deref() {
                 Some(id) if id != now_in => follow = Some(now_in),
                 // Started with `--continue`/`-r` and no id: the one it is in.
@@ -708,7 +970,7 @@ pub fn refresh_title(pty_id: &str, pid: Option<u32>, homes: &CliHomes) -> Option
     // the member's, not the conversation's own — it neither comes back after
     // "Use the automatic name" nor makes a fresh conversation "named".
     let passed: HashSet<&str> = rows.iter().filter_map(|r| r.passed_name.as_deref()).collect();
-    let mut found = session.as_deref().and_then(|id| read_title(homes, row.kind, id));
+    let mut found = session.as_deref().and_then(|id| read_title(homes, row.kind, row.account.as_deref(), id));
     if let Some(f) = found.as_mut() {
         if f.renamed.as_deref().is_some_and(|n| passed.contains(n)) {
             f.renamed = None;
@@ -749,8 +1011,15 @@ pub fn refresh_title(pty_id: &str, pid: Option<u32>, homes: &CliHomes) -> Option
             i = rows.len() - 1;
             changed = true;
         } else if let Some(id) = adopt {
-            // Not taken by another row meanwhile.
-            if rows[i].cli_session_id.is_none() && !rows.iter().any(|r| r.cli_session_id.as_deref() == Some(id.as_str())) {
+            // Not taken by another row meanwhile. 1.179.0: for Codex, by
+            // another running tile's row — a closed tile's row may name the
+            // session this tile resumed (`codex_claim`).
+            let taken = rows.iter().any(|r| {
+                r.id != row_id
+                    && (row.kind != SessionKind::Codex || live.contains(&r.id))
+                    && r.cli_session_id.as_deref() == Some(id.as_str())
+            });
+            if rows[i].cli_session_id.is_none() && !taken {
                 rows[i].cli_session_id = Some(id);
                 changed = true;
             }
@@ -860,6 +1129,10 @@ pub struct Conversation {
     /// one of the project's copies; absent for the project folder's own.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
+    /// 1.179.0: the Claude account whose folder keeps it, which a resume
+    /// runs on (`None`: Main, and every Codex conversation).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
 }
 
 /// Claude Code's directory name for a folder: every character that is not
@@ -976,27 +1249,33 @@ pub fn conversations(config_dir: &Path, workspace_id: &str, cwd: &Path, homes: &
     let mut out: Vec<Conversation> = Vec::new();
     let mut read = 0usize;
 
-    if let Some(claude) = homes.claude.as_deref() {
+    // 1.179.0: Main's folder and every Claude account's, each conversation
+    // tagged with the account that keeps it.
+    let claude_homes = homes.claude_all();
+    if !claude_homes.is_empty() {
         let mut seen: HashSet<PathBuf> = HashSet::new();
-        let mut files: Vec<(i64, String, PathBuf, usize)> = Vec::new();
-        for (i, (folder, _)) in folders.iter().enumerate() {
-            for dir in claude_project_dirs(claude, folder) {
-                let Ok(entries) = std::fs::read_dir(&dir) else { continue };
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    let Some(id) = path.file_name().and_then(|n| n.to_str()).and_then(|n| n.strip_suffix(".jsonl")) else {
-                        continue;
-                    };
-                    let Some(at) = mtime_ms(&path) else { continue };
-                    if at >= since && path.is_file() && seen.insert(path.clone()) {
-                        files.push((at, id.to_string(), path, i));
+        let mut files: Vec<(i64, String, PathBuf, usize, Option<String>)> = Vec::new();
+        for (account, claude) in &claude_homes {
+            for (i, (folder, _)) in folders.iter().enumerate() {
+                for dir in claude_project_dirs(claude, folder) {
+                    let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        let Some(id) = path.file_name().and_then(|n| n.to_str()).and_then(|n| n.strip_suffix(".jsonl"))
+                        else {
+                            continue;
+                        };
+                        let Some(at) = mtime_ms(&path) else { continue };
+                        if at >= since && path.is_file() && seen.insert(path.clone()) {
+                            files.push((at, id.to_string(), path, i, account.clone()));
+                        }
                     }
                 }
             }
         }
         files.sort_by(|a, b| b.0.cmp(&a.0));
         let mut kept = 0usize;
-        for (at, id, path, i) in files {
+        for (at, id, path, i, account) in files {
             if kept >= CONVERSATIONS_MAX || read >= CONVERSATIONS_READ_MAX {
                 break;
             }
@@ -1026,6 +1305,7 @@ pub fn conversations(config_dir: &Path, workspace_id: &str, cwd: &Path, homes: &
                 live: false,
                 cwd: folders[at_folder].1.clone(),
                 opening: found.first_message.as_deref().and_then(crate::session_titles::from_first_message),
+                account,
             });
         }
     }
@@ -1060,6 +1340,7 @@ pub fn conversations(config_dir: &Path, workspace_id: &str, cwd: &Path, homes: &
                 live: false,
                 cwd: folders[i].1.clone(),
                 opening: found.first_message.as_deref().and_then(crate::session_titles::from_first_message),
+                account: None,
             });
         }
     }
@@ -1105,6 +1386,9 @@ pub enum ResumeCheck {
     FolderGone,
     /// Its transcript is no longer there.
     ConversationGone,
+    /// 1.179.0: the Claude account it was kept on was removed from Plyloft
+    /// (its folder with it): it is not resumed on another account.
+    AccountRemoved,
 }
 
 #[cfg(unix)]
@@ -1161,11 +1445,11 @@ fn claude_open_elsewhere(claude: &Path, id: &str, cwd: &Path) -> bool {
 }
 
 /// Its transcript where the CLI would look for it from `cwd`.
-fn transcript_from(homes: &CliHomes, kind: SessionKind, cwd: &Path, id: &str) -> Option<PathBuf> {
+fn transcript_from(homes: &CliHomes, kind: SessionKind, account: Option<&str>, cwd: &Path, id: &str) -> Option<PathBuf> {
     match kind {
         SessionKind::Claude => {
             let name = format!("{id}.jsonl");
-            claude_project_dirs(homes.claude.as_deref()?, cwd).into_iter().map(|d| d.join(&name)).find(|p| p.is_file())
+            claude_project_dirs(&homes.claude_for(account)?, cwd).into_iter().map(|d| d.join(&name)).find(|p| p.is_file())
         }
         SessionKind::Codex => crate::codex_sessions::rollout_for(&homes.codex.as_deref()?.join("sessions"), id),
     }
@@ -1175,7 +1459,11 @@ fn transcript_from(homes: &CliHomes, kind: SessionKind, cwd: &Path, id: &str) ->
 /// `cwd` — a tile of this Plyloft that runs it (any workspace), another
 /// Claude in it, a folder or transcript gone. Codex keeps no per-process
 /// file, so a Codex open outside Plyloft is not seen.
-pub fn resume_check(homes: &CliHomes, kind: SessionKind, id: &str, cwd: &Path) -> ResumeCheck {
+///
+/// 1.179.0: `account` is the Claude account the conversation is kept on
+/// (`None`: Main), where it is looked for; a removed one says so first.
+pub fn resume_check(homes: &CliHomes, kind: SessionKind, id: &str, cwd: &Path, account: Option<&str>) -> ResumeCheck {
+    let account = if kind == SessionKind::Claude { account } else { None };
     let live: Vec<(PathBuf, String, String)> = {
         let guard = store().lock();
         guard.live.iter().map(|(pty, (path, row))| (path.clone(), row.clone(), pty.clone())).collect()
@@ -1194,13 +1482,16 @@ pub fn resume_check(homes: &CliHomes, kind: SessionKind, id: &str, cwd: &Path) -
     }
     // Challenger round 3: what can't be opened at all first, so "Open it
     // anyway" never spawns in a missing folder.
+    if crate::ai_accounts::recorded_account_removed(account) {
+        return ResumeCheck::AccountRemoved;
+    }
     if !cwd.is_dir() {
         return ResumeCheck::FolderGone;
     }
-    if transcript_from(homes, kind, cwd, id).is_none() {
+    if transcript_from(homes, kind, account, cwd, id).is_none() {
         return ResumeCheck::ConversationGone;
     }
-    if kind == SessionKind::Claude && homes.claude.as_deref().is_some_and(|c| claude_open_elsewhere(c, id, cwd)) {
+    if kind == SessionKind::Claude && homes.claude_for(account).is_some_and(|c| claude_open_elsewhere(&c, id, cwd)) {
         return ResumeCheck::Elsewhere;
     }
     ResumeCheck::Ready
@@ -1214,6 +1505,9 @@ pub fn resume_check(homes: &CliHomes, kind: SessionKind, id: &str, cwd: &Path) -
 pub enum Gone {
     Folder,
     Conversation,
+    /// 1.179.0: its Claude account was removed from Plyloft ("Its account
+    /// was removed from Plyloft."): not resumed on another one.
+    Account,
 }
 
 /// A row as History › Sessions shows it: the record's row, its workspace,
@@ -1259,12 +1553,15 @@ pub fn history_all(config_dir: &Path, workspace_ids: &[String], homes: &CliHomes
             let mut last_write_at = None;
             let gone = match row.cli_session_id.as_deref() {
                 None => None,
+                Some(_) if row.kind == SessionKind::Claude && crate::ai_accounts::recorded_account_removed(row.account.as_deref()) => {
+                    Some(Gone::Account)
+                }
                 Some(_) if !Path::new(&row.cwd).is_dir() => Some(Gone::Folder),
                 Some(id) => {
                     let found: Option<PathBuf> = match row.kind {
-                        SessionKind::Claude => homes.claude.as_deref().and_then(|c| {
+                        SessionKind::Claude => homes.claude_for(row.account.as_deref()).and_then(|c| {
                             let name = format!("{id}.jsonl");
-                            claude_project_dirs(c, Path::new(&row.cwd))
+                            claude_project_dirs(&c, Path::new(&row.cwd))
                                 .iter()
                                 .map(|d| d.join(&name))
                                 .find(|p| p.is_file())
@@ -1296,7 +1593,9 @@ pub fn history_all(config_dir: &Path, workspace_ids: &[String], homes: &CliHomes
             // Resume… names it — from the CLI's files, at most one short line.
             if session.row.title.is_none() && gone.is_none() {
                 if let Some(id) = session.row.cli_session_id.clone() {
-                    if let Some((title, source)) = read_title(homes, session.row.kind, &id).as_ref().and_then(listable) {
+                    if let Some((title, source)) =
+                        read_title(homes, session.row.kind, session.row.account.as_deref(), &id).as_ref().and_then(listable)
+                    {
                         session.row.title = Some(title);
                         session.row.title_source = Some(source);
                     }
@@ -1348,9 +1647,14 @@ pub(crate) fn live_conversation(pty_id: &str, pid: Option<u32>, homes: &CliHomes
     let rows = load(&path).file.sessions;
     let row = rows.iter().find(|r| r.id == view.row_id)?.clone();
     let id = row.cli_session_id.clone();
-    let file = id.as_deref().and_then(|id| transcript_from(homes, row.kind, Path::new(&row.cwd), id));
+    // 1.179.0: a Claude tile's files are in the folder of the account it
+    // runs on (its row's).
+    let account = row.account.as_deref();
+    let file = id.as_deref().and_then(|id| transcript_from(homes, row.kind, account, Path::new(&row.cwd), id));
     let pid_names_it = match row.kind {
-        SessionKind::Claude => claude_current_session(homes, pid).map(|now_in| id.as_deref() == Some(now_in.as_str())),
+        SessionKind::Claude => {
+            claude_current_session(homes, account, pid).map(|now_in| id.as_deref() == Some(now_in.as_str()))
+        }
         SessionKind::Codex => None,
     };
     // Review round 1 (M2, S3): another conversation of the same CLI written
@@ -1369,12 +1673,12 @@ pub(crate) fn live_conversation(pty_id: &str, pid: Option<u32>, homes: &CliHomes
         // its start — the tile's first action may be `/resume` of an older one.
         (SessionKind::Codex, None, _) => homes.codex.as_deref().is_some_and(|home| codex_unclaimed_since(home, &row)),
         (SessionKind::Claude, Some(own), _) if pid_names_it.is_none() => {
-            homes.claude.as_deref().is_some_and(|claude| claude_written_elsewhere(claude, &row, own))
+            homes.claude_for(account).is_some_and(|claude| claude_written_elsewhere(&claude, &row, own))
         }
         _ => false,
     };
     let plans_dir = match row.kind {
-        SessionKind::Claude => homes.claude.as_ref().map(|c| c.join("plans")),
+        SessionKind::Claude => homes.claude_for(account).map(|c| c.join("plans")),
         SessionKind::Codex => None,
     };
     Some(LiveConversation { kind: row.kind, id, title: view.title, file, pid_names_it, newer_elsewhere, plans_dir })
@@ -1399,9 +1703,16 @@ fn live_cli_ids() -> HashSet<String> {
 fn codex_unclaimed_since(codex: &Path, row: &SessionRow) -> bool {
     let cwd = Path::new(&row.cwd);
     let claimed = live_cli_ids();
-    crate::codex_sessions::rollout_paths(&codex.join("sessions")).into_iter().any(|path| {
-        mtime_ms(&path).is_some_and(|w| w >= row.started_at)
-            && crate::codex_sessions::session_of(&path, cwd).is_some_and(|(id, _)| !claimed.contains(&id))
+    // 1.179.0: written since, by the file's time or its last line's
+    // (`codex_written_since`). Every rollout is looked at (`filter` then
+    // `any` would stop at the first): the lengths stay current for the next
+    // look.
+    let written: Vec<PathBuf> = crate::codex_sessions::rollout_paths(&codex.join("sessions"))
+        .into_iter()
+        .filter(|path| codex_written_since(path, row.started_at))
+        .collect();
+    written.into_iter().any(|path| {
+        crate::codex_sessions::session_of(&path, cwd).is_some_and(|(id, _)| !claimed.contains(&id))
             && !crate::intake::rollout_is_intake(&path)
     })
 }
@@ -1450,8 +1761,13 @@ fn codex_written_elsewhere(
         if path == own_file {
             return false;
         }
-        // Stat first: nothing last written before the tile started matters.
-        let Some(written) = mtime_ms(&path).filter(|w| *w >= row.started_at) else { return false };
+        // Stat first: nothing last written before the tile started matters
+        // (1.179.0: by the file's time or, where that stays put, its last
+        // line's: `codex_written_since`).
+        if !codex_written_since(&path, row.started_at) {
+            return false;
+        }
+        let written = mtime_ms(&path).unwrap_or(i64::MIN);
         let Some((id, started)) = crate::codex_sessions::session_of(&path, cwd) else { return false };
         if id == own || claimed.contains(&id) {
             return false;
@@ -1465,8 +1781,20 @@ fn codex_written_elsewhere(
                 }
             }
         }
-        ((started > own_started && started >= row.started_at) || written > own_written)
-            && !crate::intake::rollout_is_intake(&path)
+        // 1.179.0: on Windows both files' times can stay at their creation,
+        // so "written later than the tile's own" is also read from the lines
+        // (the Mac keeps the file times, which follow the writes there).
+        let later = written > own_written
+            || (cfg!(windows)
+                && match (
+                    crate::codex_sessions::last_line_at(&path),
+                    *own_last.get_or_init(|| crate::codex_sessions::last_line_at(own_file)),
+                ) {
+                    (Some(last), Some(own_at)) => last > own_at,
+                    // A time that can't be read: it may be the later one.
+                    _ => true,
+                });
+        ((started > own_started && started >= row.started_at) || later) && !crate::intake::rollout_is_intake(&path)
     })
 }
 
@@ -1505,4 +1833,5 @@ pub fn link_for_tests(path: &Path, pty_id: &str, row_id: &str) {
 #[cfg(test)]
 pub fn reset_for_tests() {
     store().lock().live.clear();
+    entered().lock().clear();
 }

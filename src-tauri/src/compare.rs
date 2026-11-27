@@ -19,6 +19,10 @@
 //!   turn's last `phase: "final_answer"` message.
 //! - **Nothing kept.** No state, no file, no child process. An answer's text
 //!   never reaches a log or an error, and `Debug` leaves it out.
+//! - **The member's question** (1.179.0, `compare_asks.rs`): the member's own
+//!   messages of the answer's turn ride with the answer, read in the same
+//!   pass, or a reason they can't be told; the paste can carry them before
+//!   the answer, cut first. Counts only in the log, like the answer.
 
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
@@ -34,6 +38,10 @@ use crate::chat_transcript::{ChatItem, ChatState, ClaudeFold, ToolOutcome};
 use crate::plan_exchange::{cap_relay, cap_with_cut, final_answer, relay_was_cut, RELAY_CAP};
 use crate::pty::PtyRegistry;
 use crate::terminal_sessions::{CliHomes, LiveConversation, SessionKind};
+
+#[path = "compare_asks.rs"]
+mod asks;
+use asks::TurnAsks;
 
 /// The first look at a file's tail.
 pub(crate) const READ_FIRST: u64 = 256 * 1024;
@@ -124,6 +132,10 @@ pub struct CompareAnswer {
     /// (the log's fact; not sent to the window).
     #[serde(skip)]
     pub from_plan_file: bool,
+    /// 1.179.0: the member's own messages of the answer's turn (memory only:
+    /// never logged, never kept). Absent with no answer.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub turn_asks: Option<TurnAsks>,
 }
 
 /// Never the answer's text: a stray `{:?}` must not log what an AI wrote.
@@ -140,13 +152,14 @@ impl std::fmt::Debug for CompareAnswer {
             .field("from_earlier_turn", &self.from_earlier_turn)
             .field("plan_pending", &self.plan_pending)
             .field("plan_unread", &self.plan_unread)
+            .field("turn_asks", &self.turn_asks)
             .finish_non_exhaustive()
     }
 }
 
 impl CompareAnswer {
     fn without_answer(vendor: Option<Vendor>, conversation: ConversationLink, title: Option<String>, turn: TurnState) -> Self {
-        CompareAnswer { vendor, conversation, title, turn, answer: None, answer_kind: None, finished_at_ms: None, chars: None, cut: false, from_earlier_turn: false, plan_pending: false, plan_unread: false, from_plan_file: false }
+        CompareAnswer { vendor, conversation, title, turn, answer: None, answer_kind: None, finished_at_ms: None, chars: None, cut: false, from_earlier_turn: false, plan_pending: false, plan_unread: false, from_plan_file: false, turn_asks: None }
     }
 }
 
@@ -194,6 +207,10 @@ pub(crate) struct Parsed {
     /// Claude: the turn the answer would come from ended on a plan that
     /// can't be read back (see [`turn_plan`]).
     pub plan_unread: bool,
+    /// The member's messages of `found`'s turn.
+    pub asks: Option<TurnAsks>,
+    /// Claude: the newest turn's, for a plan file read in its place.
+    pub newest_asks: Option<TurnAsks>,
 }
 
 // ── The command ──────────────────────────────────────────────────────────
@@ -212,7 +229,7 @@ pub fn compare_tile_answer(registry: State<'_, PtyRegistry>, pty_id: String) -> 
     });
     let out = tile_answer(live);
     log::info!(
-        "compare: tile read pid={:?} seen(id, pid_names_it, newer_elsewhere, file_bytes)={:?} -> conversation={:?} turn={:?} kind={:?} chars={:?} earlier={} cut={} plan_file={} plan_pending={} plan_unread={}",
+        "compare: tile read pid={:?} seen(id, pid_names_it, newer_elsewhere, file_bytes)={:?} -> conversation={:?} turn={:?} kind={:?} chars={:?} earlier={} cut={} plan_file={} plan_pending={} plan_unread={} asks={}",
         pid,
         seen,
         out.conversation,
@@ -223,7 +240,8 @@ pub fn compare_tile_answer(registry: State<'_, PtyRegistry>, pty_id: String) -> 
         out.cut,
         out.from_plan_file,
         out.plan_pending,
-        out.plan_unread
+        out.plan_unread,
+        out.turn_asks.as_ref().map_or_else(|| "none".to_string(), TurnAsks::fact)
     );
     out
 }
@@ -255,6 +273,7 @@ pub(crate) fn tile_answer(live: Option<LiveConversation>) -> CompareAnswer {
     // label-only is ever pasted.
     let mut found = parsed.found.filter(|f| !paste_clean(&f.text).trim().is_empty());
     let mut earlier = parsed.earlier;
+    let mut asks = parsed.asks;
     // Measured live (2.1.331): while the plan's approval menu is up Claude
     // may not have flushed the transcript (how far varies); its plan file is
     // already written. In a planning turn, a plan file newer than the last
@@ -278,6 +297,8 @@ pub(crate) fn tile_answer(live: Option<LiveConversation>) -> CompareAnswer {
                 found = Some(plan);
                 earlier = false;
                 out.from_plan_file = true;
+                // The open turn's own plan: that turn's question.
+                asks = parsed.newest_asks.clone();
             }
         }
     }
@@ -307,6 +328,7 @@ pub(crate) fn tile_answer(live: Option<LiveConversation>) -> CompareAnswer {
             && found.kind == AnswerKind::Plan
             && (file_waits || parsed.plan_waits);
         out.answer = Some(found.text);
+        out.turn_asks = asks;
     }
     out
 }
@@ -411,7 +433,7 @@ pub(crate) fn read_tail(
     let mut n = first.min(max).max(1);
     loop {
         let Some((bytes, whole)) = fetch(n) else {
-            return Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false };
+            return Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false, asks: None, newest_asks: None };
         };
         let parsed = parse(from_line_start(&bytes, whole), whole);
         // A plan that can't be read back stops the search too: what lies
@@ -488,6 +510,17 @@ struct ClaudeSide {
     refused_with_feedback: std::collections::HashMap<String, Option<i64>>,
     /// The `sessionId` the transcript's entries carry (the last one seen).
     session_id: Option<String>,
+    /// 1.179.0, the member's question: each user entry's own facts, by `uuid`.
+    prompts: std::collections::HashMap<String, asks::PromptMeta>,
+    /// The line each user entry (by `uuid`) and each assistant message (by
+    /// `message.id` and `uuid`, its last line) was written on.
+    item_lines: std::collections::HashMap<String, usize>,
+    /// Each refusal with a `toolDenialKind`, by the refused call's id.
+    refusals: std::collections::HashMap<String, asks::Refusal>,
+    /// The lines of a compaction (`compact_boundary`, `isCompactSummary`).
+    compactions: Vec<usize>,
+    /// Turn ends (`turn_duration`) read so far.
+    turn_ends: usize,
 }
 
 /// Two spellings of one file path (Windows separators, letter case).
@@ -560,6 +593,36 @@ fn claude_side(text: &str) -> ClaudeSide {
             side.session_id = Some(session.to_string());
         }
         let sidechain = entry.get("isSidechain").and_then(Value::as_bool) == Some(true);
+        let kind = entry.get("type").and_then(Value::as_str);
+        if !sidechain {
+            if kind == Some("system") && entry.get("subtype").and_then(Value::as_str) == Some("turn_duration") {
+                side.turn_ends += 1;
+            }
+            if (kind == Some("system") && entry.get("subtype").and_then(Value::as_str) == Some("compact_boundary"))
+                || entry.get("isCompactSummary").and_then(Value::as_bool) == Some(true)
+            {
+                side.compactions.push(index);
+            }
+            if let Some(uuid) = entry.get("uuid").and_then(Value::as_str) {
+                if matches!(kind, Some("user" | "assistant")) {
+                    side.item_lines.insert(uuid.to_string(), index);
+                }
+                if kind == Some("user") {
+                    let text_of = |key: &str| entry.get(key).and_then(Value::as_str).map(str::to_string);
+                    side.prompts.entry(uuid.to_string()).or_insert(asks::PromptMeta {
+                        source: text_of("promptSource"),
+                        origin: entry.get("origin").and_then(|o| o.get("kind")).and_then(Value::as_str).map(str::to_string),
+                        turn_index: entry.get("turnPosition").and_then(|t| t.get("turnIndex")).and_then(Value::as_i64),
+                        ends_before: side.turn_ends,
+                    });
+                }
+            }
+            if kind == Some("assistant") {
+                if let Some(id) = entry["message"].get("id").and_then(Value::as_str) {
+                    side.item_lines.insert(id.to_string(), index);
+                }
+            }
+        }
         if entry.get("type").and_then(Value::as_str) == Some("user") && !sidechain {
             // Tool results (only `user` entries: request copies such as
             // `api-request-blob` repeat tool calls with other inputs).
@@ -590,6 +653,14 @@ fn claude_side(text: &str) -> ClaudeSide {
                     && result_text(block).contains("the user said")
                 {
                     side.refused_with_feedback.entry(id.to_string()).or_insert(line_ms(&entry));
+                }
+                if let Some(denial) = entry.get("toolDenialKind").and_then(Value::as_str) {
+                    side.refusals.entry(id.to_string()).or_insert(asks::Refusal {
+                        line: index,
+                        at_ms: line_ms(&entry),
+                        denial: denial.to_string(),
+                        text: result_text(block),
+                    });
                 }
             }
         }
@@ -671,8 +742,12 @@ pub(crate) fn claude_tail(bytes: &[u8], whole: bool) -> Parsed {
     // writes no `turn_duration` after it, so the fold would stay Working.
     let real: Vec<bool> = (0..count).map(|n| !segment(n).is_empty() && !segment(n).iter().all(local_command)).collect();
     let Some(newest) = real.iter().rposition(|r| *r) else {
-        return Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: side.last_at, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false };
+        return Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: side.last_at, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false, asks: None, newest_asks: None };
     };
+    // 1.179.0: the member's question, read with the answer of the same turn.
+    let segments: Vec<&[ChatItem]> = (0..count).map(segment).collect();
+    let asks_of = |n: usize| asks::claude_asks(&segments, headless, n, &side);
+    let newest_asks = Some(asks_of(newest));
     let turn = if newest + 1 < count || state == ChatState::Ready { TurnState::Done } else { TurnState::Open };
     // Walk 6: whether the open turn is a planning one — its prompt sent in
     // plan mode (`permissionMode: "plan"`, measured), or an ExitPlanMode in it.
@@ -732,17 +807,18 @@ pub(crate) fn claude_tail(bytes: &[u8], whole: bool) -> Parsed {
             TurnAnswer::Found(found) => {
                 // S1: the newest turn ended without an answer of its own.
                 let earlier = n != newest && turn == TurnState::Done;
-                return Parsed { turn, found: Some(found), earlier, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered, plan_refused_ms, plan_unread: false };
+                let asks = Some(if n == newest { newest_asks.clone().unwrap_or_else(|| asks_of(n)) } else { asks_of(n) });
+                return Parsed { turn, found: Some(found), earlier, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered, plan_refused_ms, plan_unread: false, asks, newest_asks };
             }
             // B1: never an older turn's answer instead of a plan that can't
             // be read. An open turn's plan file may still stand in.
             TurnAnswer::PlanUnread => {
-                return Parsed { turn, found: None, earlier: false, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered, plan_refused_ms, plan_unread: ended };
+                return Parsed { turn, found: None, earlier: false, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered, plan_refused_ms, plan_unread: ended, asks: None, newest_asks };
             }
             TurnAnswer::Nothing => {}
         }
     }
-    Parsed { turn, found: None, earlier: false, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered, plan_refused_ms, plan_unread: false }
+    Parsed { turn, found: None, earlier: false, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered, plan_refused_ms, plan_unread: false, asks: None, newest_asks }
 }
 
 /// A local command's line (`<command-name>…`, `<command-message>…`) or a `!`
@@ -931,8 +1007,15 @@ pub(crate) fn codex_tail(bytes: &[u8], whole: bool) -> Parsed {
     let mut last_end_answered = true;
     let mut in_turn: Option<(String, Option<i64>)> = None;
     let mut answer: Option<(String, Option<i64>)> = None;
+    // 1.179.0: the member's messages of the turn under way, and of `answer`'s.
+    let mut asking = asks::CodexTurn::default();
+    let mut answer_asks: Option<TurnAsks> = None;
     for line in text.lines() {
         let Ok(entry) = serde_json::from_str::<Value>(line.trim()) else { continue };
+        // Unmeasured: what a compaction keeps of the turn's messages.
+        if entry.get("type").and_then(Value::as_str) == Some("compacted") {
+            asking.mark(asks::AsksUnknown::Compacted);
+        }
         let Some(payload) = entry.get("payload") else { continue };
         records = true;
         let kind = payload.get("type").and_then(Value::as_str);
@@ -941,6 +1024,7 @@ pub(crate) fn codex_tail(bytes: &[u8], whole: bool) -> Parsed {
                 open = true;
                 marked = true;
                 in_turn = None;
+                asking = asks::CodexTurn::started();
             }
             (Some("event_msg"), Some("task_complete")) => {
                 open = false;
@@ -954,20 +1038,31 @@ pub(crate) fn codex_tail(bytes: &[u8], whole: bool) -> Parsed {
                 last_end_answered = false;
                 if let Some(found) = last.or_else(|| in_turn.take()) {
                     answer = Some(found);
+                    answer_asks = Some(asking.finish());
                     last_end_answered = true;
                 }
                 in_turn = None;
+                asking = asks::CodexTurn::default();
             }
             (Some("event_msg"), Some("turn_aborted")) => {
                 open = false;
                 marked = true;
                 last_end_answered = false;
                 in_turn = None;
+                asking = asks::CodexTurn::default();
             }
+            (Some("event_msg"), Some("user_message")) => asking.event(payload, line_ms(&entry)),
+            (Some("event_msg"), Some("context_compacted")) => asking.mark(asks::AsksUnknown::Compacted),
+            // Unmeasured: a review's own messages aren't the member's words.
+            (Some("event_msg"), Some("entered_review_mode")) => asking.mark(asks::AsksUnknown::Command),
             (Some("response_item"), _) => {
                 if let Some(text) = codex_final_answer(payload) {
                     in_turn = Some((text, line_ms(&entry)));
                 }
+                if matches!(kind, Some("compaction" | "compaction_summary")) {
+                    asking.mark(asks::AsksUnknown::Compacted);
+                }
+                asking.item(payload, line_ms(&entry));
             }
             _ => {}
         }
@@ -976,6 +1071,8 @@ pub(crate) fn codex_tail(bytes: &[u8], whole: bool) -> Parsed {
     // partial tail without a marker (S2) is inside a turn longer than it.
     if !marked && answer.is_none() && whole {
         answer = in_turn;
+        // Case 8: no turn marker, so no turn start to read the question from.
+        answer_asks = answer.is_some().then_some(TurnAsks::Unknown { why: asks::AsksUnknown::StartNotRead });
     }
     let turn = if open || (!whole && !marked && records) {
         TurnState::Open
@@ -989,7 +1086,8 @@ pub(crate) fn codex_tail(bytes: &[u8], whole: bool) -> Parsed {
         Found { cut: relay_was_cut(&text), text, kind: AnswerKind::Text, at_ms }
     });
     let earlier = turn == TurnState::Done && found.is_some() && !last_end_answered;
-    Parsed { turn, found, earlier, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false }
+    let asks = if found.is_some() { answer_asks } else { None };
+    Parsed { turn, found, earlier, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false, asks, newest_asks: None }
 }
 
 // ── The text to paste ────────────────────────────────────────────────────
@@ -1006,9 +1104,60 @@ pub struct PasteParts {
     pub from_label: String,
     #[serde(default)]
     pub note_label: Option<String>,
+    /// 1.179.0, "Include my question": the member's own words of the answer's
+    /// turn, as the window made them from `turnAsks` (passed text taken out).
+    /// Absent or blank: no question block, and the text as before.
+    #[serde(default)]
+    pub question: Option<String>,
+    /// `My question to Claude:` or `My question to Codex:`.
+    #[serde(default)]
+    pub question_label: Option<String>,
+    /// The question was already cut when read (`turnAsks.cut`): it always
+    /// goes with its cut line.
+    #[serde(default)]
+    pub question_cut: bool,
 }
 
-/// One text safe to paste into a Claude or Codex composer: every piece
+/// What `compare_prepare_paste` gives: the text written, and what it holds,
+/// so the composer's preview and the write come from the same function.
+#[derive(Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreparedPaste {
+    /// What is written, as before (empty when the answer is blank).
+    pub text: String,
+    /// The question exactly as it goes in `text` (cleaned, cut), without its
+    /// label; absent when none was given, it was blank, or it was left out.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub question: Option<String>,
+    /// The question goes cut, ending in its cut line.
+    pub question_cut: bool,
+    /// A question was given but left out: less than [`QUESTION_MIN_ROOM`]
+    /// characters were left for it, or the answer itself had to be cut.
+    pub question_left_out: bool,
+    /// The frame (lead, labels, note) made this function cut the answer.
+    pub answer_cut: bool,
+}
+
+/// Never the text: a stray `{:?}` must not log what goes into a tile.
+impl std::fmt::Debug for PreparedPaste {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PreparedPaste")
+            .field("chars", &self.text.chars().count())
+            .field("question_chars", &self.question.as_ref().map(|q| q.chars().count()))
+            .field("question_cut", &self.question_cut)
+            .field("question_left_out", &self.question_left_out)
+            .field("answer_cut", &self.answer_cut)
+            .finish()
+    }
+}
+
+/// The question's own cut line, where it was cut.
+const QUESTION_CUT: &str = "\n[Plyloft cut your question here to fit 16,000 characters]";
+/// Owner's decision: with less room than this the question is left out whole.
+pub(crate) const QUESTION_MIN_ROOM: usize = 200;
+
+/// One text safe to paste into a Claude or Codex composer, and what it
+/// holds ([`PreparedPaste`]): every piece
 /// cleaned as a chat message is (no control character but newline — so no
 /// ESC, no CR, no bracketed-paste end — and a leading space, so a `!` or `/`
 /// is never read as a command), less bidi and zero-width characters, a tab
@@ -1017,6 +1166,9 @@ pub struct PasteParts {
 /// ```text
 ///  <lead>
 ///
+/// <questionLabel>
+/// <question>
+///
 /// <fromLabel>
 /// <answer>
 ///
@@ -1024,12 +1176,14 @@ pub struct PasteParts {
 /// <note>
 /// ```
 ///
-/// (an empty lead or note leaves its block out), at most 16,000 characters:
-/// the answer is cut first, with the relay's cut line. A blank answer gives
-/// an empty string.
+/// (an empty lead, question or note leaves its block out), at most 16,000
+/// characters. The question is cut first, with its own cut line, and left
+/// out when less than [`QUESTION_MIN_ROOM`] is left for it; the answer is cut
+/// only when the frame without any question leaves it too little room, with
+/// the relay's cut line, as before. A blank answer gives an empty text.
 #[tauri::command]
-pub fn compare_prepare_paste(parts: PasteParts) -> String {
-    prepare_paste(&parts)
+pub fn compare_prepare_paste(parts: PasteParts) -> PreparedPaste {
+    prepare(&parts)
 }
 
 /// [`clean_text`] (U+2028/U+2029 first made new lines, which it would
@@ -1050,22 +1204,37 @@ pub(crate) fn paste_clean(text: &str) -> String {
     out
 }
 
+/// The text alone ([`prepare`]): the tests that pin it byte for byte.
+#[cfg(test)]
 pub(crate) fn prepare_paste(parts: &PasteParts) -> String {
+    prepare(parts).text
+}
+
+pub(crate) fn prepare(parts: &PasteParts) -> PreparedPaste {
     let piece = |s: Option<&str>| s.map(|s| paste_clean(s).trim().to_string()).filter(|s| !s.is_empty());
+    let mut out = PreparedPaste { text: String::new(), question: None, question_cut: false, question_left_out: false, answer_cut: false };
     let Some(answer) = piece(Some(&parts.answer)) else {
         // Nothing to hand over: never a lead and label alone.
-        return String::new();
+        return out;
     };
     let lead = piece(parts.lead.as_deref());
     let from = piece(Some(&parts.from_label)).unwrap_or_default();
     let note = piece(parts.note.as_deref());
     let note_label = piece(parts.note_label.as_deref());
-    let assemble = |answer: &str| {
+    let question = piece(parts.question.as_deref());
+    let question_label = piece(parts.question_label.as_deref());
+    let labelled = |label: Option<&str>, body: &str| {
+        [label.unwrap_or(""), body].iter().filter(|s| !s.is_empty()).copied().collect::<Vec<_>>().join("\n")
+    };
+    let assemble = |question: Option<&str>, answer: &str| {
         let mut blocks: Vec<String> = Vec::new();
         if let Some(lead) = &lead {
             blocks.push(lead.clone());
         }
-        blocks.push([from.as_str(), answer].iter().filter(|s| !s.is_empty()).copied().collect::<Vec<_>>().join("\n"));
+        if let Some(question) = question {
+            blocks.push(labelled(question_label.as_deref(), question));
+        }
+        blocks.push(labelled(Some(from.as_str()), answer));
         if let Some(note) = &note {
             blocks.push(match &note_label {
                 Some(label) => format!("{label}\n{note}"),
@@ -1076,12 +1245,60 @@ pub(crate) fn prepare_paste(parts: &PasteParts) -> String {
     };
     // The leading space counts toward the cap.
     let cap = RELAY_CAP - 1;
-    let frame = assemble("").chars().count();
+    let frame = assemble(None, "").chars().count();
     let answer_room = cap.saturating_sub(frame + 1); // the newline after the label
-    let text = assemble(&cap_with_cut(&answer, answer_room));
-    // A frame too long on its own (a very long note): the whole is cut.
-    let text = cap_with_cut(&text, cap);
-    crate::chat::composer_text(&text)
+    let answer_fits = answer.chars().count() <= answer_room;
+    // The question takes only the room the whole answer leaves: it is cut
+    // first, and never makes the answer shorter.
+    let mut asked: Option<String> = None;
+    if let Some(question) = &question {
+        if answer_fits {
+            let without = assemble(None, &answer).chars().count();
+            // Its label and newline, and the blank line that parts it from the next block.
+            let overhead = 2 + question_label.as_ref().map_or(0, |l| l.chars().count() + 1);
+            let room = cap.saturating_sub(without + overhead);
+            match cut_question(question, room, parts.question_cut) {
+                Some((text, cut)) => {
+                    asked = Some(text);
+                    out.question_cut = cut;
+                }
+                None => out.question_left_out = true,
+            }
+        } else {
+            out.question_left_out = true;
+        }
+    }
+    out.answer_cut = !answer_fits;
+    let text = assemble(asked.as_deref(), &cap_with_cut(&answer, answer_room));
+    // A frame too long on its own (a very long note): the whole is cut. A
+    // question is never in it then (the answer didn't fit).
+    let capped = cap_with_cut(&text, cap);
+    if capped != text {
+        out.answer_cut = true;
+    }
+    out.text = crate::chat::composer_text(&capped);
+    out.question = asked;
+    out
+}
+
+/// The question within `room` characters, and whether it goes cut: whole
+/// when it fits (with its cut line when it was cut when read), else cut
+/// with its cut line; `None` when less than [`QUESTION_MIN_ROOM`] is left.
+fn cut_question(question: &str, room: usize, cut_when_read: bool) -> Option<(String, bool)> {
+    let len = question.chars().count();
+    let line = QUESTION_CUT.chars().count();
+    if !cut_when_read && len <= room {
+        return Some((question.to_string(), false));
+    }
+    if cut_when_read && len + line <= room {
+        return Some((format!("{question}{QUESTION_CUT}"), true));
+    }
+    if room < QUESTION_MIN_ROOM {
+        return None;
+    }
+    let mut cut: String = question.chars().take(room - line).collect();
+    cut.push_str(QUESTION_CUT);
+    Some((cut, true))
 }
 
 #[cfg(test)]

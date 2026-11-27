@@ -78,6 +78,7 @@ mod builder_screen_judge;
 mod builder_screens_capture;
 mod build_both;
 mod branch_codex_skills;
+mod ai_accounts;
 mod claude_auth;
 mod keychain_lock;
 mod claude_theme;
@@ -1293,6 +1294,9 @@ pub fn run() {
                 .path()
                 .app_config_dir()
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            // 1.179.0 (C1): where the Claude account folders are, so every
+            // reader derives an account's folder as its commands made it.
+            ai_accounts::init(&config_dir);
             // A card's chat: its sessions, killed on quit (`run_exit_cleanup`)
             // and when their card is deleted; idle ones suspended.
             {
@@ -2126,6 +2130,13 @@ pub fn run() {
             setup_run::setup_check,
             setup_run::setup_reach,
             setup_run::setup_open_page,
+            ai_accounts::ai_accounts_list,
+            ai_accounts::ai_account_add,
+            ai_accounts::ai_account_rename,
+            ai_accounts::ai_account_use_for_new,
+            ai_accounts::ai_account_remove,
+            ai_accounts::ai_account_remove_blocked,
+            ai_accounts::ai_account_show_folder,
             setup_last_run::setup_last_run,
             project_setup::project_inspect,
             project_setup::projects_folder_look,

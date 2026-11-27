@@ -22,6 +22,9 @@ import * as W from "./compareWords.ts";
 import { readinessProbe } from "./tileHeaderStatus.ts";
 import { choiceMenuInView, matchesClaudePromptIdle, promptInputEmpty, settledTail } from "./attention.ts";
 import { liveWorking } from "./tileScreen.ts";
+import { questionFor, questionReasonWords, type QuestionState } from "./compareView.ts";
+import type { CompareTurnAsks } from "./compareIpc.ts";
+import { PROJECT_PLACE, pairTileOrder, pairsOf, placeOfCwd, placesOf } from "./compareView.ts";
 import { STALE_OPEN_QUIET_MS, answerToPass, heldIsProvisional, heldLapsed, heldOffered, nextHeld, openTurnStale, passDropped, type ReturnHeld } from "./compareView.ts";
 
 const NOW = 10_000_000;
@@ -796,3 +799,263 @@ console.log("compareView held answer lapses: ok");
   );
 }
 console.log("compareView cleared Put: ok");
+
+// 1.179.0 "Include my question": the member's own words of the answer's
+// turn, the passes into that tile taken out (rules 11 and 12), compared
+// through the paste's key normalisation.
+{
+  const asks = (...texts: string[]): CompareTurnAsks => ({
+    status: "known",
+    messages: texts.map((text, i) => ({ text, kind: i === 0 ? ("prompt" as const) : ("plan-feedback" as const) })),
+    cut: false,
+  });
+  const FINISHED = NOW - 1_000;
+  const into = (sent: string, over: Partial<Pass> = {}): Pass => ({
+    n: 1,
+    from: "codex",
+    to: "claude",
+    ask: "just-pass",
+    withNote: false,
+    at: NOW - 60_000,
+    mode: "send",
+    sent,
+    answer: "a",
+    cut: false,
+    ...over,
+  });
+  const PASS = " Review this plan. Say what is missing or wrong before any code is written.\n\nFrom Codex:\nAdd a test.";
+  const STORED = PASS.trim(); // the CLI keeps it without the leading space
+
+  // A plain typed question goes as it was written; several messages, a blank line apart.
+  assert.deepEqual(questionFor(asks("Plan the login page"), [], FINISHED), { state: "ok", text: "Plan the login page", cut: false });
+  assert.deepEqual(questionFor(asks("Plan it", "Use the old schema"), [], FINISHED), { state: "ok", text: "Plan it\n\nUse the old schema", cut: false });
+  // The backend's cut goes with it.
+  assert.deepEqual(questionFor({ ...asks("Long words"), cut: true } as CompareTurnAsks, [], FINISHED), { state: "ok", text: "Long words", cut: true });
+  // Only text Compare passed: nothing to include.
+  assert.deepEqual(questionFor(asks(STORED), [into(PASS)], FINISHED), { state: "nothing", why: "passed-only" });
+  // The member typed after a pass: only the typed part.
+  assert.deepEqual(questionFor(asks(`${STORED}\n\nAlso check the logout`), [into(PASS)], FINISHED), { state: "ok", text: "Also check the logout", cut: false });
+  // Typed before, and a pass followed: the typed part.
+  assert.deepEqual(questionFor(asks(`Look at this first\n\n${STORED}`), [into(PASS)], FINISHED), { state: "ok", text: "Look at this first", cut: false });
+  // A message that is the pass, then one of the member's own (plan feedback).
+  assert.deepEqual(questionFor(asks(STORED, "Keep it short"), [into(PASS)], FINISHED), { state: "ok", text: "Keep it short", cut: false });
+  // Compare's labels with no pass in memory (made before a restart, or edited): unknown.
+  assert.deepEqual(questionFor(asks(STORED), [], FINISHED), { state: "unknown", why: "edited" });
+  assert.deepEqual(questionFor(asks("From Claude Code:\nsome plan"), [], FINISHED), { state: "unknown", why: "edited" });
+  assert.deepEqual(questionFor(asks("Carry out this plan.\n\nmore"), [], FINISHED), { state: "unknown", why: "edited" });
+  // A pass edited by hand inside: its labels are left, so unknown.
+  assert.deepEqual(questionFor(asks(STORED.replace("Add a test.", "Add two tests.")), [into(PASS)], FINISHED), { state: "unknown", why: "edited" });
+  // A Put this turn took that no message holds verbatim: edited by hand.
+  const put = into(" Just some text\nthat went", { mode: "put", at: NOW - 30_000 });
+  assert.deepEqual(questionFor(asks("Just some words\nthat went"), [put], FINISHED), { state: "unknown", why: "edited" });
+  assert.deepEqual(questionFor(asks("Just some text\nthat went\n\nmine"), [put], FINISHED), { state: "ok", text: "mine", cut: false });
+  // …a Put an earlier turn took (its tile answered since) is not this turn's.
+  assert.deepEqual(questionFor(asks("A new question"), [{ ...put, answeredAt: FINISHED - 10_000 }], FINISHED), { state: "ok", text: "A new question", cut: false });
+  // …nor one made after this answer finished.
+  assert.deepEqual(questionFor(asks("A new question"), [{ ...put, at: FINISHED + 1 }], FINISHED), { state: "ok", text: "A new question", cut: false });
+  // Normalised as the paste is (Windows replays keys): arrows, curly quotes, CR LF, blank-line runs.
+  const typographic = " From Codex:\nUse \u201cA\u201d \u2192 B\r\n\n\n\nDone\u2026";
+  const replayed = "From Codex:\nUse \"A\" -> B\n\nDone...";
+  assert.deepEqual(questionFor(asks(replayed), [into(typographic)], FINISHED), { state: "nothing", why: "passed-only" });
+  assert.deepEqual(questionFor(asks(`${replayed}\n\nmy words`), [into(typographic)], FINISHED), { state: "ok", text: "my words", cut: false });
+  // A message with no words at all (an image only), or none.
+  assert.deepEqual(questionFor({ status: "known", messages: [], cut: false }, [], FINISHED), { state: "nothing", why: "no-words" });
+  assert.deepEqual(questionFor(asks("   "), [], FINISHED), { state: "nothing", why: "no-words" });
+  // The backend's unknowns pass through; no turn read is unknown too.
+  for (const why of ["start-not-read", "command", "not-typed", "queued-start", "feedback-unread", "compacted", "unknown-message"] as const) {
+    assert.deepEqual(questionFor({ status: "unknown", why }, [into(PASS)], FINISHED), { state: "unknown", why });
+  }
+  assert.deepEqual(questionFor(undefined, [], FINISHED), { state: "unknown", why: "not-read" });
+
+  // The reason line for each.
+  const r = (from: "claude" | "codex", q: QuestionState) => questionReasonWords(from, q);
+  assert.equal(r("claude", { state: "ok", text: "x", cut: false }), null);
+  assert.equal(r("claude", { state: "nothing", why: "passed-only" }), "That turn holds only what you passed to Claude. There's no question of yours to add.");
+  assert.equal(r("codex", { state: "nothing", why: "passed-only" }), "That turn holds only what you passed to Codex. There's no question of yours to add.");
+  for (const why of ["start-not-read", "queued-start", "compacted", "not-read"] as const) {
+    assert.equal(r("claude", { state: "unknown", why }), "Can't tell where Claude's turn started, so your question is left out.", why);
+    assert.equal(r("codex", { state: "unknown", why }), "Can't tell where Codex's turn started, so your question is left out.", why);
+  }
+  for (const why of ["command", "not-typed"] as const) {
+    assert.equal(r("claude", { state: "unknown", why }), "Claude's turn didn't start with a message of yours, so there's no question to add.", why);
+    assert.equal(r("codex", { state: "unknown", why }), "Codex's turn didn't start with a message of yours, so there's no question to add.", why);
+  }
+  assert.equal(r("claude", { state: "nothing", why: "no-words" }), "Claude's turn didn't start with a message of yours, so there's no question to add.");
+  assert.equal(r("claude", { state: "unknown", why: "feedback-unread" }), "Can't read your answer to Claude's plan menu, so your question is left out.");
+  for (const why of ["unknown-message", "edited"] as const) {
+    assert.equal(r("codex", { state: "unknown", why }), "Can't tell your words from the text you passed, so your question is left out.", why);
+  }
+
+  // What goes to the backend: the question and its label only when given.
+  assert.deepEqual(pasteParts("claude", "just-pass", "A", "", { text: "Q?", cut: false }), {
+    lead: undefined,
+    fromLabel: "From Claude Code:",
+    answer: "A",
+    note: undefined,
+    noteLabel: "My note:",
+    question: "Q?",
+    questionLabel: "My question to Claude:",
+  });
+  assert.equal(pasteParts("codex", "just-pass", "A", "", { text: "Q?", cut: true }).questionLabel, "My question to Codex:");
+  assert.equal(pasteParts("codex", "just-pass", "A", "", { text: "Q?", cut: true }).questionCut, true);
+  assert.equal("question" in pasteParts("claude", "just-pass", "A", "", { text: "  ", cut: false }), false);
+  assert.equal("question" in pasteParts("claude", "just-pass", "A", "", null), false);
+  assert.equal("questionLabel" in pasteParts("claude", "just-pass", "A", ""), false);
+}
+console.log("compareView include my question: ok");
+
+// ── 1.179.0 Two pairs ────────────────────────────────────────────────────
+{
+  const PROJ = "/Users/someone/code/orders-api";
+  const copy = (id: string, name: string, createdAt: number, state = "active") => ({
+    id,
+    name,
+    path: `${PROJ}/.plyloft-worktrees/${id}`,
+    createdAt,
+    state,
+  });
+  const c1 = copy("copy-1", "retry-on-timeout", 100);
+  const c2 = copy("copy-2", "queue-empty", 200);
+  const copies = [c2, c1];
+
+  // A tile's place: the copy whose folder holds it, else the project.
+  assert.equal(placeOfCwd(PROJ, copies, false), PROJECT_PLACE);
+  assert.equal(placeOfCwd(`${PROJ}/src`, copies, false), PROJECT_PLACE);
+  assert.equal(placeOfCwd(c1.path, copies, false), "copy-1");
+  assert.equal(placeOfCwd(`${c1.path}/`, copies, false), "copy-1");
+  assert.equal(placeOfCwd(`${c1.path}/src/lib`, copies, false), "copy-1");
+  assert.equal(placeOfCwd(`${c1.path}-other`, copies, false), PROJECT_PLACE, "a sibling folder is not inside");
+  assert.equal(placeOfCwd(null, copies, false), PROJECT_PLACE);
+  assert.equal(placeOfCwd(c1.path, [{ ...c1, state: "trashed" }], false), PROJECT_PLACE, "a thrown-away copy holds no tile");
+  // The Mac's disk may be case-sensitive: case counts there.
+  assert.equal(placeOfCwd(c1.path.toUpperCase(), copies, false), PROJECT_PLACE);
+  // Windows: the same folder as C:\ and c:\, with either separator.
+  const winCopy = { id: "copy-w", name: "w", path: "C:\\Users\\someone\\code\\orders-api\\.plyloft-worktrees\\copy-w", createdAt: 1, state: "active" };
+  assert.equal(placeOfCwd("c:\\Users\\someone\\code\\orders-api\\.plyloft-worktrees\\copy-w", [winCopy], true), "copy-w");
+  assert.equal(placeOfCwd("c:/Users/someone/code/orders-api/.plyloft-worktrees/copy-w/src", [winCopy], true), "copy-w");
+  assert.equal(placeOfCwd("C:\\Users\\someone\\code\\orders-api", [winCopy], true), PROJECT_PLACE);
+
+  // Bar order: the project, then the active copies by age.
+  assert.deepEqual(placesOf("orders-api", [...copies, copy("copy-3", "gone", 50, "trashed")]), [
+    { id: PROJECT_PLACE, name: "orders-api" },
+    { id: "copy-1", name: "retry-on-timeout" },
+    { id: "copy-2", name: "queue-empty" },
+  ]);
+
+  const places = placesOf("orders-api", copies);
+  const t = (id: string, vendor: "claude" | "codex", place: string) => ({ id, vendor, place });
+  const A = [t("ca", "claude", PROJECT_PLACE), t("xa", "codex", PROJECT_PLACE)];
+  const B = [t("cb", "claude", "copy-1"), t("xb", "codex", "copy-1")];
+  const C = [t("cc", "claude", "copy-2"), t("xc", "codex", "copy-2")];
+  const none = { claudeId: null, codexId: null };
+
+  // One place with both kinds: single-pair mode, today's bar over every tile.
+  let v = pairsOf({ tiles: [...A, t("cb", "claude", "copy-1")], places, single: none, held: [] });
+  assert.equal(v.mode, "single");
+  assert.deepEqual(v.pairs, [{ place: "", name: "", slot: "a", tileIds: ["ca", "xa", "cb"] }]);
+  assert.equal(v.crossPlace, false);
+  assert.equal(pairsOf({ tiles: [], places, single: none, held: [] }).mode, "single");
+
+  // A second place with both: two pairs, project first; the single pair's
+  // state goes to the place holding both its tiles.
+  v = pairsOf({ tiles: [...A, ...B], places, single: { claudeId: "ca", codexId: "xa" }, held: [] });
+  assert.equal(v.mode, "two");
+  assert.deepEqual(
+    v.pairs.map((p) => [p.place, p.name, p.slot, p.tileIds]),
+    [
+      [PROJECT_PLACE, "orders-api", "a", ["ca", "xa"]],
+      ["copy-1", "retry-on-timeout", "b", ["cb", "xb"]],
+    ],
+  );
+  assert.equal(v.moveTo, PROJECT_PLACE);
+  assert.equal(v.extra, null);
+  // …or to the copy, when its tiles were the pair (still drawn second).
+  v = pairsOf({ tiles: [...A, ...B], places, single: { claudeId: "cb", codexId: "xb" }, held: [] });
+  assert.equal(v.moveTo, "copy-1");
+  assert.deepEqual(v.pairs.map((p) => p.place), [PROJECT_PLACE, "copy-1"]);
+
+  // A 1.178.0 pair across two places stays the one pair, and says how to get two.
+  v = pairsOf({ tiles: [...A, ...B], places, single: { claudeId: "ca", codexId: "xb" }, held: [] });
+  assert.equal(v.mode, "single");
+  assert.equal(v.crossPlace, true);
+  // …but says nothing when no second place could pair.
+  v = pairsOf({ tiles: [...A, t("xb", "codex", "copy-1")], places, single: { claudeId: "ca", codexId: "xb" }, held: [] });
+  assert.equal(v.mode, "single");
+  assert.equal(v.crossPlace, false);
+
+  // Three places with both: the first two get bars, the second names the third.
+  v = pairsOf({ tiles: [...C, ...B, ...A], places, single: none, held: [] });
+  assert.deepEqual(v.pairs.map((p) => p.place), [PROJECT_PLACE, "copy-1"]);
+  assert.equal(v.extra, "queue-empty");
+  // The single pair's own place gets a bar first, even when it is the third.
+  v = pairsOf({ tiles: [...A, ...B, ...C], places, single: { claudeId: "cc", codexId: "xc" }, held: [] });
+  assert.deepEqual(v.pairs.map((p) => p.place), [PROJECT_PLACE, "copy-2"]);
+  assert.equal(v.moveTo, "copy-2");
+  assert.equal(v.extra, "retry-on-timeout");
+
+  // A pair of two-pair mode keeps its bar while any of its tiles is open.
+  v = pairsOf({ tiles: [...A, t("cb", "claude", "copy-1")], places, single: none, held: [PROJECT_PLACE, "copy-1"] });
+  assert.equal(v.mode, "two");
+  assert.deepEqual(v.pairs.map((p) => [p.place, p.tileIds]), [[PROJECT_PLACE, ["ca", "xa"]], ["copy-1", ["cb"]]]);
+  assert.equal(v.moveTo, null);
+  // Both of its tiles gone: back to one pair, on the pair that is left.
+  v = pairsOf({ tiles: A, places, single: none, held: [PROJECT_PLACE, "copy-1"] });
+  assert.equal(v.mode, "single");
+  assert.equal(v.backFrom, PROJECT_PLACE);
+  // Its copy thrown away: the same.
+  v = pairsOf({ tiles: [...A, ...B], places: placesOf("orders-api", [c2]), single: none, held: [PROJECT_PLACE, "copy-1"] });
+  assert.equal(v.mode, "single");
+  assert.equal(v.backFrom, PROJECT_PLACE);
+  // A pair that is left keeps its bar when a new place pairs.
+  v = pairsOf({ tiles: [...B, ...C], places, single: none, held: [PROJECT_PLACE, "copy-1"] });
+  assert.deepEqual(v.pairs.map((p) => [p.place, p.slot]), [["copy-1", "a"], ["copy-2", "b"]]);
+  // Every tile gone: one empty pair.
+  v = pairsOf({ tiles: [], places, single: none, held: [PROJECT_PLACE, "copy-1"] });
+  assert.equal(v.mode, "single");
+  assert.equal(v.backFrom, null);
+
+  // Auto layout: a pair's two tiles side by side, place by place; the rest after.
+  const order = pairTileOrder(
+    [
+      { id: "cb", place: "copy-1" },
+      { id: "sh1", place: PROJECT_PLACE },
+      { id: "ca", place: PROJECT_PLACE },
+      { id: "sh2", place: "copy-1" },
+      { id: "xb", place: "copy-1" },
+      { id: "xa", place: PROJECT_PLACE },
+    ],
+    [
+      { place: PROJECT_PLACE, claudeId: "ca", codexId: "xa" },
+      { place: "copy-1", claudeId: "cb", codexId: "xb" },
+    ],
+  );
+  assert.deepEqual([...order.entries()].sort((a, b) => a[1] - b[1]).map(([id]) => id), ["ca", "xa", "sh1", "cb", "xb", "sh2"]);
+
+  // The bar of a pair: a closed tile names its place; the other pair's
+  // composer holds the pass.
+  const named = bar(input({ tiles: [tile("c1", "claude")], pairName: "retry-on-timeout" }));
+  assert.equal(named.kind, "no-pair");
+  assert.equal(named.line, "Codex's tile in retry-on-timeout is closed. Open one there to compare again.");
+  assert.equal(
+    bar(input({ tiles: [tile("x1", "codex")], pairName: "orders-api" })).line,
+    "Claude's tile in orders-api is closed. Open one there to compare again.",
+  );
+  const both = { claude: ans("claude"), codex: fresh("codex") };
+  const ready = bar(input({ answers: both }));
+  assert.equal(ready.kind, "ready");
+  assert.equal(ready.button?.disabled, false);
+  const held = bar(input({ answers: both, otherComposer: "orders-api" }));
+  assert.equal(held.button?.disabled, true);
+  assert.equal(held.button?.reason, "Finish or cancel the pass in orders-api first.");
+  // A reason of its own stays.
+  const busy = bar(input({ tiles: [tile("c1", "claude"), tile("x1", "codex", { working: true })], answers: both, otherComposer: "orders-api" }));
+  assert.equal(busy.button?.reason, W.targetWorkingWords("codex"));
+  // With one pair nothing of this is said.
+  assert.equal(bar(input({ tiles: [tile("c1", "claude")], closed: "codex" })).line, "Codex's tile is closed.");
+
+  // The words.
+  assert.equal(W.pairRegionLabel("orders-api"), "Compare · orders-api");
+  assert.equal(W.thirdPlaceWords("queue-empty"), "Compare shows two pairs at most. Close a pair's tiles to compare the ones in queue-empty.");
+  assert.equal(W.COMPARE_CROSS_PLACE, "To compare two pairs, keep each pair's Claude and Codex tiles in one place: the project folder or a copy.");
+}
+console.log("compareView two pairs: ok");

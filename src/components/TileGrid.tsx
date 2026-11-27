@@ -31,16 +31,20 @@ import { shortcutKeys, type ShortcutId } from "../lib/shortcuts";
 import type { WorkspaceTemplate } from "../lib/workspaceTemplates";
 import { NewCopySheet } from "./NewCopySheet";
 import { CopiesView } from "./CopiesView";
-import { CompareBar } from "./CompareBar";
-import { useCompare, useWsCompare } from "../store/compareStore";
-import { COMPARE_TOGGLE, COMPARE_TOGGLE_TITLE } from "../lib/compareWords";
-import { closeComposer } from "../store/compareActions";
+import { CompareBars, useComparePairs } from "./CompareBar";
+import { pairState, useCompare, useWsCompare } from "../store/compareStore";
+import { COMPARE_NEW_COPY_HINT, COMPARE_NEW_COPY_MENU, COMPARE_TOGGLE, COMPARE_TOGGLE_TITLE } from "../lib/compareWords";
+import { closeComposer, tilePlace } from "../store/compareActions";
+import { PROJECT_PLACE, pairTileOrder, resolvePair } from "../lib/compareView";
+import type { TileComparePair } from "./Tile";
 import { onOpenNewCopySheet, type NewCopyFrom, type NewCopyProvider } from "../lib/newCopySheet";
 import { copyMadeToastWords } from "../lib/sameFolder";
 import { listenForFolderChanges } from "../store/folderChanges";
 import { pushToast } from "../store/toastStore";
 import { COPIES_TITLE, NEW_COPY_MENU, NEW_COPY_MENU_HINT } from "../lib/copyWords";
 import { listenForCopies, useCopies, useWorkspaceCopies } from "../store/copiesStore";
+import { useClaudeAccountRows } from "../store/claudeAccountsStore";
+import { newSessionChoices } from "../lib/claudeAccountNames";
 
 /** 1.174.0 E6 (T11, P23): what New › Codex chat lacks, under its name. The
  *  rest (Throw away doesn't wait for it, the Inbox doesn't reopen it) is in
@@ -171,17 +175,22 @@ export function TileGrid({ env, workspace }: Props) {
   // Terminals block P4: New › Resume….
   const [resumeOpen, setResumeOpen] = useState(false);
   const canResume = Boolean(env?.claudePath || env?.codexPath);
+  // 1.179.0 (C2): New's "Claude on {name}" entries.
+  const accountRows = useClaudeAccountRows();
   // QoL 1.168 (D3): ⌘T's hint sits beside the kind it opens.
   const defaultKind = useDefaultNewTileKind(env);
   // 1.173.0 A3: New › In a new copy… (and A4's "Same folder" popover) opens
   // the sheet; Terminals › Copies lists them, over the grid.
-  const [newCopy, setNewCopy] = useState<NewCopyProvider | null>(null);
+  // 1.179.0: "pair" — New › Compare in a new copy… opens a Claude and a
+  // Codex tile in it.
+  const [newCopy, setNewCopy] = useState<NewCopyProvider | "pair" | null>(null);
   // 1.174.0 E1: asked from a Same folder chip — who asked, for the toast.
   const [newCopyFrom, setNewCopyFrom] = useState<NewCopyFrom | null>(null);
   const [view, setView] = useState<"tiles" | "copies">("tiles");
   const copies = useWorkspaceCopies(ws.id);
   // 1.177.0 Compare: the relay bar under the grid, on or off for this workspace.
-  const compareOn = useWsCompare(ws.id).on;
+  const compareState = useWsCompare(ws.id);
+  const compareOn = compareState.on;
   const toggleCompare = () => {
     if (compareOn) closeComposer(ws.id);
     useCompare.getState().setOn(ws.id, !compareOn);
@@ -314,6 +323,9 @@ export function TileGrid({ env, workspace }: Props) {
         workspaceId={ws.id}
         env={env}
         provider={newCopy}
+        // 1.179.0: Claude and Codex together, asked from New (not from a
+        // Same folder chip, which asks for one tile's AI).
+        offerPair={newCopyFrom === null}
         onClose={() => {
           setNewCopy(null);
           setNewCopyFrom(null);
@@ -364,6 +376,33 @@ export function TileGrid({ env, workspace }: Props) {
     [tiles.length, ws.layoutPreset],
   );
   const span = lastTileSpan(tiles.length, rows, cols, Boolean(expandedTileId));
+  // 1.179.0 Compare with two pairs: each paired tile's dot (and the project
+  // pair's name), the quiet outline of the pair pointed at, and in Auto a
+  // pair's two tiles side by side (CSS order only: nothing remounts).
+  const pairsView = useComparePairs(ws.id, ws.name);
+  const [hoverSlot, setHoverSlot] = useState<"a" | "b" | null>(null);
+  const twoPairs = compareOn && pairsView.mode === "two";
+  const paired = twoPairs
+    ? pairsView.pairs.map((p) => {
+        const st = pairState(compareState, p.place);
+        const r = resolvePair(
+          tiles.filter((t) => p.tileIds.includes(t.id)).map((t) => ({ id: t.id, vendor: t.kind === "codex" ? ("codex" as const) : ("claude" as const) })),
+          st?.claudeId ?? null,
+          st?.codexId ?? null,
+        );
+        return { ...p, claudeId: r.claude?.id ?? null, codexId: r.codex?.id ?? null };
+      })
+    : [];
+  const pairMarkOf = (id: string): TileComparePair | null => {
+    const p = paired.find((x) => x.claudeId === id || x.codexId === id);
+    return p ? { slot: p.slot, name: p.name, inProject: p.place === PROJECT_PLACE, linked: hoverSlot === p.slot, onHover: setHoverSlot } : null;
+  };
+  const visualOrder =
+    twoPairs && (ws.layoutPreset ?? "auto") === "auto" && !expandedTileId
+      ? pairTileOrder(tiles.map((t) => ({ id: t.id, place: tilePlace(ws.id, t.cwd) })), paired)
+      : null;
+  // The span goes to the tile drawn last.
+  const lastShown = visualOrder ? [...visualOrder.entries()].find(([, i]) => i === tiles.length - 1)?.[0] : tiles[tiles.length - 1]?.id;
   const gridStyle = expandedTileId
     ? { gridTemplateRows: "1fr", gridTemplateColumns: "1fr" }
     : {
@@ -385,6 +424,15 @@ export function TileGrid({ env, workspace }: Props) {
       shortcut: keysHere(defaultKind === "claude" ? "newShell" : "newClaude"),
       onSelect: onAddClaude,
     });
+    // 1.179.0 (C2): with more than one Claude account, one entry per
+    // account, Main included (C3); plain Claude keeps starting on the
+    // account for new sessions.
+    for (const choice of newSessionChoices(accountRows)) {
+      newItems.push({
+        label: choice.label,
+        onSelect: () => showNewTile(useTiles.getState().addClaudeTile(ws.id, ws.cwd, { account: choice.account })),
+      });
+    }
   }
   if (env?.codexPath) {
     newItems.push({
@@ -420,6 +468,15 @@ export function TileGrid({ env, workspace }: Props) {
     // The mockup's preselection: an AI when one is installed.
     onSelect: () => setNewCopy(env?.claudePath ? "claude" : env?.codexPath ? "codex" : "shell"),
   });
+  // 1.179.0: a second Compare pair starts in a copy of its own (two Codex
+  // tiles in one folder can't be told apart).
+  if (compareOn) {
+    newItems.push({
+      label: COMPARE_NEW_COPY_MENU,
+      hint: COMPARE_NEW_COPY_HINT,
+      onSelect: () => setNewCopy("pair"),
+    });
+  }
 
   const moreItems: MenuItem[] = [];
   if (tiles.length > 0) {
@@ -646,7 +703,7 @@ export function TileGrid({ env, workspace }: Props) {
         {/* 2026-09-30 (Challenger minor): one boundary per tile, so a
             tile that fails to draw takes only itself down — the others'
             terminals stay mounted. The Terminals host's is the last resort. */}
-        {tiles.map((tile, i) => (
+        {tiles.map((tile) => (
           <CentreErrorBoundary
             key={tile.id}
             view={tile.label}
@@ -661,7 +718,9 @@ export function TileGrid({ env, workspace }: Props) {
               env={env}
               workspaceCwd={ws.cwd}
               hidden={Boolean(expandedTileId) && tile.id !== expandedTileId}
-              span={i === tiles.length - 1 ? span : undefined}
+              span={tile.id === lastShown ? span : undefined}
+              comparePair={pairMarkOf(tile.id)}
+              order={visualOrder?.get(tile.id)}
             />
           </CentreErrorBoundary>
         ))}
@@ -669,7 +728,10 @@ export function TileGrid({ env, workspace }: Props) {
       {showingCopies && copiesView}
       {/* 1.177.0 Compare: one line under the tiles, inside the same host, so
           nothing is unmounted; the grid refits by its own ResizeObserver. */}
-      {!showingCopies && <CompareBar workspaceId={ws.id} />}
+      {/* 1.179.0: with two pairs, one bar each, stacked here. */}
+      {!showingCopies && (
+        <CompareBars workspaceId={ws.id} projectName={ws.name} expandedTileId={expandedTileId} onPairHover={setHoverSlot} />
+      )}
       </div>
       {layoutPicker}
       {resumeSheet}

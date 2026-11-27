@@ -201,15 +201,18 @@ pub(crate) const PROJECT_BYPASS_NOT_FOLLOWED: &str = "This project's Claude sett
 /// the rest, and one that asks for bypass gets accept edits at most — a
 /// teammate's commit, or what a Builder wrote in its copy, can't start a
 /// session nobody watches in bypass.
-pub(crate) fn writer_mode(cwd: &Path) -> WriterMode {
-    writer_choice(cwd).mode
+///
+/// 1.179.0: "their user settings" are those of the Claude account the
+/// session runs on (`account`; `None`: Main), the folder it reads them from.
+pub(crate) fn writer_mode(cwd: &Path, account: Option<&str>) -> WriterMode {
+    writer_choice(cwd, account).mode
 }
 
 /// [`writer_mode`] with what was not followed, said in the log.
-pub(crate) fn writer_choice(cwd: &Path) -> WriterChoice {
+pub(crate) fn writer_choice(cwd: &Path, account: Option<&str>) -> WriterChoice {
     let read = |path: PathBuf| std::fs::read_to_string(path).ok();
     let managed = managed_settings_paths().into_iter().map(read).collect();
-    let user = match claude_config_dir() {
+    let user = match crate::ai_accounts::claude_dir(account) {
         Some(dir) => user_settings_layer(&own_settings_folder(cwd), &dir.join("settings.json")),
         None => Layer::Own(None),
     };
@@ -745,7 +748,14 @@ pub(crate) fn claude_config_dir() -> Option<PathBuf> {
 
 /// Claude's global state file: `$CLAUDE_CONFIG_DIR/.claude.json` when set,
 /// else `~/.claude.json`. Plyloft only ever reads it.
-fn claude_global_config() -> Option<PathBuf> {
+///
+/// 1.179.0: of the Claude account `account`. Main (`None`) as before;
+/// another account's is in its own folder (Claude keeps `.claude.json`, and
+/// so the folder-trust answers, under `CLAUDE_CONFIG_DIR`).
+fn claude_global_config(account: Option<&str>) -> Option<PathBuf> {
+    if account.is_some() {
+        return Some(crate::ai_accounts::claude_dir(account)?.join(".claude.json"));
+    }
     if let Some(dir) = std::env::var_os("CLAUDE_CONFIG_DIR").filter(|dir| !dir.is_empty()) {
         return Some(PathBuf::from(dir).join(".claude.json"));
     }
@@ -761,8 +771,11 @@ fn claude_global_config() -> Option<PathBuf> {
 /// nothing here predicts it: what the session's screen shows decides
 /// (`pty::SessionWatch`). `None` when the state can't be read. Read-only:
 /// the member answers the question in Claude.
-pub(crate) fn folder_trusted(dir: &Path) -> Option<bool> {
-    let text = std::fs::read_to_string(claude_global_config()?).ok()?;
+///
+/// 1.179.0: as the Claude account `account` answered it (`None`: Main);
+/// every account answers the question for itself.
+pub(crate) fn folder_trusted(dir: &Path, account: Option<&str>) -> Option<bool> {
+    let text = std::fs::read_to_string(claude_global_config(account)?).ok()?;
     trusted_in(&text, dir)
 }
 

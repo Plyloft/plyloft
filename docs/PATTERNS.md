@@ -654,6 +654,26 @@ message, which names the value. A value older builds may ignore belongs in a str
 kept as written (`releaseKind`, `Workspace.shipVia`) or behind
 `lenient_opt`, not in an enum.
 
+### A Claude account on a record: `account: Option<String>`, `None` = Main (1.179.0)
+
+A record that belongs to a Claude session (a `terminal_sessions.json` row,
+a card's `BuilderState`, a chat `Conversation`) names the account it ran
+on as `account: Option<String>` with `#[serde(default, skip_serializing_if
+= "Option::is_none")]`. `None` is Main, so every older file loads on Main
+and is written back without the key, and an older Plyloft reads the
+record as it always did. Each such field gets its round-trip test (the
+`…_before_claude_accounts_…_and_an_account_round_trips` tests in
+`terminal_sessions_tests.rs`, `kanban.rs` and `chat_store.rs`).
+
+**A new reader of Claude's folder takes the session's account folder**
+(`ai_accounts::claude_dir`, `recorded_claude_dir`, or `CliHomes::claude_for`
+in `terminal_sessions.rs`), never Claude's single folder: a session on an
+account keeps its transcripts, titles and usage limits in its own folder.
+`ai_accounts_tests.rs::no_reader_takes_claudes_single_folder_outside_the_allowed_list`
+counts the single-folder reads (`SINGLE_FOLDER_READS`) in every source
+file and fails one not in `SINGLE_FOLDER_ALLOWED`, where each file has its
+most and its reason.
+
 ## v1.9.x ship-gate footguns
 
 The verify-then-ship gate (Phases A–F, v1.9.0) introduced its own family

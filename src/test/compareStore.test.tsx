@@ -223,4 +223,23 @@ describe("the Compare store", () => {
     expect(localStorage.length).toBe(0);
     expect(sessionStorage.length).toBe(0);
   });
+
+  it("1.179.0: a Put learns the first answer its tile finished after it; a pass's question stays in memory only", () => {
+    const s = useCompare.getState();
+    s.setOn(W, true);
+    const t0 = Date.now() - 60_000;
+    s.addPass(W, { ...pass(1), mode: "put", at: t0, question: "my own question", questionCut: false, withQuestion: true });
+    const a = { vendor: "codex" as const, conversation: "known" as const, turn: "done" as const, answer: "r", answerKind: "text" as const, cut: false };
+    // An answer from before the Put is not the one that took it.
+    s.setAnswer(W, "codex", { ...a, finishedAtMs: t0 - 1 });
+    expect(useCompare.getState().byWorkspace[W].history[0].answeredAt).toBeUndefined();
+    s.setAnswer(W, "codex", { ...a, finishedAtMs: t0 + 10 });
+    expect(useCompare.getState().byWorkspace[W].history[0].answeredAt).toBe(t0 + 10);
+    // The first one stays.
+    s.setAnswer(W, "codex", { ...a, answer: "r2", finishedAtMs: t0 + 20 });
+    expect(useCompare.getState().byWorkspace[W].history[0].answeredAt).toBe(t0 + 10);
+    expect(useCompare.getState().byWorkspace[W].history[0]).toMatchObject({ question: "my own question", withQuestion: true });
+    expect(localStorage.length).toBe(0);
+    expect(sessionStorage.length).toBe(0);
+  });
 });

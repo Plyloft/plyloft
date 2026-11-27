@@ -192,6 +192,18 @@ export function CopiesView({
     openNewTile(workspaceId, copy.path, openKind(copy), env);
     onShowTerminals();
   }
+  // 1.179.0: a copy made with one AI offers the other too, so its Claude
+  // and Codex tiles can be a Compare pair (only when that one is installed).
+  function otherKind(copy: CopyView): "claude" | "codex" | null {
+    const own = openKind(copy);
+    if (own === "claude") return env?.codexPath ? "codex" : null;
+    if (own === "codex") return env?.claudePath ? "claude" : null;
+    return null;
+  }
+  function openOther(copy: CopyView, kind: "claude" | "codex") {
+    openNewTile(workspaceId, copy.path, kind, env);
+    onShowTerminals();
+  }
 
   return (
     <div className="copies-view">
@@ -215,6 +227,10 @@ export function CopiesView({
                     onOpenPr={() => setPrFor(copy)}
                     onOpenTerminal={() => openTerminal(copy)}
                     openLabel={copyOpenLabel(openKind(copy))}
+                    other={(() => {
+                      const kind = otherKind(copy);
+                      return kind ? { label: copyOpenLabel(kind), onOpen: () => openOther(copy, kind) } : null;
+                    })()}
                     onThrowAway={() =>
                       throwAwayAsk(copy.saved) ? setAskThrow(copy) : void holding(copy, () => throwAway(copy))
                     }
@@ -279,6 +295,7 @@ function CopyRow({
   onOpenPr,
   onOpenTerminal,
   openLabel,
+  other = null,
   onThrowAway,
 }: {
   workspaceId: string;
@@ -290,6 +307,8 @@ function CopyRow({
   onOpenTerminal: () => void;
   /** The open press's words (`copyOpenLabel`). */
   openLabel: string;
+  /** 1.179.0: the other AI ("Open Codex" beside "Open Claude"), in the ⋯. */
+  other?: { label: string; onOpen: () => void } | null;
   onThrowAway: () => void;
 }) {
   const kinds = useKindsIn(workspaceId, copy.path);
@@ -317,19 +336,21 @@ function CopyRow({
   const throwAwayItem: MenuItem = { label: THROW_AWAY, onSelect: onThrowAway, disabled: Boolean(held), hint: held ?? undefined };
   let primary: { label: string; onClick: () => void; strong?: boolean };
   const more: MenuItem[] = [];
+  const otherItem: MenuItem[] = other ? [{ label: other.label, onSelect: other.onOpen }] : [];
   if (prShown) {
     primary = { label: SHOW_THE_PULL_REQUEST, onClick: () => void openWebLink(copy.pr!.url).catch((e: unknown) => pushToast(linkDidNotOpen(copy.pr!.url, e))) };
-    more.push({ label: openLabel, onSelect: onOpenTerminal }, throwAwayItem);
+    more.push({ label: openLabel, onSelect: onOpenTerminal }, ...otherItem, throwAwayItem);
   } else if (changed) {
     primary = { label: MAKE_IT_A_CARD, onClick: onMakeCard, strong: true };
     more.push(
       { label: OPEN_A_PULL_REQUEST, onSelect: onOpenPr },
       { label: openLabel, onSelect: onOpenTerminal },
+      ...otherItem,
       throwAwayItem,
     );
   } else {
     primary = { label: openLabel, onClick: onOpenTerminal };
-    more.push(throwAwayItem, { label: MAKE_IT_A_CARD, onSelect: onMakeCard });
+    more.push(...otherItem, throwAwayItem, { label: MAKE_IT_A_CARD, onSelect: onMakeCard });
   }
   return (
     <Row

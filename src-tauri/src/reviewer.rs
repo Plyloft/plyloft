@@ -1761,6 +1761,9 @@ fn run_collected_pass(
             run_id: None,
             retention_class: RetentionClass::Unattended,
             objective: Some(objective.to_string()),
+            // 1.179.0: a Claude pass starts on the account new sessions
+            // start on now (nothing of a review is resumed later).
+            account: crate::ai_accounts::for_new_session(app, provider),
         },
         timeout_secs,
     ) {

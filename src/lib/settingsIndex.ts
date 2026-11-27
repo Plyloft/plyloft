@@ -49,6 +49,7 @@ import {
 } from "./settingsSearch.ts";
 import { formatKeys, isMac, isWindows, machineWords, platformWord } from "./platform.ts";
 import { PROGRAM_FOLDERS_HINT_MAC, PROGRAM_FOLDERS_HINT_WINDOWS } from "./programFolders.ts";
+import { SECTION_TITLE as CLAUDE_ACCOUNTS, introLine as claudeAccountsIntro } from "./claudeAccounts.ts";
 
 // ── Pages ───────────────────────────────────────────────────────────────
 
@@ -391,6 +392,18 @@ const ROW_ENTRIES: RowEntry[] = [
     hint: "Whether this project's setup is shared with everyone who opens the repository, and the way to stop sharing it or share it again.",
     synonyms: ["stop sharing", "share", "sharing", "shared", "unshare", "share it again", "workspace.json", "team", "setup"],
     absentNote: "this project never shared its setup.",
+  },
+  // 1.179.0 (C1): the Claude accounts section, found by its Main row (the one
+  // row always drawn, whatever the member named it: `findAs`).
+  {
+    page: "claude-codex",
+    section: CLAUDE_ACCOUNTS,
+    label: CLAUDE_ACCOUNTS,
+    hint: claudeAccountsIntro(isWindows() ? "windows" : "mac"),
+    synonyms: [
+      "claude account", "claude accounts", "second subscription", "another subscription", "switch account",
+      "new sessions",
+    ],
   },
   {
     page: "claude-codex",
@@ -1156,7 +1169,7 @@ export const NOT_SEARCHABLE: Record<string, string> = {
     "what the checklist-classes sub-page says when there are too many classes to publish.",
   "Drafted from a finding":
     "the class editor's first row, saying where the draft in front of you came from.",
-  Name: "the class editor's own field on Cards › Building and checking; Project › General's Name row is indexed as a field of that page.",
+  Name: "the class editor's own field on Cards › Building and checking, and (1.179.0) the name field of the Claude accounts' Add and Rename sheets; Project › General's Name row is indexed as a field of that page.",
   "What to look for": "the class editor's own field, inside the sub-page's form.",
   "Start command":
     "the field that How to start your app opens under itself while you change it; that row is indexed.",
@@ -1212,6 +1225,9 @@ export const DYNAMIC_ROWS: Record<string, { labels?: readonly string[]; why?: st
   "{SOLO_REPO_BOARD_TEAM}": {
     why: "1.172.0 (B1): Settings › Project › General (its board) in solo mode when the repository's shared setup keeps its board on GitHub Issues; the row opens Setup and account › Setup's Work with a team (adoption.ts).",
   },
+  // 1.179.0 (C1): one row per Claude account, named by the member; Main's row
+  // is found as the section (`findAs`).
+  "{account.name}": { labels: [CLAUDE_ACCOUNTS] },
   "{areaTitle(area)}": {
     why: "1.173.0 G1: one Releases row per area on Settings › Cards › Shipping, named after the area; the default release kind is part of the areas, and the page's entry is what a search finds.",
   },

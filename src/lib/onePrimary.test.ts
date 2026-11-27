@@ -66,6 +66,7 @@ type Baseline = { file: string; component: string; count: number; possible?: num
 /** Components that drew more than one filled primary when the guard landed
  *  (1.174.0, B2). Each is fixed by a card with an approved mockup. */
 const BASELINE: Baseline[] = [
+  { file: "components/CompareBar.tsx", component: "CompareBars", count: 1, perRow: 1, reason: "Compare's relay bars (1.179.0 two pairs): one CompareBar with one pair, or one per pair in a .map with two — branches that never show together. The .map draws at most two bars, each its own view of its own pair (its own tiles, passes and composer) with its own Pass, as one pair's bar has today; at rest both Pass buttons can be on, and while one pair's composer is open the other's Pass is off (bar(), otherComposer)" },
   { file: "components/CardTroubles.tsx", component: "ShipRefusalBlocks", count: 0, possible: 2, reason: "the refused ship's two blocks (LocalBranchBlock, UnpublishedReleaseBlock), each with its own primary way out; each draws only for this card's refusal, so at most one shows (1.175.0 F8, drawn once by the card page)" },
   { file: "components/CardReviewPanel.tsx", component: "CardReviewPanel", count: 2, reason: "the conflict block's Ask the Builder / Retry merge: card-review-btn primary in branches that never show together (the class is a ternary)" },
   { file: "components/CardShipStep.tsx", component: "CardShipStep", count: 0, possible: 2, reason: "the Shipping section's LocalBranchBlock and UnpublishedReleaseBlock, error blocks, each with its own primary way out" },
@@ -101,6 +102,7 @@ const BASELINE: Baseline[] = [
   { file: "components/setup/TeamStep.tsx", component: "JoinedPanel", count: 2, reason: "TeamProjects' primary and InvitePeople's can show together on the joined team" },
   { file: "components/setup/TeamStep.tsx", component: "TeamStep", count: 5, possible: 3, reason: "Setup's team step draws JoinPanel (2), CreatePanel and JoinedPanel (2): the panels are branches that never show together, but JoinedPanel's two can; plus the panels' error blocks, each with its own primary way out" },
   { file: "components/tutorial/GuidePanel.tsx", component: "GuidePanel", count: 0, perRow: 1, reason: "the guide's step rows: only the current step's row draws its Next, drawn inside the .map" },
+  { file: "components/settings/ClaudeAccountsSection.tsx", component: "ClaudeAccountsSection", count: 3, reason: "draws AddSheet, RenameSheet or SignInSheet: one sheet open at a time, and the section itself has no filled button" },
   { file: "components/tutorial/HelpSheets.tsx", component: "HelpSheets", count: 2, reason: "draws WhatsNewSheet or GetHelpSheet: one sheet open at a time" },
   { file: "components/ux/ErrorBlock.tsx", component: "ErrorBlock", count: 0, perRow: 1, reason: "its ways out come from a list: only the one marked primary is filled, drawn inside the .map (each call site counts once in a view)" },
 ];

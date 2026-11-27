@@ -2059,7 +2059,9 @@ follow the project you're in, not your first card's.
   to ask the other one (**Review this plan**, **Carry it out**, **Check this
   work**, **Answer this review** or **Just pass it**), add a note of your
   own if you want, then **Send** it, or **Put it in its box** and press
-  Enter there yourself. A plan Claude wrote in plan mode can be passed while
+  Enter there yourself. **Include my question** adds what you asked in that
+  turn before the answer; it is left out when the turn holds only text you
+  passed, or when Plyloft can't tell which words are yours. A plan Claude wrote in plan mode can be passed while
   Claude still waits for your answer; to send something to Claude while it
   waits there, press Esc in its session first. Nothing goes by itself: every
   pass is your press. While the other session is working, asks you something or
@@ -2073,7 +2075,11 @@ follow the project you're in, not your first card's.
   the list are gone when you quit Plyloft. Codex chat sessions and shells
   aren't compared. After `/new` in a Codex session Plyloft can't tell which
   conversation it is in, and offers no answer of it back: close it and open
-  a new Codex session to compare.
+  a new Codex session to compare. You can compare two pairs at once: one in
+  the project folder and one in a copy. Open the second with **New ›
+  Compare in a new copy…**. Each pair has its own bar, named after its
+  copy, and **⌘⇧Y** (**Ctrl+Shift+Y** on Windows) passes in the pair you're
+  working in.
 <!-- tour:terminals.new-copy -->
 - **Work in a copy**: **New › In a new copy…** opens a session in its own
   copy of the project, started from your main branch on GitHub, so it
@@ -2398,6 +2404,17 @@ is a more independent check. Choose who builds in **Settings › Cards › AI
 and models › Who builds new cards**, or per card. That row shows the AI a new
 card starts with: picking an AI on a card makes it the choice there too, and
 choosing there again sets it for the next cards.
+
+**A second Claude subscription.** You can add one in **Settings › Cards ›
+AI and models › Claude accounts**; it signs in with Claude's own login.
+New sessions start on the account you choose there. A session that is
+already running keeps its account, and resuming a conversation uses the
+account it was started on. With more than one account, a Claude terminal
+and a card's Builder say which one they run on. When a card's Builder
+reaches its usage limit, the card offers **Start fresh on** and the name of
+another of your accounts: only when you press it, it starts a new Builder on
+that account in the same copy, and new sessions still start on the account
+you chose.
 
 **Models.** Each role runs on the model and effort set for it in **Settings ›
 Cards › AI and models › Models**: one row per AI, whose **Change…** opens its

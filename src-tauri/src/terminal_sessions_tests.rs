@@ -26,6 +26,7 @@ fn row(id: &str, started_at: i64) -> SessionRow {
         resumed_from: None,
         passed_name: None,
         open_at_quit: None,
+        account: None,
         extra: Default::default(),
     }
 }
@@ -701,7 +702,7 @@ fn resume_shows_a_tile_that_runs_it_and_refuses_a_gone_folder_a_gone_file_or_one
     for id in ["s-ok", "s-tile", "s-open"] {
         write(&claude.path().join(format!("projects/{key}/{id}.jsonl")), &[claude_line(&cwd, "x")]);
     }
-    let check = |id: &str, dir: &std::path::Path| resume_check(&homes, SessionKind::Claude, id, dir);
+    let check = |id: &str, dir: &std::path::Path| resume_check(&homes, SessionKind::Claude, id, dir, None);
     assert_eq!(check("s-ok", &folder), ResumeCheck::Ready);
     assert_eq!(check("s-missing", &folder), ResumeCheck::ConversationGone);
     assert_eq!(check("s-ok", std::path::Path::new("/no/such/folder")), ResumeCheck::FolderGone);
@@ -1046,6 +1047,203 @@ fn two_codex_tiles_opened_together_in_one_folder_stay_unclaimed_and_ambiguous() 
     reset_for_tests();
 }
 
+// ── 1.179.0 Windows walk (step 14): a fresh Codex tile's own `/resume` ──
+
+/// A fresh Codex tile's world: an older session `older` of its folder, begun
+/// four hours ago.
+struct Resumable {
+    config: tempfile::TempDir,
+    codex: tempfile::TempDir,
+    _folder: tempfile::TempDir,
+    homes: CliHomes,
+    cwd: String,
+}
+
+fn an_older_session(mtimes: Mtimes) -> Resumable {
+    let config = tempfile::tempdir().unwrap();
+    let codex = tempfile::tempdir().unwrap();
+    let homes = CliHomes { claude: None, codex: Some(codex.path().to_path_buf()) };
+    let folder = tempfile::tempdir().unwrap();
+    let cwd = folder.path().to_string_lossy().to_string();
+    let hours_ago = chrono::Utc::now().timestamp_millis() - 4 * 60 * 60 * 1000;
+    codex_turn(codex.path(), "older", &cwd, hours_ago, "earlier work");
+    codex_append(codex.path(), "older", hours_ago + 2_000, mtimes);
+    Resumable { config, codex, _folder: folder, homes, cwd }
+}
+
+/// Tile `pty` starts in that folder; returns when it started.
+fn a_tile(w: &Resumable, pty: &str, session: Option<&str>) -> i64 {
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    let row = record_start(w.config.path(), "ws", pty, SessionKind::Codex, &w.cwd, session.map(str::to_string)).unwrap();
+    started_of(w.config.path(), &row)
+}
+
+/// The tile resumed a session held by a tile that closed earlier: once its
+/// own Enter and a turn's lines in that session, it is in it, whether or not
+/// the rollout's mtime moves.
+#[test]
+fn a_fresh_codex_tile_that_resumed_an_older_session_is_in_it() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        a_tile(&w, "pty-old", Some("older"));
+        record_end("pty-old");
+        let tr = a_tile(&w, "pty-r", None);
+        let got = live_conversation("pty-r", None, &w.homes).unwrap();
+        assert_eq!(got.id, None, "{mtimes:?}: no turn yet");
+        assert!(!got.newer_elsewhere, "{mtimes:?}: nothing written since it started");
+        note_input("pty-r", b"\r");
+        codex_append(w.codex.path(), "older", tr + 1_000, mtimes);
+        let got = live_conversation("pty-r", None, &w.homes).unwrap();
+        assert_eq!(got.id.as_deref(), Some("older"), "{mtimes:?}: the session it resumed");
+        assert_eq!(got.file.as_deref(), Some(codex_file(w.codex.path(), "older").as_path()), "{mtimes:?}");
+        assert!(!got.newer_elsewhere, "{mtimes:?}");
+        reset_for_tests();
+    }
+}
+
+/// No Enter into the tile before the growth was seen: never its. An Enter
+/// after that look doesn't make that growth its; the next one, after it, does.
+#[test]
+fn a_resumed_session_is_the_tile_s_only_after_its_own_enter() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        let tr = a_tile(&w, "pty-r", None);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None);
+        // Written by something else (no key went into the tile).
+        codex_append(w.codex.path(), "older", tr + 1_000, mtimes);
+        let got = live_conversation("pty-r", None, &w.homes).unwrap();
+        assert_eq!(got.id, None, "{mtimes:?}: no Enter in the tile");
+        assert!(got.newer_elsewhere, "{mtimes:?}: so it can't tell");
+        // A paste with line breaks is no Enter.
+        note_input("pty-r", b"\x1b[200~two\rlines\x1b[201~");
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{mtimes:?}: a paste");
+        std::thread::sleep(std::time::Duration::from_millis(3));
+        note_input("pty-r", b"\r");
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{mtimes:?}: an Enter after that look");
+        codex_append(w.codex.path(), "older", tr + 2_000, mtimes);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id.as_deref(), Some("older"), "{mtimes:?}");
+        reset_for_tests();
+    }
+}
+
+/// Another running Codex tile in the folder, holding its own session: the
+/// older session's new lines may be its (its own `/resume`), so the fresh
+/// tile takes nothing, Enter or not.
+#[test]
+fn a_fresh_codex_tile_beside_a_running_one_never_takes_a_resumed_session() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        let tu = a_tile(&w, "pty-u", None);
+        codex_turn(w.codex.path(), "u-own", &w.cwd, tu + 1_000, "the other tile's work");
+        assert_eq!(live_conversation("pty-u", None, &w.homes).unwrap().id.as_deref(), Some("u-own"));
+        let tr = a_tile(&w, "pty-r", None);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None);
+        note_input("pty-r", b"\r");
+        codex_append(w.codex.path(), "older", tr + 1_000, mtimes);
+        let got = live_conversation("pty-r", None, &w.homes).unwrap();
+        assert_eq!(got.id, None, "{mtimes:?}: it may be the running tile's");
+        assert!(got.newer_elsewhere, "{mtimes:?}: can't tell");
+        reset_for_tests();
+    }
+}
+
+/// The same resume with two Codex tiles waiting in the folder: either could
+/// have resumed it, so neither takes it and both can't tell.
+#[test]
+fn a_resumed_session_with_two_codex_tiles_waiting_in_its_folder_is_claimed_by_neither() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        a_tile(&w, "pty-x", None);
+        let ty = a_tile(&w, "pty-y", None);
+        for pty in ["pty-x", "pty-y"] {
+            assert_eq!(live_conversation(pty, None, &w.homes).unwrap().id, None);
+            note_input(pty, b"\r");
+        }
+        codex_append(w.codex.path(), "older", ty + 1_000, mtimes);
+        for pty in ["pty-x", "pty-y", "pty-x"] {
+            let got = live_conversation(pty, None, &w.homes).unwrap();
+            assert_eq!(got.id, None, "{mtimes:?}: {pty} claims nothing");
+            assert!(got.newer_elsewhere, "{mtimes:?}: {pty} can't tell");
+        }
+        reset_for_tests();
+    }
+}
+
+/// A tile that held the session wrote its last lines and closed after the
+/// look before them: those lines are its, never the fresh tile's.
+#[test]
+fn a_closing_tile_s_last_lines_are_not_taken_by_a_fresh_one() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        a_tile(&w, "pty-h", Some("older"));
+        let tr = a_tile(&w, "pty-r", None);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None);
+        note_input("pty-r", b"\r");
+        codex_append(w.codex.path(), "older", tr + 1_000, mtimes);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{mtimes:?}: held");
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        record_end("pty-h");
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{mtimes:?}: the closed tile's lines");
+        reset_for_tests();
+    }
+}
+
+/// The first look ever at the session comes after it grew: nothing says when,
+/// so not the tile's. Its next growth after the tile's Enter is.
+#[test]
+fn a_session_first_seen_already_grown_is_taken_only_at_its_next_growth() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        let tr = a_tile(&w, "pty-r", None);
+        note_input("pty-r", b"\r");
+        codex_append(w.codex.path(), "older", tr + 1_000, mtimes);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{mtimes:?}: first seen grown");
+        codex_append(w.codex.path(), "older", tr + 2_000, mtimes);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id.as_deref(), Some("older"), "{mtimes:?}");
+        reset_for_tests();
+    }
+}
+
+/// An older session that grew is never the tile's when it is Plyloft's own
+/// card intake, or not the interactive CLI's (`codex exec`).
+#[test]
+fn a_grown_intake_or_non_cli_session_is_never_a_resumed_one() {
+    let _serial = serial();
+    for kind in ["intake", "exec"] {
+        reset_for_tests();
+        let w = an_older_session(Mtimes::StayAtCreation);
+        let hours_ago = chrono::Utc::now().timestamp_millis() - 3 * 60 * 60 * 1000;
+        let ts = chrono::DateTime::from_timestamp_millis(hours_ago).unwrap().to_rfc3339();
+        if kind == "intake" {
+            let text = format!("Instructions.\n\n{}\n\n---\n\nCard title: x", crate::intake::codex_intake_marker("intake-1"));
+            codex_turn(w.codex.path(), "other", &w.cwd, hours_ago, &text);
+        } else {
+            write(&codex_file(w.codex.path(), "other"), &[
+                json!({"type": "session_meta", "payload": {"id": "other", "cwd": w.cwd.as_str(), "source": "exec", "timestamp": ts}}),
+                json!({"type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "A task."}]}}),
+            ]);
+        }
+        let tr = a_tile(&w, "pty-r", None);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None);
+        note_input("pty-r", b"\r");
+        codex_append(w.codex.path(), "other", tr + 1_000, Mtimes::StayAtCreation);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{kind}");
+        reset_for_tests();
+    }
+}
+
 #[test]
 fn a_codex_tile_whose_own_codex_started_a_newer_session_is_ambiguous() {
     let _serial = serial();
@@ -1088,4 +1286,115 @@ fn after_a_sister_tile_closed_a_session_no_tile_claimed_still_makes_a_codex_tile
         assert!(s.a_started < s.b_started);
         reset_for_tests();
     }
+}
+
+// ── 1.179.0 (C2): Claude accounts ───────────────────────────────────────
+
+/// Schema migration (PPVP Tier 2): a row written before Claude accounts
+/// reads as Main and writes back without the key; a row on an account keeps
+/// it through a write and a read.
+#[test]
+fn a_row_before_claude_accounts_reads_as_main_and_an_account_round_trips() {
+    let old: SessionRow =
+        serde_json::from_value(json!({ "id": "r1", "kind": "claude", "cwd": "/p", "startedAt": 5 })).unwrap();
+    assert_eq!(old.account, None, "Main");
+    assert!(serde_json::to_value(&old).unwrap().get("account").is_none(), "left out while Main");
+    let mut r = row("r2", 6);
+    r.account = Some("a1b2c3d4".into());
+    let v = serde_json::to_value(&r).unwrap();
+    assert_eq!(v["account"], "a1b2c3d4");
+    let back: SessionRow = serde_json::from_value(v).unwrap();
+    assert_eq!(back.account.as_deref(), Some("a1b2c3d4"));
+}
+
+/// A test project with Main's folder and one account's, `a1b2c3d4`, under
+/// a temporary app config folder (`ai_accounts::test_root`, this thread).
+struct TwoAccounts {
+    config: tempfile::TempDir,
+    _main: tempfile::TempDir,
+    _project: tempfile::TempDir,
+    homes: CliHomes,
+    folder: std::path::PathBuf,
+    cwd: String,
+    account_dir: std::path::PathBuf,
+}
+
+const ACCOUNT: &str = "a1b2c3d4";
+
+fn two_accounts() -> TwoAccounts {
+    let config = tempfile::tempdir().unwrap();
+    let main = tempfile::tempdir().unwrap();
+    let project = tempfile::tempdir().unwrap();
+    let folder = crate::platform::canonicalize(project.path()).unwrap();
+    let cwd = folder.to_string_lossy().to_string();
+    crate::ai_accounts::test_root::set(Some(config.path().to_path_buf()));
+    let account_dir = config.path().join("ai-accounts").join("claude").join(ACCOUNT);
+    std::fs::create_dir_all(&account_dir).unwrap();
+    let homes = CliHomes { claude: Some(main.path().to_path_buf()), codex: None };
+    TwoAccounts { config, _main: main, _project: project, homes, folder, cwd, account_dir }
+}
+
+/// A conversation kept in an account's folder is found for a row recorded
+/// on that account, and not for a row recorded on Main: Resume…'s check,
+/// History and the project's list all look where the row's account keeps
+/// it, and the list says which account that is.
+#[test]
+fn a_conversation_in_an_accounts_folder_is_found_for_its_row_and_not_for_main() {
+    let _serial = serial();
+    reset_for_tests();
+    let t = two_accounts();
+    let key = claude_project_key(&t.cwd);
+    write(&t.account_dir.join(format!("projects/{key}/s-acc.jsonl")), &[claude_line(&t.cwd, "tidy the footer")]);
+    let on = |account: Option<&str>| resume_check(&t.homes, SessionKind::Claude, "s-acc", &t.folder, account);
+    assert_eq!(on(Some(ACCOUNT)), ResumeCheck::Ready);
+    assert_eq!(on(None), ResumeCheck::ConversationGone, "Main's folder never holds it");
+
+    record_start_on(t.config.path(), "ws", "pty-acc", SessionKind::Claude, &t.cwd, Some("s-acc".into()), Some(ACCOUNT.into()))
+        .unwrap();
+    record_start(t.config.path(), "ws", "pty-main", SessionKind::Claude, &t.cwd, Some("s-acc".into())).unwrap();
+    reset_for_tests();
+    let history = history_all(t.config.path(), &["ws".to_string()], &t.homes);
+    let of = |account: Option<&str>| {
+        history.sessions.iter().find(|s| s.session.row.account.as_deref() == account).expect("its row")
+    };
+    assert!(of(Some(ACCOUNT)).resumable && of(Some(ACCOUNT)).gone.is_none());
+    assert_eq!(of(None).gone, Some(Gone::Conversation));
+
+    let listed = conversations(t.config.path(), "ws", &t.folder, &t.homes);
+    let found = listed.iter().find(|c| c.cli_session_id == "s-acc").expect("listed from the account's folder");
+    assert_eq!(found.account.as_deref(), Some(ACCOUNT));
+    crate::ai_accounts::test_root::set(None);
+    reset_for_tests();
+}
+
+/// A row whose account was removed (its folder with it) is not resumed on
+/// another account: Resume…'s check and History say so, in the words
+/// `ai_accounts::ACCOUNT_REMOVED` gives the window.
+#[test]
+fn a_row_whose_account_was_removed_is_not_resumable() {
+    let _serial = serial();
+    reset_for_tests();
+    let t = two_accounts();
+    let key = claude_project_key(&t.cwd);
+    // The same conversation id in Main's folder must not stand in for it.
+    write(&t.homes.claude.clone().unwrap().join(format!("projects/{key}/s-gone.jsonl")), &[claude_line(&t.cwd, "x")]);
+    record_start_on(t.config.path(), "ws", "pty-gone", SessionKind::Claude, &t.cwd, Some("s-gone".into()), Some(ACCOUNT.into()))
+        .unwrap();
+    reset_for_tests();
+    std::fs::remove_dir_all(&t.account_dir).unwrap();
+    assert_eq!(
+        resume_check(&t.homes, SessionKind::Claude, "s-gone", &t.folder, Some(ACCOUNT)),
+        ResumeCheck::AccountRemoved
+    );
+    let history = history_all(t.config.path(), &["ws".to_string()], &t.homes);
+    let row = &history.sessions[0];
+    assert_eq!((row.resumable, row.gone), (false, Some(Gone::Account)));
+    assert_eq!(serde_json::to_value(row).unwrap()["gone"], "account");
+    assert_eq!(
+        serde_json::to_value(ResumeCheck::AccountRemoved).unwrap(),
+        json!({ "kind": "accountRemoved" })
+    );
+    assert_eq!(crate::ai_accounts::ACCOUNT_REMOVED, "Its account was removed from Plyloft.");
+    crate::ai_accounts::test_root::set(None);
+    reset_for_tests();
 }

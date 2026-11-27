@@ -515,6 +515,7 @@ fn ids_are_matched_exactly_and_unknown_ones_are_refused() {
 fn arguments_are_only_the_github_host_and_only_for_gh() {
     let host = |h: &str| SetupArgs {
         hostname: Some(h.to_string()),
+        ..SetupArgs::default()
     };
     for id in ["login.gh", "add-account.gh", "setupgit.gh", "refresh.gh"] {
         assert!(
@@ -683,6 +684,7 @@ fn no_frontend_string_reaches_an_argv() {
                 action.id(),
                 Some(&SetupArgs {
                     hostname: Some(GITHUB_HOST.into()),
+                    ..SetupArgs::default()
                 }),
                 &[],
             );
@@ -698,6 +700,7 @@ fn no_frontend_string_reaches_an_argv() {
             let host = rng.string();
             let args = SetupArgs {
                 hostname: Some(host.clone()),
+                ..SetupArgs::default()
             };
             check(&id, Some(&args), &[id.clone(), host]);
             // Mutations of a real id are never accepted.
@@ -849,4 +852,104 @@ fn reach_argv_is_fixed_per_platform() {
     assert!(tls.proxy);
     let offline = reach_verdict(Some(1), "The remote name could not be resolved: 'claude.ai'");
     assert!(!offline.reachable && !offline.proxy);
+}
+
+// ── 1.179.0 (C1): the Claude account steps ──────────────────────────────
+
+const WORK_DIR: &str = "/Users/someone/Library/Application Support/com.mbadv.ply/ai-accounts/claude/a1b2c3d4";
+
+fn work() -> Vec<crate::ai_accounts::AccountFolder> {
+    vec![crate::ai_accounts::AccountFolder {
+        id: "a1b2c3d4".into(),
+        dir: std::path::PathBuf::from(WORK_DIR),
+    }]
+}
+
+fn on(id: &str) -> SetupArgs {
+    SetupArgs {
+        account: Some(id.into()),
+        ..SetupArgs::default()
+    }
+}
+
+/// The CLI's own `claude auth login` / `logout`, with the account's folder
+/// in `CLAUDE_CONFIG_DIR` and nothing else changed; Main's sign-in still
+/// gets no folder.
+#[test]
+fn an_account_step_runs_claudes_own_login_on_its_own_folder() {
+    let accounts = work();
+    let folder = vec![("CLAUDE_CONFIG_DIR".to_string(), WORK_DIR.to_string())];
+    let login = plan_request_with("login-account.claude", Some(&on("a1b2c3d4")), &mac(), &accounts).unwrap();
+    assert_eq!(login.argv, with(CLAUDE, &["auth", "login"]));
+    assert_eq!(login.watch, Watch::ClaudeSignIn);
+    assert_eq!(login.env, folder);
+    assert!(login.cwd.is_none() && login.token.is_none() && login.clone.is_none() && !login.direct);
+    assert_eq!(login.display, "claude auth login");
+
+    let logout = plan_request_with("logout-account.claude", Some(&on("a1b2c3d4")), &mac(), &accounts).unwrap();
+    assert_eq!(logout.argv, with(CLAUDE, &["auth", "logout"]));
+    assert_eq!(logout.watch, Watch::ExitCode);
+    assert_eq!(logout.env, folder);
+
+    let windows_login =
+        plan_request_with("login-account.claude", Some(&on("a1b2c3d4")), &windows(), &accounts).unwrap();
+    assert_eq!(windows_login.argv, with(W_CLAUDE, &["auth", "login"]));
+
+    assert!(plan_request("login.claude", None, &mac()).unwrap().env.is_empty(), "Main: no folder");
+}
+
+/// Principle 8 for the account steps: the folder comes from the stored
+/// account the id names, never from the text sent. An id no account has, a
+/// path, a near miss or no id at all plans nothing; so does a request
+/// without the stored folders.
+#[test]
+fn an_account_step_takes_its_folder_from_the_id_only() {
+    let accounts = work();
+    for id in ["login-account.claude", "logout-account.claude"] {
+        let action = ActionId::parse(id).unwrap();
+        assert!(action.is_account_step() && !ALL_ACTIONS.contains(&action), "{id}");
+        assert_eq!(action.id(), id);
+        for args in [
+            None,
+            Some(SetupArgs::default()),
+            Some(on("ffffffff")),
+            Some(on("A1B2C3D4")),
+            Some(on("a1b2c3d4 ")),
+            Some(on("../a1b2c3d4")),
+            Some(on(WORK_DIR)),
+            Some(on("/tmp/elsewhere")),
+        ] {
+            assert_eq!(
+                plan_request_with(id, args.as_ref(), &mac(), &accounts).unwrap_err(),
+                crate::ai_accounts::UNKNOWN_ACCOUNT,
+                "{id} {args:?}"
+            );
+        }
+        let with_host = SetupArgs {
+            hostname: Some(GITHUB_HOST.into()),
+            account: Some("a1b2c3d4".into()),
+        };
+        assert_eq!(plan_request_with(id, Some(&with_host), &mac(), &accounts).unwrap_err(), ARGS_REFUSED);
+        assert_eq!(
+            plan_request(id, Some(&on("a1b2c3d4")), &mac()).unwrap_err(),
+            crate::ai_accounts::UNKNOWN_ACCOUNT,
+            "{id}: without the stored folders"
+        );
+        let bare = PlanFacts { claude: None, ..mac() };
+        assert!(plan_request_with(id, Some(&on("a1b2c3d4")), &bare, &accounts)
+            .unwrap_err()
+            .contains("isn't installed"));
+    }
+    // Every other step refuses an account argument.
+    for action in ALL_ACTIONS {
+        assert_eq!(
+            plan_request_with(action.id(), Some(&on("a1b2c3d4")), &mac(), &accounts).unwrap_err(),
+            ARGS_REFUSED,
+            "{}",
+            action.id()
+        );
+    }
+    // The argument decodes by its name only; nothing else rides along.
+    assert_eq!(serde_json::from_str::<SetupArgs>(r#"{"account":"a1b2c3d4"}"#).unwrap(), on("a1b2c3d4"));
+    assert!(serde_json::from_str::<SetupArgs>(r#"{"account":"a1b2c3d4","dir":"/tmp"}"#).is_err());
 }

@@ -144,11 +144,57 @@ export function fromLabelWords(v: CompareVendor): string {
   return v === "claude" ? "From Claude Code:" : "From Codex:";
 }
 export const COMPARE_NOTE_LABEL = "My note:";
+/** 1.179.0: the question block's label in the pasted text (prompt text for
+ *  the AI), named after the tile the answer comes from. */
+export function questionLabelWords(from: CompareVendor): string {
+  return `My question to ${compareVendorName(from)}:`;
+}
+
+// 1.179.0 "Include my question": the composer's switch and why it is off.
+export const COMPARE_INCLUDE_QUESTION = "Include my question";
+export function includeQuestionHint(from: CompareVendor): string {
+  return `Adds what you asked ${compareVendorName(from)} in that turn, before its answer.`;
+}
+export function questionPassedOnlyWords(from: CompareVendor): string {
+  return `That turn holds only what you passed to ${compareVendorName(from)}. There's no question of yours to add.`;
+}
+export function questionStartUnknownWords(from: CompareVendor): string {
+  return `Can't tell where ${compareVendorName(from)}'s turn started, so your question is left out.`;
+}
+export function questionNotYoursWords(from: CompareVendor): string {
+  return `${compareVendorName(from)}'s turn didn't start with a message of yours, so there's no question to add.`;
+}
+export const QUESTION_EDITED_WORDS = "Can't tell your words from the text you passed, so your question is left out.";
+export const QUESTION_PLAN_FEEDBACK_WORDS = "Can't read your answer to Claude's plan menu, so your question is left out.";
+export const COMPARE_QUESTION_CUT = "Your question is cut to fit 16,000 characters.";
+export const COMPARE_QUESTION_LEFT_OUT = "Your question is left out: the answer takes the 16,000 characters.";
 
 // History.
 export const COMPARE_HISTORY_LABEL = "Passes";
 export const COMPARE_WITH_NOTE = "with your note";
+export const COMPARE_WITH_QUESTION = "with your question";
 export const COMPARE_PASS_AGAIN = "Pass it again";
 export function historyDirection(from: CompareVendor, to: CompareVendor): string {
   return `${compareVendorName(from)} → ${compareVendorName(to)}`;
 }
+
+// 1.179.0 Two pairs: a pair is named after its place (the project's name,
+// or the copy's).
+export function pairRegionLabel(name: string): string {
+  return `Compare · ${name}`;
+}
+export function pairTileClosedWords(v: CompareVendor, name: string): string {
+  return `${compareVendorName(v)}'s tile in ${name} is closed. Open one there to compare again.`;
+}
+export function otherPassOpenWords(name: string): string {
+  return `Finish or cancel the pass in ${name} first.`;
+}
+export function thirdPlaceWords(name: string): string {
+  return `Compare shows two pairs at most. Close a pair's tiles to compare the ones in ${name}.`;
+}
+export const COMPARE_CROSS_PLACE =
+  "To compare two pairs, keep each pair's Claude and Codex tiles in one place: the project folder or a copy.";
+export const COMPARE_NEW_COPY_MENU = "Compare in a new copy…";
+export const COMPARE_NEW_COPY_HINT = "a Claude and a Codex tile";
+/** The copy sheet's choice that opens both tiles. */
+export const COMPARE_PAIR_CHOICE = "Claude and Codex";

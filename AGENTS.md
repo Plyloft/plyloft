@@ -10,7 +10,9 @@ agent configurations and prompts. Source lives in `src/` and `src-tauri/`.
    Claude Pro or Max through `claude`, or ChatGPT through `codex`. Ply never uses
    the Anthropic SDK or an API key of its own. Rust `portable-pty` spawns the CLI,
    which inherits authentication from its own login (`~/.claude/`, `~/.codex/`);
-   do not replace it with JS node-pty.
+   do not replace it with JS node-pty. A second Claude subscription is Claude's
+   own login in its own folder (`CLAUDE_CONFIG_DIR`, `ai_accounts.rs`); Plyloft
+   never reads the login, only whether one exists.
 2. **Inject the cached PATH into every PTY spawn.** GUI apps do not read shell
    startup files. Use `shell_env::init()` and the `pty.rs::spawn` pattern.
    Plyloft's own Setup and Repair install, update and removal steps get the
@@ -76,7 +78,9 @@ touching live state; an implementation request does not authorize resetting it.
   not into a question, a menu, a turn in progress or a box holding the
   member's typing. Plyloft answers no screen of an AI. The answers it reads
   from the CLIs' own conversation files stay in memory: never logged,
-  never persisted.
+  never persisted. With two pairs, the shortcut and every write act on the
+  pair the member is in, and *Include my question* adds only the member's
+  own words from the same in-memory read, never logged or persisted.
 - Tauri plugin permissions are opt-in through `src-tauri/capabilities/default.json`.
 - Rust changes in `tauri dev` trigger rebuilds and reset running window/pane state.
 

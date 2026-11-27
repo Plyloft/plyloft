@@ -5712,3 +5712,164 @@ describe("the Review and the session, open together (C3)", () => {
     expect(mounts.builder).toBe(1);
   });
 });
+
+// 1.179.0 (C2): with a second Claude account, the Run step names the one the
+// Builder runs on, and a Resume that will run on another account says so.
+describe("the Builder's Claude account (C2)", () => {
+  const TWO_ACCOUNTS = {
+    ai_accounts_list: [
+      { id: null, name: "Main", signedIn: "yes", isCurrent: true, folder: null },
+      { id: "acct0001", name: "Work", signedIn: "yes", isCurrent: false, folder: "/Users/someone/work" },
+    ],
+  };
+  const builderOn = (account: string | undefined, ptyId: string | null) => ({
+    vendor: "claude" as const,
+    bypass: false,
+    model: "opus",
+    ptyId,
+    sessionLost: false,
+    startedAt: 1,
+    snapshots: [],
+    ...(account ? { account } : {}),
+  });
+
+  it("says Builds on Claude (Work) with its model, only with more than one account", async () => {
+    useBuilder.setState({
+      byCard: {
+        c1: { workspaceId: BOARD_WS, ptyId: "pty-1", vendor: "claude", startedAt: Date.now(), lastOutputAt: Date.now(), promptBoxIdle: true, pending: [] } as never,
+      },
+    });
+    open(boardCard("c1", { notes: "Do it", columnId: "in_progress", lastRunStatus: "running", builder: builderOn("acct0001", "pty-1") }), [], TWO_ACCOUNTS);
+    await waitFor(() => expect(within(section("run")).getByText("Builds on Claude (Work) with opus")).toBeTruthy());
+    expect(within(section("run")).queryByText("Claude builds on opus")).toBeNull();
+  });
+
+  it("with Main alone, the sentence is the one it always was", async () => {
+    useBuilder.setState({
+      byCard: {
+        c1: { workspaceId: BOARD_WS, ptyId: "pty-1", vendor: "claude", startedAt: Date.now(), lastOutputAt: Date.now(), promptBoxIdle: true, pending: [] } as never,
+      },
+    });
+    const { tauri } = open(boardCard("c1", { notes: "Do it", columnId: "in_progress", lastRunStatus: "running", builder: builderOn(undefined, "pty-1") }));
+    await waitFor(() => expect(tauri.callsOf("ai_accounts_list").length).toBeGreaterThan(0));
+    expect(within(section("run")).getByText("Claude builds on opus")).toBeTruthy();
+    expect(document.querySelector("[data-ply-builder-resume-account]")).toBeNull();
+  });
+
+  it("a closed session kept on another account says Resume runs there", async () => {
+    useBuilder.setState({ byCard: {} });
+    open(boardCard("c1", { notes: "Do it", columnId: "in_progress", builder: builderOn("acct0001", null) }), [], TWO_ACCOUNTS);
+    await waitFor(() =>
+      expect(within(section("run")).getByText("Resumes on Work, where this conversation is kept.")).toBeTruthy(),
+    );
+  });
+
+  it("a closed session on the current account has no note", async () => {
+    useBuilder.setState({ byCard: {} });
+    const { tauri } = open(boardCard("c1", { notes: "Do it", columnId: "in_progress", builder: builderOn(undefined, null) }), [], TWO_ACCOUNTS);
+    await waitFor(() => expect(tauri.callsOf("ai_accounts_list").length).toBeGreaterThan(0));
+    await waitFor(() => expect(within(section("run")).getByText("Builds on Claude (Main) with opus")).toBeTruthy());
+    expect(document.querySelector("[data-ply-builder-resume-account]")).toBeNull();
+  });
+
+  it("a closed session whose account was removed says so", async () => {
+    useBuilder.setState({ byCard: {} });
+    open(boardCard("c1", { notes: "Do it", columnId: "in_progress", builder: builderOn("acct0009", null) }), [], TWO_ACCOUNTS);
+    await waitFor(() => expect(within(section("run")).getByText("Its account was removed from Plyloft.")).toBeTruthy());
+  });
+});
+
+// 1.179.0 (C3): a Builder stopped by Claude's usage limit, with another Claude
+// account, offers Start fresh on it: a bordered button beside Finish and
+// check, pressed by the member only. It closes the session, then starts a new
+// Builder on the account named (`builder_start`'s `account`).
+describe("Start fresh on {name} at Claude's usage limit (C3)", () => {
+  const MAIN = { id: null, name: "Main", signedIn: "yes", isCurrent: true, folder: null };
+  const WORK = { id: "acct0001", name: "Work", signedIn: "yes", isCurrent: false, folder: "/Users/someone/work" };
+  const SECOND = { id: "acct0002", name: "Second", signedIn: "yes", isCurrent: false, folder: "/Users/someone/second" };
+  const builderOn = (account: string | undefined, ptyId: string | null) => ({
+    vendor: "claude" as const,
+    bypass: false,
+    model: "opus",
+    ptyId,
+    sessionLost: false,
+    startedAt: 1,
+    snapshots: [],
+    ...(account ? { account } : {}),
+  });
+  const limited = (kind: "usageLimit" | "bypass" = "usageLimit", account?: string) => {
+    useBuilder.setState({
+      byCard: {
+        c1: { workspaceId: BOARD_WS, ptyId: "pty-1", vendor: "claude", startedAt: Date.now(), lastOutputAt: Date.now(), promptBoxIdle: true, pending: [] } as never,
+      },
+      vendorPref: {},
+      sessionBlocks: { c1: { workspaceId: BOARD_WS, vendor: "claude", kind, resetsAt: "6pm", ...(account ? { account } : {}) } },
+    });
+  };
+  const liveCard = (account?: string) =>
+    boardCard("c1", {
+      notes: "Do it",
+      columnId: "in_progress",
+      lastRunStatus: "running",
+      worktreePath: "/Users/someone/code/lyra-c1",
+      builderPermissions: "asks",
+      builder: builderOn(account, "pty-1"),
+    });
+  const freshOn = () => document.querySelector<HTMLButtonElement>("[data-ply-start-fresh-on]");
+
+  it("names the current account when the Builder's isn't it, as a bordered button, and starts there after closing", async () => {
+    limited();
+    const card = liveCard();
+    const { user, tauri } = open(card, [], {
+      ai_accounts_list: [{ ...MAIN, isCurrent: false }, { ...WORK, isCurrent: true }],
+    });
+    tauri.fixture("kanban_load", () => [{ ...card, builder: builderOn(undefined, null) }]);
+    tauri.fixture("builder_start", () => ({}));
+    await waitFor(() => expect(freshOn()?.textContent).toBe("Start fresh on Work"));
+    const button = freshOn()!;
+    expect(button.getAttribute("title")).toBe(
+      "Ends this session and starts a new Builder on Work in the same copy. The files stay; the conversation starts again.",
+    );
+    expect(button.className).not.toMatch(/cbtn--accent/);
+    // Same row, same size as Finish and check beside it.
+    const finish = within(section("run")).getByRole("button", { name: "Finish and check", hidden: true });
+    expect(button.closest(".ux-card-section-actions")).toBe(finish.closest(".ux-card-section-actions"));
+    expect(button.className).not.toMatch(/cbtn--sm/);
+    await user.click(button);
+    await waitFor(() => expect(tauri.callsOf("builder_start")).toHaveLength(1));
+    expect(tauri.callsOf("builder_close")).toHaveLength(1);
+    expect(tauri.callsOf("builder_start")[0].args).toMatchObject({ cardId: "c1", vendor: "claude", account: "acct0001" });
+  });
+
+  it("names the first other account when the Builder's is the current one: Main, by its id", async () => {
+    limited("usageLimit", "acct0001");
+    const card = liveCard("acct0001");
+    const { user, tauri } = open(card, [], {
+      ai_accounts_list: [{ ...MAIN, isCurrent: false }, { ...WORK, isCurrent: true }, SECOND],
+    });
+    tauri.fixture("kanban_load", () => [{ ...card, builder: builderOn("acct0001", null) }]);
+    tauri.fixture("builder_start", () => ({}));
+    await waitFor(() => expect(freshOn()?.textContent).toBe("Start fresh on Main"));
+    await user.click(freshOn()!);
+    await waitFor(() => expect(tauri.callsOf("builder_start")).toHaveLength(1));
+    expect(tauri.callsOf("builder_start")[0].args.account).toBe("main");
+  });
+
+  it("isn't offered with Main alone", async () => {
+    limited();
+    const { tauri } = open(liveCard(), [], { ai_accounts_list: [MAIN] });
+    await waitFor(() => expect(tauri.callsOf("ai_accounts_list").length).toBeGreaterThan(0));
+    expect(within(section("run")).getByRole("button", { name: "Finish and check", hidden: true })).toBeTruthy();
+    expect(freshOn()).toBeNull();
+  });
+
+  it("isn't offered for a block that isn't the usage limit, nor with no block", async () => {
+    limited("bypass");
+    const { tauri } = open(liveCard(), [], { ai_accounts_list: [MAIN, WORK] });
+    await waitFor(() => expect(tauri.callsOf("ai_accounts_list").length).toBeGreaterThan(0));
+    await waitFor(() => expect(within(section("run")).getByText("Builds on Claude (Main) with opus")).toBeTruthy());
+    expect(freshOn()).toBeNull();
+    act(() => useBuilder.setState({ sessionBlocks: {} }));
+    expect(freshOn()).toBeNull();
+  });
+});

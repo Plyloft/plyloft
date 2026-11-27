@@ -787,3 +787,83 @@ runs the slash command and finalizes per the contract".
   workspace cwd is the working dir (not the worktree); confirm
   the script path is workspace-relative; confirm shell_quote
   isn't over-quoting safe paths (its tests cover the boundary).
+
+---
+
+## Tier 4 — two pairs in Compare, Include my question, Claude accounts (1.179.0)
+
+Mandatory walkthrough whenever `compare.rs`, `compare_asks.rs`,
+`ai_accounts.rs`, the account fields of `terminal_sessions.rs`,
+`builder.rs` or `chat_store.rs`, `compareView.ts`, `CompareBar`,
+`CompareComposer`, `NewCopySheet` or `ClaudeAccountsSection` changes. On a
+Mac and on Windows, on a test build (the app tester's *Plyloft Test*) or
+the release build, with real Claude and Codex tiles in a sandbox project.
+Each step's verification is in italics.
+
+### 1. Main alone is unchanged
+
+With no account added, open a Claude tile, a card's Run and Resume.
+*Nothing names an account anywhere; the Claude tile spawns with no
+API-key prompt and no `CLAUDE_CONFIG_DIR` (Hard rule 1); Compare with one
+pair works as in 1.178.0.*
+
+### 2. Two pairs
+
+Open a Claude and a Codex tile in the project folder, then *New › Compare
+in a new copy…*. *Two named bars under the grid, each with its pair's dot
+on the bar and on its two tiles. A pass from each bar reaches its own
+pair's other tile; the shortcut passes in the pair the keyboard is in;
+while one pass is open the other bar's pass waits. A copy made with one
+AI offers the other.*
+
+### 3. Include my question
+
+Ask a question in the Claude tile, let it answer, open the composer.
+*Include my question is on and the preview starts with the question; turn
+it off and the preview and paste carry only the answer; on a turn that
+holds only passed text it is off with its reason. Pass it again carries
+the question when the pass did. A held answer lapses when its tile
+answers again, and the composer says so.*
+
+### 4. Claude accounts
+
+Settings › Cards › AI and models › *Claude accounts*: add an account and
+sign in through Setup's guided terminal; choose it for new sessions.
+*A new Claude tile names the account and runs on it; a tile already
+running keeps its account; Resume opens on the account the conversation
+started on; New offers Claude on each account, Main included; Remove is
+refused while a session runs on the account and its Resume is refused
+after it is removed. At a usage limit a card offers Start fresh on
+{name}, which starts a new Builder on that account in the same copy only
+on the press, and the account for new sessions is unchanged.*
+
+### 5. Persisted fields
+
+Open a profile written by 1.178.0. *It opens on Main with every tile row,
+card and chat as before.* The migration tests:
+`a_pre_1179_settings_file_loads_with_only_main_and_saves_back_unchanged`,
+`unknown_keys_survive_a_load_and_a_save`,
+`a_current_account_not_in_the_list_reads_as_main` (`settings.rs`),
+`a_row_before_claude_accounts_reads_as_main_and_an_account_round_trips`
+(`terminal_sessions_tests.rs`),
+`a_builder_before_claude_accounts_loads_on_main_and_an_account_round_trips`
+(`kanban.rs`),
+`a_conversation_before_claude_accounts_reads_on_main_and_an_account_round_trips`
+(`chat_store.rs`).
+
+### 6. PTY orphan check
+
+With a tile on an added account and one on Main running, arm
+`./scripts/check-ply-cmdq-cleanup.sh` in an external terminal and Cmd-Q.
+*Every armed descendant exits within its bound (Hard rule 4).*
+
+### When this Tier 4 sequence fails
+
+- **A tile on an account opens on Main's login**: the spawn lost
+  `ai_accounts::spawn_env`, or the row was recorded without its account.
+- **History, titles or usage limits missing for an account's sessions**:
+  a reader takes Claude's single folder; the source test
+  `no_reader_takes_claudes_single_folder_outside_the_allowed_list` should
+  have caught it.
+- **A pass goes to the other pair's tile**: the bar's place was lost
+  between `compareView.ts` and the write.

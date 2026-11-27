@@ -1121,6 +1121,9 @@ pub fn apply_pick(card: &mut KanbanCard, lane: &str, by: Option<&str>, at: i64, 
         lost_on_restart: false,
         self_check_started_at: None,
         pr_draft: None,
+        // 1.179.0 accounts: Build with both runs its builds on Main
+        // (`spawn_lane`), so the picked one is Main's.
+        account: None,
     });
     card.last_run_status = Some(LastRunStatus::Running);
     Ok(())
@@ -1422,7 +1425,10 @@ pub fn spawn_lane(
         return Err(why);
     }
     let ws_cwd = workspace_cwd(app, workspace_id)?;
-    let theme = if l.vendor == "claude" { crate::claude_theme::theme_for_spawn(app) } else { None };
+    // 1.179.0 accounts: a build of Build with both runs on Main. Its lane
+    // record keeps no account yet, so a Resume of it could not find a
+    // conversation kept in another account's folder.
+    let theme = if l.vendor == "claude" { crate::claude_theme::theme_for_spawn(app, None) } else { None };
     // CL-8: the model chosen for this build at start, on its spawn and on
     // every Resume / Start fresh; a build from before CL-8 reads the
     // workspace's Builder row (CL-4) as it did.
@@ -1480,6 +1486,7 @@ pub fn spawn_lane(
         &l.vendor,
         args,
         claude_session_id.clone(),
+        None,
     )?;
     if resume {
         // Round 3: a Resume that ends at once points at Start fresh (as F17

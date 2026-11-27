@@ -61,6 +61,17 @@ pub fn read() -> (CredentialSeen, CredentialSeen) {
     )
 }
 
+/// 1.179.0 (C1): one Claude account folder's login, for a folder Plyloft
+/// gave the CLI as `CLAUDE_CONFIG_DIR` (`ai_accounts`). Only the item keyed to
+/// that folder and the folder's own `.credentials.json`: never the plain item
+/// or `~/.claude`, which are the Main account's, so Main's login never makes
+/// another account read as signed in. `dir` must be spelled exactly as the
+/// CLI was given it: the suffix is the hash of that text.
+pub fn read_for_dir(dir: &Path) -> (CredentialSeen, CredentialSeen) {
+    let service = suffixed_service(&nfc(&dir.to_string_lossy()));
+    (keychain(&[service]), credentials_file(&[dir.to_path_buf()]))
+}
+
 /// The keychain services to look under (GH #169 review 1), after the CLI's
 /// own naming (`RD()` in Claude Code 2.1.280):
 ///

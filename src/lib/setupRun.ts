@@ -17,11 +17,13 @@ import { isRepairAction, REPAIR_ENDED_LINE, REPAIR_RUNNING_LINE } from "./repair
 /** The run-state dot a `StatusLine` draws. */
 export type SetupRunState = "running" | "done" | "aborted" | "empty";
 
-type Kind = "install" | "update" | "login" | "setupgit" | "refresh" | "clone" | "trust";
+type Kind = "install" | "update" | "login" | "logout" | "setupgit" | "refresh" | "clone" | "trust";
 
 function kindOf(id: SetupGuidedActionId): Kind {
   if (id === "project.clone") return "clone";
   if (id === "trust.claude") return "trust";
+  // 1.179.0 (C1): a Claude account's sign-out (Remove's first half).
+  if (id === "logout-account.claude") return "logout";
   if (id.startsWith("install.")) return "install";
   if (id.startsWith("update.")) return "update";
   if (id === "setupgit.gh") return "setupgit";
@@ -82,6 +84,7 @@ export function setupLine(
   // event's `clone`; this line only says where the download is.
   if (kind === "clone") return cloneLine(phase, outcome);
   if (kind === "trust") return trustLine(phase, outcome);
+  if (kind === "logout") return logoutLine(phase, outcome);
   if (phase === "waiting-long") return "Still waiting for you to sign in.";
   // 1.176.0 R2: before an install or update, its version is read.
   if (phase === "preparing") return `Checking which version of ${mid(name)} is there…`;
@@ -140,6 +143,8 @@ export function setupLine(
     case "failed":
       if (kind === "install") return `${name}'s installer stopped with an error. Nothing else was changed.`;
       if (kind === "update") return `${name}'s updater stopped with an error. Nothing else was changed.`;
+      // 1.179.0 (C1): a Claude account's sign-in is Claude Code's, not gh's.
+      if (id === "login-account.claude") return `${name} stopped with an error. Nothing was changed.`;
       return "The GitHub command stopped with an error. Nothing was changed.";
     case "timed-out":
       if (clt) return "The macOS installer didn't finish within 30 minutes.";
@@ -188,6 +193,23 @@ function trustLine(phase: SetupPhase, outcome: SetupOutcome | null): string {
       return "Plyloft couldn't tell whether Claude trusts the folder.";
     default:
       return "Claude doesn't trust Plyloft's review folder yet.";
+  }
+}
+
+/** 1.179.0 (C1): `claude auth logout` on one Claude account's folder,
+ *  judged by its exit code alone; the account is removed after it,
+ *  whatever the end. */
+function logoutLine(phase: SetupPhase, outcome: SetupOutcome | null): string {
+  if (phase !== "done") return "Signing out of Claude Code…";
+  switch (outcome) {
+    case "succeeded":
+      return "Signed out.";
+    case "cancelled":
+      return "Stopped.";
+    case "failed":
+      return "Claude Code's sign-out stopped with an error.";
+    default:
+      return "Claude Code's sign-out didn't finish.";
   }
 }
 

@@ -1585,6 +1585,9 @@ export type TileTitle = {
   followed?: boolean;
   /** The CLI's files give that conversation a title of its own. */
   conversationNamed?: boolean;
+  /** 1.179.0 (C2): the Claude account the tile runs on (an
+   *  `ai_accounts_list` id); absent: Main. */
+  account?: string;
 };
 
 export function terminalTileTitle(ptyId: string) {
@@ -1623,6 +1626,9 @@ export type TerminalSession = {
   openAtQuit?: number;
   /** Its tile runs in this launch. */
   live: boolean;
+  /** 1.179.0 (C2): the Claude account the tile ran on; absent: Main. A
+   *  resume runs there. */
+  account?: string;
 };
 
 /** QoL 1.168 (block 4, D11): by workspace, the Claude and Codex sessions open
@@ -1648,7 +1654,8 @@ export function terminalLinkTarget(workspaceId: string, cwd: string, path: strin
 export type TerminalHistorySession = TerminalSession & {
   workspaceId: string;
   resumable: boolean;
-  gone?: "folder" | "conversation";
+  /** 1.179.0 (C2) "account": its Claude account was removed from Plyloft. */
+  gone?: "folder" | "conversation" | "account";
   /** 1.174.0 E9 round 1: when its conversation's transcript was last
    *  written (unix ms), from the lookup that decides `resumable`. */
   lastWriteAt?: number;
@@ -1681,6 +1688,8 @@ export type TerminalConversation = {
   /** 1.174.0 walk G3b: the copy's folder it ran in, for a conversation of
    *  one of the project's copies; absent for the project folder's own. */
   cwd?: string;
+  /** 1.179.0 (C2): the Claude account whose folder keeps it; absent: Main. */
+  account?: string;
 };
 
 export function terminalConversations(workspaceId: string) {
@@ -1693,10 +1702,14 @@ export type ResumeCheck =
   | { kind: "inTile"; workspaceId: string; ptyId: string }
   | { kind: "elsewhere" }
   | { kind: "folderGone" }
-  | { kind: "conversationGone" };
+  | { kind: "conversationGone" }
+  /** 1.179.0 (C2): the Claude account it was kept on was removed. */
+  | { kind: "accountRemoved" };
 
-export function terminalResumeCheck(kind: "claude" | "codex", cliSessionId: string, cwd: string) {
-  return invoke<ResumeCheck>("terminal_resume_check", { kind, cliSessionId, cwd });
+/** 1.179.0 (C2): `account` is the one the conversation is kept on (its
+ *  row's); absent: Main, and then not sent at all. */
+export function terminalResumeCheck(kind: "claude" | "codex", cliSessionId: string, cwd: string, account?: string | null) {
+  return invoke<ResumeCheck>("terminal_resume_check", account ? { kind, cliSessionId, cwd, account } : { kind, cliSessionId, cwd });
 }
 
 /** Terminals block P3: what stops a tile's session, from its drawn screen. */
@@ -1798,7 +1811,11 @@ export type SetupActionId =
   | "setupgit.gh"
   | "refresh.gh"
   | "install.git"
-  | "install.node";
+  | "install.node"
+  /** 1.179.0 (C1): `claude auth login` / `logout` on one Claude account's
+   *  folder, named by `SetupArgs.account` (Rust derives the folder). */
+  | "login-account.claude"
+  | "logout-account.claude";
 
 /** A terminal run (`status.*` are `setupCheck` reads). */
 export type SetupRunActionId = Exclude<SetupActionId, "status.claude" | "status.codex">;
@@ -1808,9 +1825,11 @@ export type SetupRunActionId = Exclude<SetupActionId, "status.claude" | "status.
  *  `setup_run`). `setup_active` and `setup://progress` carry either. */
 export type SetupGuidedActionId = SetupRunActionId | "project.clone";
 
-/** The one structured argument: gh's host, which must be github.com. */
+/** The structured arguments: gh's host, which must be github.com, and
+ *  (1.179.0, C1) the Claude account an account step is on, by id only. */
 export interface SetupArgs {
   hostname?: "github.com";
+  account?: string;
 }
 
 export type SetupTool = "claude" | "codex" | "gh" | "git" | "node";
@@ -1829,7 +1848,9 @@ export type SetupWatch =
   | { kind: "claude-folder-trust" }
   | { kind: "answer" }
   /** OB-11: a clone's `.git` appeared and `gh repo clone` exited cleanly. */
-  | { kind: "cloned" };
+  | { kind: "cloned" }
+  /** 1.179.0 (C1): `logout-account.claude`: the exit code alone. */
+  | { kind: "exit-code" };
 
 export interface SetupStarted {
   runId: string;
@@ -2389,6 +2410,71 @@ export interface WorkspaceGithub {
  *  GitHub origin. Never a token. */
 export function githubAccountWorkspaces() {
   return invoke<WorkspaceGithub[]>("github_account_workspaces");
+}
+
+// ── 1.179.0 (C1): Claude accounts (`ai_accounts.rs`) ───────────────────
+// An account is named by its id only: Rust derives its folder, and no path
+// or command ever crosses from here. `aiAccounts` in settings is Rust's,
+// never written through `settings_set`.
+
+/** "unknown" is never "not signed in": Main reads it whenever no login
+ *  trace is found (an API key, a helper), as Diagnostics does. */
+export type ClaudeAccountSignedIn = "yes" | "no" | "unknown";
+
+export interface ClaudeAccountRow {
+  /** null: Main, the account Claude uses on its own. */
+  id: string | null;
+  /** The member's name for it; Main's is "Main" until renamed. */
+  name: string;
+  signedIn: ClaudeAccountSignedIn;
+  /** New sessions start on this account; exactly one row is. */
+  isCurrent: boolean;
+  /** Display only: Show folder goes through `aiAccountShowFolder`. null:
+   *  Main's home could not be told. */
+  folder: string | null;
+}
+
+export interface ClaudeAccountRemoved {
+  name: string;
+  signOut: boolean;
+  /** Whether Claude's own login for the account is still saved on this
+   *  computer, read after its folder went. */
+  loginLeft: ClaudeAccountSignedIn;
+}
+
+/** Main first, then the accounts in the order they were added. */
+export function aiAccountsList() {
+  return invoke<ClaudeAccountRow[]>("ai_accounts_list");
+}
+
+/** Makes the account's folder and lists it (signed in "no" until Setup's
+ *  `login-account.claude` runs for it). */
+export function aiAccountAdd(name: string) {
+  return invoke<ClaudeAccountRow>("ai_account_add", { name });
+}
+
+/** `id` null renames Main. */
+export function aiAccountRename(id: string | null, name: string) {
+  return invoke<ClaudeAccountRow>("ai_account_rename", { id, name });
+}
+
+/** The account new sessions start on (`id` null: Main); every row back. */
+export function aiAccountUseForNew(id: string | null) {
+  return invoke<ClaudeAccountRow[]>("ai_account_use_for_new", { id });
+}
+
+/** Main has no id, so it is never removed. `signOut`: the window ran
+ *  `logout-account.claude` first. */
+export function aiAccountRemove(id: string, signOut: boolean) {
+  return invoke<ClaudeAccountRemoved>("ai_account_remove", { id, signOut });
+}
+
+/** Remove's refusal while sessions run on the account, or null (the removal checks again). */
+export const aiAccountRemoveBlocked = (id: string) => invoke<string | null>("ai_account_remove_blocked", { id });
+
+/** Opens the account's folder in Finder or File Explorer (`id` null: Main's). */
+export function aiAccountShowFolder(id: string | null) {
+  return invoke<null>("ai_account_show_folder", { id });
 }
 
 // ── OB-6: Setup's Git and identity step ────────────────────────────────
@@ -3426,6 +3512,9 @@ export interface BuilderState {
    *  (`builderPermissions.ts`). Absent on sessions started before it and
    *  on the tour card's own bounded start. */
   permissions?: "editsCopy" | "asks" | "neverAsks" | null;
+  /** 1.179.0 (C2): the Claude account this session was started on (an
+   *  `ai_accounts_list` id); absent: Main. Resume runs there. */
+  account?: string | null;
   ptyId?: string | null;
   sessionLost: boolean;
   /** 1.169.0 (A3): lost because Plyloft quit or restarted (Resume's case). */
@@ -9721,6 +9810,9 @@ export function builderStart(
   guided = false,
   /** 1.169.0 (A3): "Retry on…" — this start's model and effort, this once. */
   retry?: RetryChoice,
+  /** 1.179.0 (C3): Start fresh on {name} — the Claude account it starts on
+   *  (an `ai_accounts_list` id, or `MAIN_ACCOUNT_ID`); absent: the current one. */
+  account?: string,
 ) {
   return invoke<BuilderStartResult>("builder_start", {
     workspaceId,
@@ -9729,6 +9821,7 @@ export function builderStart(
     bypass,
     guided,
     ...(retry ? { retry } : {}),
+    ...(account ? { account } : {}),
   });
 }
 
@@ -10367,6 +10460,9 @@ export type SessionBlock = {
   kind: "trust" | "bypass" | "usageLimit";
   /** A usage limit's reset time as Claude wrote it ("3pm"), when it did. */
   resetsAt?: string;
+  /** 1.179.0 (C2): the Claude account the stopped session runs on; absent:
+   *  Main (and every intake). */
+  account?: string;
 };
 
 export function builderSessionBlocks() {
@@ -11422,6 +11518,9 @@ export type ChatSnapshot = {
   usage: ChatTokenUsage;
   attachments: ChatAttachment[];
   ptyId?: string | null;
+  /** 1.179.0 (C2): the Claude account the conversation's session was
+   *  started on; absent: Main. */
+  account?: string;
 };
 
 export type ChatStateEvent = {

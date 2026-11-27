@@ -5,6 +5,7 @@ import {
   goneMessage,
   type ConversationKind,
 } from "../lib/terminalConversations";
+import { ACCOUNT_REMOVED } from "../lib/claudeAccountNames";
 import { openCodexTile } from "./openCodexTile";
 import { useTiles } from "./tileStore";
 import { showNewTile, showTile } from "./tileActions";
@@ -28,6 +29,9 @@ export interface ResumeTarget {
   titleSource?: TileTitle["titleSource"] | null;
   /** A tile that runs it now. */
   livePtyId?: string | null;
+  /** 1.179.0 (C2): the Claude account it is kept on (the row's); absent:
+   *  Main, or the one its record says. */
+  account?: string | null;
 }
 
 export type ResumeOutcome =
@@ -64,7 +68,8 @@ export async function resumeConversation(
   if (t.kind === "codex" && !env?.codexPath) {
     return { kind: "failed", message: "Codex isn't installed on this computer, so this conversation can't be resumed here." };
   }
-  const check = await terminalResumeCheck(t.kind, t.cliSessionId, t.cwd).catch(() => null);
+  const account = t.kind === "claude" ? (t.account ?? null) : null;
+  const check = await terminalResumeCheck(t.kind, t.cliSessionId, t.cwd, account).catch(() => null);
   if (!check) return { kind: "failed", message: "Plyloft couldn't check this conversation. Try again in a moment." };
   if (check.kind === "inTile") {
     const there = show(check.ptyId);
@@ -74,12 +79,14 @@ export async function resumeConversation(
   if (check.kind === "elsewhere" && !how.anyway) return { kind: "failed", message: OPEN_ELSEWHERE, canOpenAnyway: true };
   if (check.kind === "folderGone") return { kind: "failed", message: FOLDER_GONE, folderGone: true };
   if (check.kind === "conversationGone") return { kind: "failed", message: goneMessage(t.kind) };
+  if (check.kind === "accountRemoved") return { kind: "failed", message: ACCOUNT_REMOVED };
   const opts = {
     args: t.kind === "claude" ? ["--resume", t.cliSessionId] : ["resume", t.cliSessionId],
     label: t.title ?? undefined,
     // A name the member gave stays theirs; any other follows the CLI (P2).
     labelSource: t.titleSource === "user" ? ("user" as const) : ("auto" as const),
     cliSessionId: t.cliSessionId,
+    ...(account ? { account } : {}),
   };
   const tile =
     t.kind === "claude"

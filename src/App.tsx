@@ -1,6 +1,7 @@
 // App root: warms workspaces, wires global IPC/shortcuts, and renders the workspace shell.
 import { useCompare } from "./store/compareStore";
-import { COMPARE_PASS_EVENT } from "./components/CompareBar";
+import { COMPARE_PASS_EVENT, type ComparePassDetail } from "./components/CompareBar";
+import { comparePassNow } from "./store/compareActions";
 import { PutOnGithubHost } from "./components/PutOnGithubSheet";
 import { sharedFirstToasts, sharingToasts, type SharedFirst, type SharingNote } from "./lib/sharedSetup";
 import { useEffect, useRef, useState, startTransition } from "react";
@@ -1257,9 +1258,16 @@ function App() {
           !visibleModalOpen() &&
           useCompare.getState().byWorkspace[activeWs]?.on
         ) {
-          // A held key repeats: only the first press asks.
-          if (!e.repeat) window.dispatchEvent(new CustomEvent(COMPARE_PASS_EVENT, { detail: { workspaceId: activeWs } }));
-          handled = true;
+          // 1.179.0: with two pairs, the pair the keyboard is in; outside
+          // both, nothing — and the key isn't Plyloft's (on Windows a
+          // terminal's program gets it, as any key Plyloft doesn't answer).
+          const target = comparePassNow(activeWs);
+          if (target.place !== null) {
+            const detail: ComparePassDetail = target.place === "" ? { workspaceId: activeWs } : { workspaceId: activeWs, place: target.place };
+            // A held key repeats: only the first press asks.
+            if (!e.repeat) window.dispatchEvent(new CustomEvent(COMPARE_PASS_EVENT, { detail }));
+          }
+          handled = target.swallow;
         }
       } else if (id === "newCard") {
         // QoL 1.168 (C6): New card from anywhere, as ⌘K › New card….

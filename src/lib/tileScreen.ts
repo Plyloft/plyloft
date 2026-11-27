@@ -19,6 +19,7 @@ import {
   type InputCell,
 } from "./attention.ts";
 import { readinessProbe } from "./tileHeaderStatus.ts";
+import { isWindows } from "./platform.ts";
 
 /** What the screen shows now. `null` for any field the screen can't say. */
 export interface TileScreenNow {
@@ -66,6 +67,9 @@ export interface TileScreenNow {
   lastDrawnAt?: number | null;
   /** Whether the composer holds this pasted text (Codex only). */
   holds: (text: string) => boolean | null;
+  /** 1.179.0 (re-walk): `screenShape` of the rows read, for the log when
+   *  Compare can't tell (classes only, never text); absent: not read. */
+  shape?: string;
 }
 
 const readers = new Map<string, () => TileScreenNow | null>();
@@ -166,7 +170,8 @@ export function liveScreenFacts(
       decisionMatcherFor(vendor)(tail) ||
       choiceMenuInView(vendor, tail) ||
       (vendor === "codex" && codexPickerOpen(rows)) ||
-      (vendor === "claude" && claudePickerOpen(rows)),
+      (vendor === "claude" && claudePickerOpen(rows)) ||
+      box.asks === true,
     turnOver: vendor === "claude" ? box.turnOver : null,
     readyBox: box.ready,
     boxDrawn: box.drawn,
@@ -205,6 +210,9 @@ export interface BoxProof {
    *  doesn't depend on which). The guard tells them apart by the member's
    *  input (`deliveryGate`). */
   askedShape: boolean;
+  /** 1.179.0, Claude on Windows with its footer lost: a question drawn above
+   *  the box since the last finished turn (`claudeFooterLostProof`). */
+  asks?: boolean;
   /** Round 9, Claude: its box with one row and its mode line, nothing running
    *  anywhere on screen, whatever is above (see `claudeBoxProof`). */
   boxMode?: boolean;
@@ -365,9 +373,39 @@ function claudeTurnEndRow(rows: readonly string[], top: number): boolean {
   return true;
 }
 
+/** 1.179.0 (re-walk): the shape of a screen's last `n` settled rows, one
+ *  class per row, never their text: `_` blank, `R` a rule, `>` the chevron
+ *  alone, `>t` the chevron with text, `M` Claude's mode line, `S` a spinner,
+ *  `D` a turn's done line, `t` other text; with how many blank rows the
+ *  settled rows leave under them and the screen's height. For the log when
+ *  Compare can't tell whether a tile is ready. */
+export function screenShape(screen: readonly string[], n = 8): string {
+  const rows = settledTail(screen, screen.length);
+  const classes = rows.slice(Math.max(0, rows.length - n)).map((r) => {
+    if (r.trim() === "") return "_";
+    if (CLAUDE_TOP_RULE.test(r) || CLAUDE_BOTTOM_RULE.test(r)) return "R";
+    if (/^[\s│|]*[>❯›]\s*$/.test(r)) return ">";
+    if (/^[\s│|]*[>❯›]\s/.test(r)) return ">t";
+    if (CLAUDE_MODE_FOOTER.test(r.trim())) return "M";
+    if (CLAUDE_SPINNER.test(r)) return "S";
+    if (CLAUDE_TURN_DONE.test(r)) return "D";
+    return "t";
+  });
+  return `rows=${screen.length} under=${screen.length - rows.length} tail=${classes.join(",")}`;
+}
+
 /** `BoxProof` of a Claude Code screen (its visible rows). */
 export function claudeBoxProof(screen: readonly string[]): BoxProof {
   const rows = settledTail(screen, screen.length);
+  // 1.179.0 Windows walk (step 7): the box with nothing under its bottom
+  // rule (`claudeFooterLostProof`), on Windows only: on the Mac that shape is
+  // a frame read halfway through a redraw, never proof. The rows read are the
+  // buffer's bottom page (`Terminal.tsx` `screenRows`), so nothing is drawn
+  // below the last one: a rule there, or blank rows under it, is a footer
+  // that isn't drawn (re-walk 2026-11-27: the shrunk tile ends on the rule).
+  if (isWindows() && rows.length >= 3 && CLAUDE_BOTTOM_RULE.test(rows[rows.length - 1])) {
+    return claudeFooterLostProof(rows);
+  }
   // The footer: the rows under the box's bottom rule, at most a few.
   let bottom = rows.length - 1;
   while (bottom >= 0 && rows.length - 1 - bottom < CLAUDE_FOOTER_MAX && !CLAUDE_BOTTOM_RULE.test(rows[bottom])) bottom--;
@@ -411,6 +449,56 @@ export function claudeBoxProof(screen: readonly string[]): BoxProof {
   // is open, or the screen's that the last one ended (`deliveryGate`).
   const boxMode = quiet && top + 2 === bottom && CLAUDE_MODE_FOOTER.test(footerText.trim());
   return { drawn: true, ready, turnOver, idleShape: ready, askedShape: false, boxMode, running };
+}
+
+/**
+ * 1.179.0 Windows walk (step 7, screenshots of Claude Code 2.1.332 in a
+ * ConPTY): when a tile shrinks (the Compare composer's preview opens), ConPTY
+ * drops the rows under Claude's cursor, which sits in its box, and Claude
+ * doesn't draw its footer again: while the tile is small the screen ends on
+ * the box's bottom rule, and once it grows back blank rows are under it. With
+ * no footer `ready` can't be proven, and the box read as no box at all
+ * ("Can't tell if Claude is ready") however long the member waited or
+ * clicked. `rows` (the settled rows) end with the bottom rule.
+ *
+ * The box counts as drawn (the draft check reads it), never `ready` or
+ * `turnOver` (the footer and the end row are what proved those). One row
+ * between its rules with nothing running anywhere on screen is `boxMode`:
+ * proof only with the transcript's word that no turn is open
+ * (`deliveryGate`, `claudeModeProof`) — the open turn a lost footer might
+ * have shown running is refused there. A numbered row in the box is a menu,
+ * never the box.
+ */
+function claudeFooterLostProof(rows: readonly string[]): BoxProof {
+  const bottom = rows.length - 1;
+  let top = -1;
+  for (let i = bottom - 1; i >= Math.max(0, bottom - 12); i--) {
+    if (CLAUDE_TOP_RULE.test(rows[i])) {
+      top = i;
+      break;
+    }
+  }
+  if (top < 0 || top + 1 >= bottom || !CLAUDE_BOX_INPUT.test(rows[top + 1])) return NO_BOX;
+  if (/^[\s│|]*[>❯]\s*\d+\.\s/.test(rows[top + 1])) return NO_BOX;
+  const tail = settledTail(rows, 20).join("\n");
+  const running =
+    rows.some((r) => CLAUDE_RUNNING_WORDS.test(r)) || claudeTurnRunning(tail) || claudeSpinnerAfterLastDone(rows, top);
+  // Review of the fix: with the footer gone, a question drawn above the box
+  // since the last finished turn (a permission's `Do you want to …?`, a
+  // plan's `Would you like to proceed?`, a numbered choice) is the screen
+  // asking, which the matchers miss (the box's chevron is the last one).
+  let from = 0;
+  for (let i = top - 1; i >= 0; i--) {
+    if (CLAUDE_TURN_DONE.test(rows[i])) {
+      from = i + 1;
+      break;
+    }
+  }
+  const asks = rows
+    .slice(from, top)
+    .some((r) => /do you want to|would you like to/i.test(r) || /^[\s│|]*❯\s*\d+\.\s/.test(r));
+  const boxMode = !running && !asks && top + 2 === bottom;
+  return { drawn: true, ready: false, turnOver: false, idleShape: false, askedShape: false, boxMode, running, asks };
 }
 
 /**

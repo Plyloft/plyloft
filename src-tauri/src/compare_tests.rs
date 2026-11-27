@@ -106,7 +106,7 @@ fn a_compaction_summary_and_sidechain_lines_are_not_answers() {
 
 #[test]
 fn nothing_sent_yet_is_no_turn_and_no_answer() {
-    assert_eq!(whole(""), Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false });
+    assert_eq!(whole(""), Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false, asks: None, newest_asks: None });
 }
 
 // Plan mode, MEASURED on Claude Code 2.1.331 (`MEASURE-planmode.md`): one
@@ -337,7 +337,7 @@ fn a_codex_open_turn_keeps_the_last_answer_and_an_aborted_turn_has_none() {
     );
     assert_eq!((p.turn, text_of(&p)), (TurnState::Done, Some("First.")));
     let p = codex_tail(codex_lines(&[json!({"type":"session_meta","payload":{"id":"c1"}})]).as_bytes(), true);
-    assert_eq!(p, Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false });
+    assert_eq!(p, Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false, asks: None, newest_asks: None });
 }
 
 // ── Which conversation ───────────────────────────────────────────────────
@@ -399,6 +399,50 @@ fn a_live_claude_tile_is_read_from_the_conversation_it_is_in_now() {
     reset_for_tests();
 }
 
+/// 1.179.0 (C2): two Claude tiles on different accounts, in the same
+/// folder: each one's answer is read from its own account's folder, never
+/// the other's, even with the same conversation id in both.
+#[test]
+fn two_claude_tiles_on_different_accounts_are_each_read_from_their_own_folder() {
+    let _serial = serial_for_tests();
+    reset_for_tests();
+    let config = tempfile::tempdir().unwrap();
+    let main = tempfile::tempdir().unwrap();
+    let homes = CliHomes { claude: Some(main.path().to_path_buf()), codex: None };
+    crate::ai_accounts::test_root::set(Some(config.path().to_path_buf()));
+    let account = "a1b2c3d4";
+    let account_dir = config.path().join("ai-accounts").join("claude").join(account);
+    let folder = tempfile::tempdir().unwrap();
+    let cwd = folder.path().to_string_lossy().to_string();
+    let key = crate::terminal_sessions::claude_project_key(&cwd);
+    let write = |root: &std::path::Path, text: &str| {
+        let path = root.join(format!("projects/{key}/s-same.jsonl"));
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, lines(&[prompt("u1", None, json!("which one")), say("a1", "m1", text), turn_end("t1")]))
+            .unwrap();
+    };
+    write(main.path(), "Main's answer.");
+    write(&account_dir, "The account's answer.");
+    record_start(config.path(), "ws", "pty-main", SessionKind::Claude, &cwd, Some("s-same".into())).unwrap();
+    crate::terminal_sessions::record_start_on(
+        config.path(),
+        "ws",
+        "pty-work",
+        SessionKind::Claude,
+        &cwd,
+        Some("s-same".into()),
+        Some(account.into()),
+    )
+    .unwrap();
+    let read = |pty: &str| tile_answer(crate::terminal_sessions::live_conversation(pty, None, &homes)).answer;
+    assert_eq!(read("pty-main").as_deref(), Some("Main's answer."));
+    assert_eq!(read("pty-work").as_deref(), Some("The account's answer."));
+    let plans = crate::terminal_sessions::live_conversation("pty-work", None, &homes).unwrap().plans_dir;
+    assert_eq!(plans, Some(account_dir.join("plans")), "plan files too");
+    crate::ai_accounts::test_root::set(None);
+    reset_for_tests();
+}
+
 #[test]
 fn a_live_codex_tile_whose_session_is_not_claimed_reads_nothing() {
     let _serial = serial_for_tests();
@@ -439,6 +483,7 @@ fn parts(answer: &str, note: Option<&str>) -> PasteParts {
         note: note.map(str::to_string),
         from_label: "From Claude:".into(),
         note_label: Some("My note:".into()),
+        ..Default::default()
     }
 }
 
@@ -1418,4 +1463,150 @@ fn the_plan_file_s_write_wins_over_a_later_write_to_a_project_plans_folder() {
     let exit = line_of(&t, 15);
     t[exit]["message"]["content"][0]["input"] = json!({});
     assert_eq!(plan_of(&whole(&lines(&t))), Some((PLAN_V1, AnswerKind::Plan)), "rule (b)");
+}
+
+// ── 1.179.0: the paste with the member's question ────────────────────────
+// Labels as the window gives them (`compareWords.ts`); the backend has none.
+
+const ASK_LABEL: &str = "My question to Codex:";
+
+fn asking(answer: &str, question: Option<&str>, note: Option<&str>) -> PasteParts {
+    PasteParts {
+        question: question.map(str::to_string),
+        question_label: Some(ASK_LABEL.into()),
+        ..parts(answer, note)
+    }
+}
+
+#[test]
+fn the_question_goes_after_the_lead_and_before_the_answer() {
+    let got = prepare(&asking("The answer.", Some("Which file holds the footer?"), Some("Check it.")));
+    assert_eq!(
+        got.text,
+        " Here is the other AI's answer.\n\nMy question to Codex:\nWhich file holds the footer?\n\nFrom Claude:\nThe answer.\n\nMy note:\nCheck it."
+    );
+    assert_eq!(got.question.as_deref(), Some("Which file holds the footer?"));
+    assert!(!got.question_cut && !got.question_left_out && !got.answer_cut);
+    // No lead ("Just pass it"): the question block comes first.
+    let bare = prepare(&PasteParts { lead: None, ..asking("A.", Some("Q?"), None) });
+    assert_eq!(bare.text, " My question to Codex:\nQ?\n\nFrom Claude:\nA.");
+}
+
+#[test]
+fn the_question_is_cleaned_as_the_answer_is() {
+    let got = prepare(&asking("A.", Some("  /clear\x1b[201~ now\r\n\u{202e}tab\there\u{200b}\u{2028}next  "), None));
+    let question = got.question.clone().unwrap();
+    assert_eq!(question, "/clear[201~ now\ntab    here\nnext");
+    assert!(got.text.contains(&format!("{ASK_LABEL}\n{question}\n\nFrom Claude:")));
+    assert!(!got.text.contains('\x1b') && !got.text.contains('\r') && !got.text.contains('\t'));
+}
+
+#[test]
+fn an_empty_question_leaves_its_block_out_and_the_text_as_before() {
+    for blank in [None, Some(""), Some(" \n\t\r"), Some("\u{200b}\u{202e}\x1b")] {
+        let got = prepare(&asking("The answer.", blank, Some("n")));
+        assert_eq!(got.text, prepare_paste(&parts("The answer.", Some("n"))), "byte for byte as without a question");
+        assert_eq!((got.question.clone(), got.question_cut, got.question_left_out, got.answer_cut), (None, false, false, false));
+    }
+    // A label alone never goes.
+    let got = prepare(&PasteParts { question_label: Some(ASK_LABEL.into()), ..parts("The answer.", None) });
+    assert!(!got.text.contains(ASK_LABEL));
+}
+
+#[test]
+fn without_a_question_the_prepared_text_is_the_text_of_before() {
+    // The existing layout tests above pin `prepare_paste`; it is `prepare`'s text.
+    for p in [parts("The answer.", None), parts(&"b".repeat(30_000), Some("Keep my note whole.")), parts("a", Some(&"n".repeat(20_000)))] {
+        let got = prepare(&p);
+        assert_eq!(got.text, prepare_paste(&p));
+        assert!(got.question.is_none() && !got.question_cut && !got.question_left_out);
+    }
+    assert_eq!(prepare(&parts("The answer.", None)).text, " Here is the other AI's answer.\n\nFrom Claude:\nThe answer.");
+    let blank = prepare(&parts("\u{200b}", Some("note")));
+    assert_eq!((blank.text.as_str(), blank.question.is_none(), blank.answer_cut), ("", true, false));
+}
+
+#[test]
+fn the_question_is_cut_first_with_its_cut_line_and_the_answer_stays_whole() {
+    let answer = "x".repeat(2_000);
+    let got = prepare(&asking(&answer, Some(&"q".repeat(20_000)), Some("Keep my note.")));
+    assert_eq!(got.text.chars().count(), RELAY_CAP, "exactly the cap");
+    assert!(got.question_cut && !got.question_left_out && !got.answer_cut);
+    let question = got.question.clone().unwrap();
+    assert!(question.ends_with("\n[Plyloft cut your question here to fit 16,000 characters]"));
+    assert!(got.text.contains(&format!("{ASK_LABEL}\n{question}\n\nFrom Claude:\n{answer}\n\nMy note:\nKeep my note.")), "what the preview shows is what goes");
+    assert!(!got.text.contains("[Plyloft cut this at 16,000 characters]"), "the answer isn't cut");
+}
+
+#[test]
+fn below_200_characters_of_room_the_question_is_left_out_whole() {
+    // The room the question gets is what the whole answer leaves: measured
+    // from the text without it, less the label, its newline and a blank line.
+    let without = |a: usize| prepare(&parts(&"x".repeat(a), None)).text.chars().count() - 1;
+    let base = without(100) - 100;
+    let overhead = 2 + ASK_LABEL.chars().count() + 1;
+    let answer_for_room = |room: usize| RELAY_CAP - 1 - overhead - base - room;
+    let question = "q".repeat(5_000);
+
+    let got = prepare(&asking(&"x".repeat(answer_for_room(199)), Some(&question), None));
+    assert!(got.question_left_out && got.question.is_none() && !got.question_cut && !got.answer_cut);
+    assert_eq!(got.text, prepare_paste(&parts(&"x".repeat(answer_for_room(199)), None)), "the text as without a question");
+
+    let got = prepare(&asking(&"x".repeat(answer_for_room(200)), Some(&question), None));
+    assert!(!got.question_left_out && got.question_cut);
+    assert_eq!(got.question.as_ref().unwrap().chars().count(), 200, "cut to the room, its cut line in it");
+    assert_eq!(got.text.chars().count(), RELAY_CAP);
+    // A short question that fits a small room goes whole.
+    let got = prepare(&asking(&"x".repeat(answer_for_room(50)), Some("Why?"), None));
+    assert_eq!((got.question.as_deref(), got.question_cut, got.question_left_out), (Some("Why?"), false, false));
+}
+
+#[test]
+fn the_answer_is_cut_only_by_the_frame_and_then_the_question_is_left_out() {
+    let long = "b".repeat(30_000);
+    let got = prepare(&asking(&long, Some("What next?"), Some("Keep my note whole.")));
+    assert!(got.answer_cut && got.question_left_out && got.question.is_none());
+    assert_eq!(got.text, prepare_paste(&parts(&long, Some("Keep my note whole."))), "the answer cut as before");
+}
+
+#[test]
+fn answer_cut_says_when_the_note_made_the_answer_shorter() {
+    // An answer of 15,990 characters fits alone; with a note it doesn't.
+    let answer = "a".repeat(15_990);
+    let bare = PasteParts { lead: None, from_label: "".into(), answer: answer.clone(), ..Default::default() };
+    assert!(!prepare(&bare).answer_cut);
+    let noted = PasteParts { note: Some("Keep my note.".into()), note_label: Some("My note:".into()), ..bare.clone() };
+    let got = prepare(&noted);
+    assert!(got.answer_cut);
+    assert!(got.text.ends_with("[Plyloft cut this at 16,000 characters]\n\nMy note:\nKeep my note."));
+    // A note too long on its own cuts the whole: said too.
+    assert!(prepare(&parts("a", Some(&"n".repeat(20_000)))).answer_cut);
+}
+
+#[test]
+fn a_question_cut_when_read_always_goes_with_its_cut_line() {
+    let got = prepare(&PasteParts { question_cut: true, ..asking("A.", Some("The start of a long question"), None) });
+    assert_eq!(got.question.as_deref(), Some("The start of a long question\n[Plyloft cut your question here to fit 16,000 characters]"));
+    assert!(got.question_cut && !got.question_left_out);
+    assert!(got.text.contains(&format!("{ASK_LABEL}\n{}\n\nFrom Claude:\nA.", got.question.as_ref().unwrap())));
+}
+
+#[test]
+fn the_window_s_paste_shapes_are_stable() {
+    let from_window: PasteParts = serde_json::from_value(json!({
+        "lead":"L","fromLabel":"From Claude Code:","answer":"A.","noteLabel":"My note:",
+        "question":"Q?","questionLabel":"My question to Claude:","questionCut":false
+    }))
+    .unwrap();
+    let got = prepare(&from_window);
+    assert_eq!(got.text, " L\n\nMy question to Claude:\nQ?\n\nFrom Claude Code:\nA.");
+    assert_eq!(
+        serde_json::to_value(&got).unwrap(),
+        json!({"text":got.text,"question":"Q?","questionCut":false,"questionLeftOut":false,"answerCut":false})
+    );
+    // The window of before (no question fields) still reads.
+    let old: PasteParts = serde_json::from_value(json!({"fromLabel":"F","answer":"A.","noteLabel":"N"})).unwrap();
+    assert_eq!(serde_json::to_value(prepare(&old)).unwrap(), json!({"text":" F\nA.","questionCut":false,"questionLeftOut":false,"answerCut":false}));
+    // Debug never shows what goes.
+    assert!(!format!("{got:?}").contains("Q?"));
 }

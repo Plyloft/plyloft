@@ -250,7 +250,7 @@ pub fn apply(args: Vec<String>, theme: Option<&str>) -> Vec<String> {
 }
 
 /// Claude Code's config directory: `$CLAUDE_CONFIG_DIR`, else `~/.claude`.
-fn claude_config_dir() -> Option<PathBuf> {
+fn main_config_dir() -> Option<PathBuf> {
     if let Ok(dir) = std::env::var("CLAUDE_CONFIG_DIR") {
         if !dir.trim().is_empty() {
             return Some(PathBuf::from(dir));
@@ -271,8 +271,15 @@ pub fn global_claude_theme_at(config_dir: &Path, legacy_config: Option<&Path>) -
     theme_in(&config_dir.join("settings.json")).or_else(|| legacy_config.and_then(theme_in))
 }
 
-fn global_claude_theme() -> Option<String> {
-    let dir = claude_config_dir()?;
+/// 1.179.0: of the Claude account the session runs on. Main (`None`) reads
+/// as before; another account reads its own folder's `settings.json`, then
+/// its own `.claude.json` (Claude keeps both there).
+fn global_claude_theme(account: Option<&str>) -> Option<String> {
+    if account.is_some() {
+        let dir = crate::ai_accounts::claude_dir(account)?;
+        return global_claude_theme_at(&dir, Some(dir.join(".claude.json").as_path()));
+    }
+    let dir = main_config_dir()?;
     let legacy = crate::platform::home_dir().map(|h| h.join(".claude.json"));
     global_claude_theme_at(&dir, legacy.as_deref())
 }
@@ -290,19 +297,20 @@ fn system_is_dark<R: Runtime>(app: &AppHandle<R>) -> Option<bool> {
     }
 }
 
-/// The Claude theme a session spawned now should draw with.
-pub fn theme_for_spawn<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
+/// The Claude theme a session spawned now on Claude account `account`
+/// (`None`: Main) should draw with.
+pub fn theme_for_spawn<R: Runtime>(app: &AppHandle<R>, account: Option<&str>) -> Option<String> {
     let lightness = ply_lightness_now(app);
     let env = crate::shell_env::get();
-    spawn_theme(lightness, global_claude_theme().as_deref(), env.claude_version.as_deref())
+    spawn_theme(lightness, global_claude_theme(account).as_deref(), env.claude_version.as_deref())
 }
 
-/// `apply` with the theme resolved for a spawn happening now.
-pub fn session_args<R: Runtime>(app: &AppHandle<R>, args: Vec<String>) -> Vec<String> {
+/// `apply` with the theme resolved for a spawn happening now on `account`.
+pub fn session_args<R: Runtime>(app: &AppHandle<R>, args: Vec<String>, account: Option<&str>) -> Vec<String> {
     if is_headless(&args) {
         return args;
     }
-    apply(args, theme_for_spawn(app).as_deref())
+    apply(args, theme_for_spawn(app, account).as_deref())
 }
 
 #[cfg(test)]

@@ -32,6 +32,7 @@
     "src/components/settings/ProgramFoldersRow.tsx",
     "src/components/settings/CheckedField.tsx",
     "src/components/settings/BuildsRunsPage.tsx",
+    "src/components/settings/ClaudeAccountsSection.tsx",
     "src/components/settings/DictationPage.tsx",
     "src/components/settings/BoardPage.tsx",
     "src/components/settings/WorktreesPage.tsx",

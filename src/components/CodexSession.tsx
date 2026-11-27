@@ -639,7 +639,7 @@ export function CodexSession({ sessionId, workspaceId, cwd }: Props) {
           id: INITIALIZE_ID,
           method: "initialize",
           params: {
-            clientInfo: { name: "ply", title: "Plyloft", version: "1.178.0" },
+            clientInfo: { name: "ply", title: "Plyloft", version: "1.179.0" },
             capabilities: { experimentalApi: true },
           },
         });

@@ -170,6 +170,12 @@ export interface Tile {
   /** Try it (TI-2): shell only — this tile is the Try session of that card
    *  copy (`lib/trySession.ts`). In memory only, never persisted. */
   tryOf?: TryOf;
+  /** 1.179.0 (C2): claude only — the Claude account it runs on (an
+   *  `ai_accounts_list` id, or C3's `MAIN_ACCOUNT_ID`; null: Main). Set when it was asked for (the
+   *  new-session menu, a resumed row's), then from each look at its title
+   *  (`terminal_tile_title`); absent until either. A string is what its
+   *  spawn asks for. In memory only, never persisted. */
+  account?: string | null;
 }
 
 interface WorkspaceTileState {
@@ -193,6 +199,9 @@ export interface CliTileOpts {
   /** QoL 1.168 (block 4): the conversation it resumes, known at once (Continue
    *  works before the first look at its title). */
   cliSessionId?: string;
+  /** 1.179.0 (C2): Claude only — the account to run on (the new-session
+   *  menu's choice, or the one a resumed conversation is kept on). */
+  account?: string | null;
 }
 
 const isCliKind = (kind: TileKind) => kind === "claude" || kind === "codex";
@@ -320,6 +329,8 @@ interface TileStore {
    *  the conversation's title comes back at the next look. */
   dropUserLabel: (tileId: string) => void;
   setCliSession: (tileId: string, cliSessionId: string) => void;
+  /** 1.179.0 (C2): the Claude account a look at the tile's title found. */
+  setTileAccount: (tileId: string, account: string | null) => void;
   /** P2: the pending `/rename`, taken once (it is typed now). */
   takePendingCliRename: (ptyId: string) => string | null;
   /**
@@ -470,6 +481,7 @@ export const useTiles = create<TileStore>((set, get) => ({
       workspaceId,
       kind: "claude",
       ptyId: null,
+      ...(opts?.account ? { account: opts.account } : {}),
       label: named ? uniqueLabel(ws.tiles, named) : nextLabel(ws.tiles, "claude", "claude"),
       ...(named ? { labelSource: opts?.labelSource ?? "auto" } : {}),
       // Challenger round 2: a member's name from the record is theirs here
@@ -723,6 +735,9 @@ export const useTiles = create<TileStore>((set, get) => ({
             ? { userName: prev.userName, ...(isCliKind(prev.kind) ? { pendingCliRename: prev.userName } : {}) }
             : {}),
           ...(prev.cliSessionId && keepsConversation ? { cliSessionId: prev.cliSessionId } : {}),
+          // 1.179.0 (C2): a conversation goes on where it is kept; a fresh
+          // start is a new session, on the account new sessions start on.
+          ...(prev.kind === "claude" && keepsConversation && prev.account !== undefined ? { account: prev.account } : {}),
           startedAt: Date.now(),
           status: "running",
           pendingClose: false,
@@ -972,6 +987,18 @@ export const useTiles = create<TileStore>((set, get) => ({
         if (idx < 0 || ws.tiles[idx].cliSessionId === cliSessionId) continue;
         const updated = [...ws.tiles];
         updated[idx] = { ...ws.tiles[idx], cliSessionId };
+        return { byWorkspace: { ...s.byWorkspace, [wsId]: { ...ws, tiles: updated } } };
+      }
+      return s;
+    }),
+
+  setTileAccount: (tileId, account) =>
+    set((s) => {
+      for (const [wsId, ws] of Object.entries(s.byWorkspace)) {
+        const idx = ws.tiles.findIndex((t) => t.id === tileId);
+        if (idx < 0 || ws.tiles[idx].account === account) continue;
+        const updated = [...ws.tiles];
+        updated[idx] = { ...ws.tiles[idx], account };
         return { byWorkspace: { ...s.byWorkspace, [wsId]: { ...ws, tiles: updated } } };
       }
       return s;

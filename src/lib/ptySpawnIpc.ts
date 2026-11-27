@@ -25,6 +25,11 @@ export function ptySpawn(opts: {
   /** 1.176.0 R7: the id the tile already listens under (a lowercase UUID,
    *  `pty_tile_id.rs`), so the first output and an instant exit reach it. */
   id?: string | null;
+  /** 1.179.0 (C2): the Claude account a Claude tile runs on (an
+   *  `ai_accounts_list` id): the new-session menu's choice, or the account
+   *  a resumed conversation is kept on. Absent: the backend's choice (the
+   *  account for new sessions; for a resume, the one its record says). */
+  account?: string | null;
 }) {
   return invoke<string>("pty_spawn", {
     cmd: opts.cmd,
@@ -36,6 +41,7 @@ export function ptySpawn(opts: {
     tryTarget: opts.tryTarget ?? null,
     cli: opts.cli ?? null,
     id: opts.id ?? null,
+    account: opts.account ?? null,
   });
 }
 

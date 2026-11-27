@@ -2,26 +2,33 @@
 // two ways to hand over. One filled primary: "Send to {B}". Its own file, so
 // the bar at rest (whose one primary is "Pass to {B} →") and this are two
 // views, never drawn together.
-import type { RefObject } from "react";
+import { useEffect, type ReactNode, type RefObject } from "react";
 import { useCompare, type Composer } from "../store/compareStore";
-import { closeComposer, deliver } from "../store/compareActions";
+import { closeComposer, deliver, refreshPreview } from "../store/compareActions";
+import { questionReasonWords } from "../lib/compareView";
 import {
   COMPARE_ASKS,
   COMPARE_ASK_LABEL,
   COMPARE_CANCEL,
   COMPARE_CUT_WORDS,
   COMPARE_HIDE,
+  COMPARE_INCLUDE_QUESTION,
   COMPARE_NOTE_MAX,
   COMPARE_NOTE_PLACEHOLDER,
   COMPARE_PUT_IN_BOX,
+  COMPARE_QUESTION_CUT,
+  COMPARE_QUESTION_LEFT_OUT,
   COMPARE_SHOW,
   askHeading,
   charsWords,
   composerTitleWords,
+  includeQuestionHint,
+  questionLabelWords,
   sendWords,
 } from "../lib/compareWords";
 import { formatKeys, mod } from "../lib/platform";
 import { CBtn } from "./ui/primitives";
+import { Toggle } from "./ux/controls";
 import { MarkdownText } from "./MarkdownText";
 import { RelayWho } from "./RelayWho";
 
@@ -32,6 +39,10 @@ export function CompareComposer({
   putReason,
   answerGone = false,
   noteRef,
+  place = "",
+  label = "Compare",
+  hidden = false,
+  lead = null,
 }: {
   workspaceId: string;
   composer: Composer;
@@ -41,12 +52,31 @@ export function CompareComposer({
    *  new conversation): its text and length aren't shown as if it were. */
   answerGone?: boolean;
   noteRef: RefObject<HTMLTextAreaElement | null>;
+  /** 1.179.0 two pairs: the pair's place, its region's name, hidden while
+   *  the other pair's tile is expanded, and its dot and name first. */
+  place?: string;
+  label?: string;
+  hidden?: boolean;
+  lead?: ReactNode;
 }) {
   const store = useCompare.getState();
   // F2: why a button is off, as soon as it is — Send's, else Put's (only Put
   // off: its own reason, under it) — never while a press is under way (its
   // own paste makes the box read typed for a moment).
   const shownReason = composer.busy ? null : (sendReason ?? putReason);
+  // 1.179.0 "Include my question": null when the switch isn't offered (a
+  // pass from the history that went without one).
+  const question = composer.question ?? null;
+  const questionOn = composer.includeQuestion === true && question?.state === "ok";
+  const questionText = question?.state === "ok" ? question.text : null;
+  // The preview comes from the backend, from the parts a press sends: asked
+  // again (debounced) when they change, only with the switch on.
+  useEffect(() => {
+    refreshPreview(workspaceId);
+  }, [workspaceId, composer.answer, composer.ask, composer.note, composer.includeQuestion, questionText]);
+  const preview = questionOn ? (composer.preview ?? null) : null;
+  // The question as it goes when the backend has said, else as it was read.
+  const questionChars = preview?.question !== undefined ? [...preview.question].length : questionText !== null ? [...questionText].length : 0;
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -64,8 +94,17 @@ export function CompareComposer({
   };
 
   return (
-    <div className="ux-relay ux-relay--open" role="region" aria-label="Compare" data-compare-ws={workspaceId} onKeyDown={onKeyDown}>
+    <div
+      className="ux-relay ux-relay--open"
+      role="region"
+      aria-label={label}
+      data-compare-ws={workspaceId}
+      data-compare-place={place}
+      hidden={hidden || undefined}
+      onKeyDown={onKeyDown}
+    >
       <div className="ux-relay-line">
+        {lead}
         <RelayWho vendor={composer.from}>
           <b>{composerTitleWords(composer.from, composer.to, composer.answerKind)}</b>
         </RelayWho>
@@ -86,6 +125,13 @@ export function CompareComposer({
       </div>
       {composer.expanded && !answerGone && (
         <div className="ux-relay-answer">
+          {/* The question exactly as the backend prepared it, plain text. */}
+          {preview?.question !== undefined && (
+            <>
+              <p className="ux-relay-muted">{questionLabelWords(composer.from)}</p>
+              <p>{preview.question}</p>
+            </>
+          )}
           <MarkdownText text={composer.answer} />
         </div>
       )}
@@ -117,6 +163,31 @@ export function CompareComposer({
           ))}
         </span>
       </div>
+      {question && !answerGone && (
+        <div className="ux-relay-line">
+          <span className="ux-relay-reason" title={includeQuestionHint(composer.from)}>
+            <Toggle
+              checked={questionOn}
+              disabled={composer.busy || question.state !== "ok"}
+              label={COMPARE_INCLUDE_QUESTION}
+              onChange={(next) => store.patchComposer(workspaceId, { includeQuestion: next })}
+            />
+            <span>{COMPARE_INCLUDE_QUESTION}</span>
+          </span>
+          {questionOn ? (
+            <>
+              <span className="ux-relay-muted">{charsWords(questionChars)}</span>
+              {preview?.questionLeftOut ? (
+                <span className="ux-relay-muted">{COMPARE_QUESTION_LEFT_OUT}</span>
+              ) : (
+                preview?.questionCut && <span className="ux-relay-muted">{COMPARE_QUESTION_CUT}</span>
+              )}
+            </>
+          ) : (
+            question.state !== "ok" && <span className="ux-relay-muted">{questionReasonWords(composer.from, question)}</span>
+          )}
+        </div>
+      )}
       <div className="ux-relay-line ux-relay-line--note">
         <textarea
           ref={noteRef}

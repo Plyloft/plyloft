@@ -528,6 +528,95 @@ pub struct DeviceSettings {
     pub hardware: Option<String>,
 }
 
+/// 1.179.0 (C1): the AI accounts this computer keeps beside the one each CLI
+/// uses on its own (Main). Local only, backend-owned (`ai_accounts`); absent
+/// in every earlier settings.json → only Main, and left out of the file while
+/// there is nothing to say. Each account's folder is not stored: it is
+/// derived from its id (`<app-config>/ai-accounts/claude/<id>/`), so no
+/// machine path lives in settings.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AiAccountsSettings {
+    #[serde(
+        default,
+        skip_serializing_if = "ClaudeAccountsSettings::is_empty",
+        deserialize_with = "lenient"
+    )]
+    pub claude: ClaudeAccountsSettings,
+    /// Vendors a later Plyloft adds (Codex accounts) survive a save here.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+impl AiAccountsSettings {
+    pub fn is_empty(&self) -> bool {
+        self.claude.is_empty() && self.extra.is_empty()
+    }
+}
+
+/// 1.179.0 (C1): the Claude accounts. `current` is the one new sessions start
+/// on (`None`, or an id no longer listed: Main); `main_name` the member's name
+/// for Main (`None`: "Main").
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ClaudeAccountsSettings {
+    /// An entry that can't be read is dropped on its own, never the list
+    /// (`lenient_accounts`).
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "lenient_accounts"
+    )]
+    pub accounts: Vec<AiAccountEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient_opt")]
+    pub current: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none", deserialize_with = "lenient_opt")]
+    pub main_name: Option<String>,
+}
+
+impl ClaudeAccountsSettings {
+    pub fn is_empty(&self) -> bool {
+        self.accounts.is_empty() && self.current.is_none() && self.main_name.is_none()
+    }
+
+    /// The account new sessions start on: `current` only while it names a
+    /// listed account; anything else reads as Main (`None`).
+    pub fn current_id(&self) -> Option<&str> {
+        self.current
+            .as_deref()
+            .filter(|id| self.accounts.iter().any(|a| a.id == *id))
+    }
+}
+
+/// One added account: an id Plyloft made (`ai_accounts::new_id`), the
+/// member's name for it and when it was added (RFC 3339).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AiAccountEntry {
+    pub id: String,
+    pub name: String,
+    pub added_at: String,
+    /// Fields a later Plyloft adds to an account survive a save here.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
+}
+
+/// Keeps every entry that reads as an account with an id and a name.
+fn lenient_accounts<'de, D>(deserializer: D) -> Result<Vec<AiAccountEntry>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    let serde_json::Value::Array(items) = value else {
+        return Ok(Vec::new());
+    };
+    Ok(items
+        .into_iter()
+        .filter_map(|item| serde_json::from_value::<AiAccountEntry>(item).ok())
+        .filter(|entry| !entry.id.is_empty() && !entry.name.is_empty())
+        .collect())
+}
+
 /// 1.174.0 (A4): Next improvement's slate on this computer, per area of a
 /// workspace (`<workspaceId>::<area>`, the section's key). Written by the
 /// frontend; local only, never shared. Absent in every earlier settings.json
@@ -1464,6 +1553,20 @@ pub struct Settings {
     /// computer. Absent in every earlier settings.json → empty.
     #[serde(default)]
     pub next_improvement: NextImprovementSettings,
+    /// 1.179.0 (C1): the Claude accounts beside Main. Absent in every earlier
+    /// settings.json → only Main; left out of the file while empty; a value
+    /// that can't be read is only Main, never a reset of the whole file.
+    #[serde(
+        default,
+        skip_serializing_if = "AiAccountsSettings::is_empty",
+        deserialize_with = "lenient"
+    )]
+    pub ai_accounts: AiAccountsSettings,
+    /// 1.179.0 (owner D6): top-level keys this Plyloft doesn't know (a later
+    /// one's settings) are kept through a load and a save, so a downgrade no
+    /// longer drops them.
+    #[serde(flatten)]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }
 
 impl Default for Settings {
@@ -1484,6 +1587,8 @@ impl Default for Settings {
             projects: ProjectsSettings::default(),
             device: DeviceSettings::default(),
             next_improvement: NextImprovementSettings::default(),
+            ai_accounts: AiAccountsSettings::default(),
+            extra: serde_json::Map::new(),
         }
     }
 }
@@ -2031,6 +2136,13 @@ impl SettingsStore {
         next.library.my_library = stored.library.my_library.clone();
         // 1.173.0 (C2): this computer's id and name ([`Self::ensure_device`]).
         next.device = stored.device.clone();
+        // 1.179.0 (C1): the Claude accounts are written only by their own
+        // commands (`ai_accounts`): a window save never adds, drops or
+        // renames one, so no account folder is left without its entry.
+        next.ai_accounts = stored.ai_accounts.clone();
+        // 1.179.0 (D6): keys a later Plyloft wrote are this build's to keep,
+        // never to change; a window save carries what is stored.
+        next.extra = stored.extra.clone();
     }
 
     /// 1.173.0 (C2): this computer's identity — its id made once (a uuid)
@@ -4983,5 +5095,105 @@ mod tests {
                 assert_eq!(plain, want, "{} (resolve_card_model_with_team)", c.name);
             }
         }
+    }
+
+    /// 1.179.0 (C1) Tier 2: a settings.json from before Claude accounts loads
+    /// with only Main, and a backend save writes no `aiAccounts` key and
+    /// changes nothing but what it was asked to.
+    #[test]
+    fn a_pre_1179_settings_file_loads_with_only_main_and_saves_back_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut value = serde_json::to_value(Settings::default()).unwrap();
+        assert!(value.get("aiAccounts").is_none(), "empty, it isn't written");
+        value["appearance"]["theme"] = serde_json::json!("dark");
+        let text = serde_json::to_string_pretty(&value).unwrap();
+        std::fs::write(dir.path().join(SETTINGS_FILE), &text).unwrap();
+
+        let store = SettingsStore::new(dir.path().to_path_buf()).unwrap();
+        let loaded = store.snapshot();
+        assert!(loaded.ai_accounts.is_empty());
+        assert_eq!(loaded.ai_accounts.claude.current_id(), None, "new sessions: Main");
+        assert!(loaded.extra.is_empty());
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join(SETTINGS_FILE)).unwrap(),
+            text,
+            "loading doesn't rewrite the file"
+        );
+
+        store.update(|s| s.appearance.theme = ThemePref::Light).unwrap();
+        let on_disk: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(dir.path().join(SETTINGS_FILE)).unwrap()).unwrap();
+        assert!(on_disk.get("aiAccounts").is_none());
+        let mut expected = value.clone();
+        expected["appearance"]["theme"] = serde_json::json!("light");
+        assert_eq!(on_disk, expected, "only the change itself landed");
+    }
+
+    /// 1.179.0 (D6): a top-level key this Plyloft doesn't know (a later
+    /// one's) is kept through a load, a backend save and a window save, and
+    /// so are unknown keys inside `aiAccounts` and inside an account.
+    #[test]
+    fn unknown_keys_survive_a_load_and_a_save() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut value = serde_json::to_value(Settings::default()).unwrap();
+        value["fromALaterPlyloft"] = serde_json::json!({ "kept": [1, 2] });
+        value["aiAccounts"] = serde_json::json!({
+            "claude": {
+                "accounts": [{ "id": "a1b2c3d4", "name": "Work", "addedAt": "2026-11-27T10:00:00.000Z", "folderKind": "own" }],
+                "current": "a1b2c3d4"
+            },
+            "codex": { "accounts": [] }
+        });
+        std::fs::write(
+            dir.path().join(SETTINGS_FILE),
+            serde_json::to_string_pretty(&value).unwrap(),
+        )
+        .unwrap();
+
+        let store = SettingsStore::new(dir.path().to_path_buf()).unwrap();
+        let loaded = store.snapshot();
+        assert_eq!(loaded.extra.get("fromALaterPlyloft"), Some(&serde_json::json!({ "kept": [1, 2] })));
+        assert_eq!(loaded.ai_accounts.claude.current_id(), Some("a1b2c3d4"));
+
+        store.update(|s| s.appearance.theme = ThemePref::Light).unwrap();
+        // The window's save, from a copy that never carried the unknown keys.
+        let mut window = Settings::default();
+        window.appearance.theme = ThemePref::Dark;
+        store.replace(window).unwrap();
+
+        let on_disk: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(dir.path().join(SETTINGS_FILE)).unwrap()).unwrap();
+        assert_eq!(on_disk["fromALaterPlyloft"], serde_json::json!({ "kept": [1, 2] }));
+        assert_eq!(on_disk["aiAccounts"]["codex"], serde_json::json!({ "accounts": [] }));
+        assert_eq!(on_disk["aiAccounts"]["claude"]["accounts"][0]["folderKind"], "own");
+        assert_eq!(on_disk["aiAccounts"]["claude"]["current"], "a1b2c3d4", "a window save keeps the accounts");
+        assert_eq!(on_disk["appearance"]["theme"], "dark");
+    }
+
+    /// 1.179.0 (C1): `current` naming an account that isn't listed reads as
+    /// Main; an unreadable entry is dropped on its own; an unreadable
+    /// `aiAccounts` is only Main, never a reset of the whole file.
+    #[test]
+    fn a_current_account_not_in_the_list_reads_as_main() {
+        let parsed: Settings = serde_json::from_str(
+            r#"{ "schemaVersion": 1, "appearance": { "theme": "dark" },
+                 "aiAccounts": { "claude": {
+                     "accounts": [{ "id": "a1b2c3d4", "name": "Work", "addedAt": "2026-11-27T10:00:00.000Z" }, { "id": 7 }, "x"],
+                     "current": "ffffffff", "mainName": "Personal" } } }"#,
+        )
+        .unwrap();
+        let claude = &parsed.ai_accounts.claude;
+        assert_eq!(claude.current.as_deref(), Some("ffffffff"), "kept as written");
+        assert_eq!(claude.current_id(), None, "but read as Main");
+        assert_eq!(claude.accounts.len(), 1);
+        assert_eq!(claude.accounts[0].name, "Work");
+        assert_eq!(claude.main_name.as_deref(), Some("Personal"));
+
+        let broken: Settings = serde_json::from_str(
+            r#"{ "schemaVersion": 1, "appearance": { "theme": "dark" }, "aiAccounts": "nonsense" }"#,
+        )
+        .unwrap();
+        assert!(broken.ai_accounts.is_empty());
+        assert_eq!(broken.appearance.theme, ThemePref::Dark, "the rest of the file is kept");
     }
 }

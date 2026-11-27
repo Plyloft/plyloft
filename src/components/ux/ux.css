@@ -6852,6 +6852,37 @@ h3.ux-card-field-label {
 .ux-relay--open {
   min-height: 0;
 }
+/* 1.179.0: the bar of the other pair while a tile is expanded — hidden, not
+   unmounted (the class's display would otherwise win over [hidden]). */
+.ux-relay[hidden] {
+  display: none;
+}
+/* 1.179.0 two pairs: the pair's name, bold, before the bar's line. It gives
+   way first when the bar is narrow. */
+.ux-relay-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+/* The pair's dot: its only colour, on the bar and on both tiles' heads.
+   Pair A the cyan preset; pair B the code editor's string green, the one
+   token far from cyan, from Claude's violet and Codex's magenta glyphs and
+   from the error red in every theme. No bar, fill or border takes it. */
+.ux-pair-dot {
+  flex: 0 0 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+.ux-pair-dot--a {
+  background: var(--accent-cyan);
+}
+.ux-pair-dot--b {
+  background: var(--syntax-string);
+}
 .ux-relay kbd,
 .ux-relay-keys {
   font-family: var(--font-ui);

@@ -289,6 +289,11 @@ beforeEach(() => {
     // 1.173.0 (H1): Diagnostics › Responsiveness — no freezes, unless a test
     // gives some.
     watchdog_status: { startedAt: 0, episodes: [], lines: [], previousRun: null },
+    // 1.179.0 (C1): AI and models' Claude accounts — Main alone unless a
+    // test gives more.
+    ai_accounts_list: [{ id: null, name: "Main", signedIn: "unknown", isCurrent: true, folder: null }],
+    // No session runs on the account Remove's sheet opens for.
+    ai_account_remove_blocked: null,
   });
 });
 

@@ -1121,7 +1121,9 @@ pub fn run_probe_locked(
     // and Plyloft never answers that: its probe runs under the Claude
     // session root, which the member trusts once (`claude_review_trust_status`).
     if let (Provider::Claude, Some(config)) = (provider, registry.config_dir()) {
-        if crate::claude_session::folder_trusted(&crate::claude_session::sessions_root(config))
+        // 1.179.0 accounts: the probe runs on Main (it has no app handle to
+        // read the account new sessions start on), so Main's answer.
+        if crate::claude_session::folder_trusted(&crate::claude_session::sessions_root(config), None)
             == Some(false)
         {
             return Err(crate::claude_session::FOLDER_TRUST_REFUSAL.into());
@@ -1201,6 +1203,8 @@ pub fn run_probe_locked(
                 run_id: None,
                 retention_class: RetentionClass::Ephemeral,
                 objective: Some("Prove reviewer write denial".into()),
+                // 1.179.0 accounts: on Main; see the trust read above.
+                account: None,
             },
             PROBE_TIMEOUT_SECS,
         )?;
