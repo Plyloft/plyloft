@@ -1345,7 +1345,8 @@ pub(crate) struct LiveConversation {
 pub(crate) fn live_conversation(pty_id: &str, pid: Option<u32>, homes: &CliHomes) -> Option<LiveConversation> {
     let view = refresh_title(pty_id, pid, homes)?;
     let path = store().lock().live.get(pty_id).map(|(path, _)| path.clone())?;
-    let row = load(&path).file.sessions.into_iter().find(|r| r.id == view.row_id)?;
+    let rows = load(&path).file.sessions;
+    let row = rows.iter().find(|r| r.id == view.row_id)?.clone();
     let id = row.cli_session_id.clone();
     let file = id.as_deref().and_then(|id| transcript_from(homes, row.kind, Path::new(&row.cwd), id));
     let pid_names_it = match row.kind {
@@ -1359,7 +1360,8 @@ pub(crate) fn live_conversation(pty_id: &str, pid: Option<u32>, homes: &CliHomes
     // or it is somebody else's. Either way not this tile's for sure.
     let newer_elsewhere = match (row.kind, id.as_deref(), file.as_deref()) {
         (SessionKind::Codex, Some(own), Some(own_file)) => {
-            homes.codex.as_deref().is_some_and(|home| codex_written_elsewhere(home, &row, own, own_file))
+            let ended = ended_codex_claims(&rows);
+            homes.codex.as_deref().is_some_and(|home| codex_written_elsewhere(home, &row, own, own_file, &ended))
         }
         // Not claimed yet: any unclaimed session begun in the folder since
         // the tile started is one it might be in ("unstarted" when none).
@@ -1404,14 +1406,45 @@ fn codex_unclaimed_since(codex: &Path, row: &SessionRow) -> bool {
     })
 }
 
+/// 1.179.0: the Codex sessions claimed by this record's tiles that have
+/// ended, each with when its tile ended (the latest, when several did).
+fn ended_codex_claims(rows: &[SessionRow]) -> HashMap<String, i64> {
+    let mut ended: HashMap<String, i64> = HashMap::new();
+    for r in rows.iter().filter(|r| r.kind == SessionKind::Codex) {
+        if let (Some(id), Some(at)) = (r.cli_session_id.as_deref(), r.ended_at) {
+            let slot = ended.entry(id.to_string()).or_insert(at);
+            *slot = (*slot).max(at);
+        }
+    }
+    ended
+}
+
 /// M2: an unclaimed interactive Codex rollout in the tile's folder, written
 /// since the tile started, that either started after the tile's own (and
 /// after the tile: `/new`, a `codex` run outside) or was written later than
 /// the tile's own (`/resume` of an older one).
-fn codex_written_elsewhere(codex: &Path, row: &SessionRow, own: &str, own_file: &Path) -> bool {
+///
+/// 1.179.0: a rollout another tile of this record claimed and that tile has
+/// since closed (`ended`) is set aside while its last line is dated no
+/// later than that tile ended and no later than this tile's own last line.
+/// Otherwise a second Codex tile opened and closed in the same folder left
+/// the first "can't tell" for good. A line after the other tile closed
+/// (this tile resumed it), or after this tile's own last one (the other
+/// tile's claim was wrong and this tile is in it), or a time that can't be
+/// read, still counts: then it may be this tile's. These times come from
+/// the lines, not the file: a Codex rollout's mtime doesn't advance on
+/// Windows as turns are appended (the mtimes below are left as they were).
+fn codex_written_elsewhere(
+    codex: &Path,
+    row: &SessionRow,
+    own: &str,
+    own_file: &Path,
+    ended: &HashMap<String, i64>,
+) -> bool {
     let cwd = Path::new(&row.cwd);
     let own_started = crate::codex_sessions::session_of(own_file, cwd).map_or(i64::MIN, |(_, s)| s);
     let own_written = mtime_ms(own_file).unwrap_or(i64::MIN);
+    let own_last: std::cell::OnceCell<Option<i64>> = std::cell::OnceCell::new();
     let claimed = live_cli_ids();
     crate::codex_sessions::rollout_paths(&codex.join("sessions")).into_iter().any(|path| {
         if path == own_file {
@@ -1422,6 +1455,15 @@ fn codex_written_elsewhere(codex: &Path, row: &SessionRow, own: &str, own_file: 
         let Some((id, started)) = crate::codex_sessions::session_of(&path, cwd) else { return false };
         if id == own || claimed.contains(&id) {
             return false;
+        }
+        if let Some(&at) = ended.get(&id) {
+            let last = crate::codex_sessions::last_line_at(&path);
+            let own_at = *own_last.get_or_init(|| crate::codex_sessions::last_line_at(own_file));
+            if let (Some(last), Some(own_at)) = (last, own_at) {
+                if last <= at && last <= own_at {
+                    return false;
+                }
+            }
         }
         ((started > own_started && started >= row.started_at) || written > own_written)
             && !crate::intake::rollout_is_intake(&path)

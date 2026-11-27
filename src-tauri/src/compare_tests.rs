@@ -106,7 +106,7 @@ fn a_compaction_summary_and_sidechain_lines_are_not_answers() {
 
 #[test]
 fn nothing_sent_yet_is_no_turn_and_no_answer() {
-    assert_eq!(whole(""), Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false });
+    assert_eq!(whole(""), Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false });
 }
 
 // Plan mode, MEASURED on Claude Code 2.1.331 (`MEASURE-planmode.md`): one
@@ -337,7 +337,7 @@ fn a_codex_open_turn_keeps_the_last_answer_and_an_aborted_turn_has_none() {
     );
     assert_eq!((p.turn, text_of(&p)), (TurnState::Done, Some("First.")));
     let p = codex_tail(codex_lines(&[json!({"type":"session_meta","payload":{"id":"c1"}})]).as_bytes(), true);
-    assert_eq!(p, Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false });
+    assert_eq!(p, Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false });
 }
 
 // ── Which conversation ───────────────────────────────────────────────────
@@ -1145,4 +1145,277 @@ fn a_plan_file_rewritten_while_claude_works_is_not_pending() {
     let l3 = plan_tile(dir.path(), &up);
     write_plan(&l3, &format!("p-of-{SESSION}.md"), "# Plan file", ms("2026-11-24T21:46:30Z"));
     assert!(tile_answer(Some(l3)).plan_pending);
+}
+
+// ── B1: the plan after a write that lands late (Claude Code 2.1.332) ─────
+// Measured: when Claude writes the plan file and calls ExitPlanMode in one
+// message and the write's result lands after the ExitPlanMode, its
+// `input.plan` is the file as it was before that write. The fixtures are
+// built by hand in that shape (invented plans, fake ids and paths).
+
+const STALE_AFTER_FEEDBACK: &str = include_str!("compare_fixtures/plan-stale-after-feedback.jsonl");
+const STALE_ACROSS_TURNS: &str = include_str!("compare_fixtures/plan-stale-across-turns.jsonl");
+const PLAN_V0: &str = "1. Do X.\n2. Do Y.";
+const PLAN_V1: &str = "1. Do A.\n2. Do B.\n3. Do C.";
+const PLAN_V2: &str = "1. Do A.\n2. Do B.";
+
+fn entries(text: &str) -> Vec<Value> {
+    text.lines().map(|l| serde_json::from_str(l).unwrap()).collect()
+}
+
+/// Where the fixture line whose uuid ends in `n` is.
+fn line_of(t: &[Value], n: u32) -> usize {
+    let uuid = format!("00000000-0000-4000-8000-{n:012}");
+    t.iter().position(|e| e["uuid"] == uuid.as_str()).unwrap()
+}
+
+/// An ExitPlanMode refused on its menu: with the member's words ("Tell
+/// Claude what to change"), or by Esc.
+fn refused(uuid: &str, tool: &str, feedback: Option<&str>) -> Value {
+    let text = match feedback {
+        Some(words) => format!("The user doesn't want to proceed with this tool use. To tell you how to proceed, the user said:\n{words}"),
+        None => "The user doesn't want to take this action right now. STOP what you are doing and wait for the user to tell you how to proceed.".to_string(),
+    };
+    json!({"type":"user","uuid":uuid,"isSidechain":false,"toolDenialKind":"user-rejected",
+           "message":{"role":"user","content":[{"type":"tool_result","tool_use_id":tool,"is_error":true,"content":text}]}})
+}
+
+fn plan_of(p: &Parsed) -> Option<(&str, AnswerKind)> {
+    p.found.as_ref().map(|f| (f.text.as_str(), f.kind))
+}
+
+#[test]
+fn a_stale_plan_after_feedback_is_rebuilt_from_the_plan_file_s_edit() {
+    let p = whole(STALE_AFTER_FEEDBACK);
+    assert_eq!(p.turn, TurnState::Done, "Esc on the second menu");
+    assert_eq!(plan_of(&p), Some((PLAN_V2, AnswerKind::Plan)), "never the first plan the ExitPlanMode still carries");
+    assert_eq!(p.found.as_ref().unwrap().at_ms, Some(ms("2026-11-27T10:24:49Z")), "the second ExitPlanMode's time");
+    assert!(!p.plan_unread && !p.earlier);
+    // The first ExitPlanMode had no plan at all: rebuilt from its Write.
+    let i = line_of(&entries(STALE_AFTER_FEEDBACK), 18);
+    let mut first = entries(STALE_AFTER_FEEDBACK)[..=i].to_vec();
+    first.push(interrupt("u9", "msg_02"));
+    assert_eq!(plan_of(&whole(&lines(&first))), Some((PLAN_V1, AnswerKind::Plan)));
+    // End to end: the window gets the second plan, and no reason.
+    let dir = tempfile::tempdir().unwrap();
+    let got = tile_answer(Some(plan_tile(dir.path(), &entries(STALE_AFTER_FEEDBACK))));
+    assert_eq!((got.turn, got.answer.as_deref(), got.answer_kind), (TurnState::Done, Some(PLAN_V2), Some(AnswerKind::Plan)));
+    assert!(!got.plan_unread && !got.plan_pending);
+    assert_eq!(serde_json::to_value(&got).unwrap().get("planUnread"), None);
+}
+
+#[test]
+fn a_first_plan_carrying_the_previous_turn_s_plan_is_the_one_its_write_wrote() {
+    let p = whole(STALE_ACROSS_TURNS);
+    assert_eq!((p.turn, plan_of(&p), p.earlier), (TurnState::Done, Some((PLAN_V1, AnswerKind::Plan)), false));
+    // The earlier turn alone (its write's result first): its own plan, as before.
+    let t = entries(STALE_ACROSS_TURNS);
+    let earlier = &t[..=line_of(&t, 36)];
+    assert_eq!(plan_of(&whole(&lines(earlier))), Some((PLAN_V0, AnswerKind::Plan)));
+}
+
+#[test]
+fn a_plan_file_write_whose_result_comes_first_leaves_the_exit_plan_mode_s_plan() {
+    // The good shape (every plan of the Mac captures): the Edit's result
+    // before the ExitPlanMode, whose plan is then the file after it.
+    let mut t = entries(STALE_AFTER_FEEDBACK);
+    let edit_result = t.remove(line_of(&t, 21));
+    let exit = line_of(&t, 20);
+    t.insert(exit, edit_result);
+    t[exit + 1]["message"]["content"][0]["input"]["plan"] = json!("1. Do A.\n2. Do B, as shown.");
+    let p = whole(&lines(&t));
+    assert_eq!(plan_of(&p), Some(("1. Do A.\n2. Do B, as shown.", AnswerKind::Plan)), "input.plan, unchanged");
+}
+
+#[test]
+fn a_plan_file_write_that_can_t_be_read_offers_no_plan_and_says_why() {
+    // An Edit whose old text isn't in the file it reports.
+    let mut t = finished_turn();
+    t.extend(entries(STALE_AFTER_FEEDBACK));
+    let i = line_of(&t, 21);
+    t[i]["toolUseResult"]["originalFile"] = json!("1. Do Z.");
+    let p = whole(&lines(&t));
+    assert_eq!((p.turn, text_of(&p), p.plan_unread), (TurnState::Done, None, true), "neither the stale plan nor the earlier answer");
+    let dir = tempfile::tempdir().unwrap();
+    let got = tile_answer(Some(plan_tile(dir.path(), &t)));
+    assert_eq!((got.turn, got.answer.clone(), got.from_earlier_turn, got.plan_unread), (TurnState::Done, None, false, true));
+    assert_eq!(serde_json::to_value(&got).unwrap()["planUnread"], json!(true));
+    // A Write whose result never reached the file.
+    let mut t = entries(STALE_ACROSS_TURNS);
+    t.remove(line_of(&t, 44));
+    let p = whole(&lines(&t));
+    assert_eq!((text_of(&p), p.plan_unread), (None, true), "never the earlier turn's plan");
+    // A Write that failed.
+    let mut t = entries(STALE_ACROSS_TURNS);
+    let i = line_of(&t, 44);
+    t[i]["message"]["content"][0]["is_error"] = json!(true);
+    assert_eq!((text_of(&whole(&lines(&t))), whole(&lines(&t)).plan_unread), (None, true));
+}
+
+#[test]
+fn no_plan_file_write_since_the_last_exit_plan_mode_keeps_its_plan() {
+    // Nothing changed the file between the two menus: the second
+    // ExitPlanMode's own plan is right.
+    let mut t = entries(STALE_AFTER_FEEDBACK);
+    t.remove(line_of(&t, 21));
+    t.remove(line_of(&t, 19));
+    assert_eq!(plan_of(&whole(&lines(&t))), Some((PLAN_V1, AnswerKind::Plan)));
+    // An Edit of another file is no write of the plan.
+    let mut t = entries(STALE_AFTER_FEEDBACK);
+    let i = line_of(&t, 19);
+    t[i]["message"]["content"][0]["input"]["file_path"] = json!("/Users/someone/notes-app/index.html");
+    assert_eq!(plan_of(&whole(&lines(&t))), Some((PLAN_V1, AnswerKind::Plan)));
+}
+
+#[test]
+fn a_plan_less_last_exit_plan_mode_no_longer_falls_back_to_an_older_one() {
+    let mut t = finished_turn();
+    t.extend([
+        in_mode(prompt("u2", None, json!("plan it")), "plan"),
+        tool("a2", "m2", "toolu_p1", "ExitPlanMode", json!({"plan": PLAN_V1})),
+        refused("r2", "toolu_p1", Some("Make it two steps only.")),
+        tool("a3", "m3", "toolu_p2", "ExitPlanMode", json!({})),
+        refused("r3", "toolu_p2", None),
+        interrupt("u9", "m3"),
+    ]);
+    let p = whole(&lines(&t));
+    assert_ne!(text_of(&p), Some(PLAN_V1), "the turn's last ExitPlanMode is the last one, readable or not");
+    assert_eq!((text_of(&p), p.earlier), (Some("Answer one."), true));
+}
+
+#[test]
+fn the_second_plan_s_menu_is_pending_like_the_first() {
+    // Measured (Mac, 2.1.332): on the second plan's menu the transcript ends
+    // with the first plan's ExitPlanMode and its refusal with feedback; the
+    // plan file was rewritten after that refusal.
+    let dir = tempfile::tempdir().unwrap();
+    let mut t = menu_up(false);
+    t.extend(stamped(
+        vec![
+            tool("a3", "m3", "toolu_w", "Write", json!({"file_path":"/h/.claude/plans/p.md","content":PLAN_V1})),
+            tool("a4", "m3", "toolu_p", "ExitPlanMode", json!({"plan":PLAN_V1,"planFilePath":"/h/.claude/plans/p.md"})),
+            result("r3", "toolu_w", false),
+            refused("r4", "toolu_p", Some("Make it two steps only.")),
+        ],
+        "2026-11-24T21:46:0",
+    ));
+    let p = whole(&lines(&t));
+    assert_eq!((p.turn, p.plan_answered, p.plan_refused_ms), (TurnState::Open, true, Some(ms("2026-11-24T21:46:03Z"))));
+    let l = plan_tile(dir.path(), &t);
+    write_plan(&l, &format!("p-of-{SESSION}.md"), PLAN_V2, ms("2026-11-24T21:46:07Z"));
+    let got = tile_answer(Some(l.clone()));
+    assert_eq!((got.turn, got.answer.as_deref(), got.answer_kind), (TurnState::Open, Some(PLAN_V2), Some(AnswerKind::Plan)));
+    assert!(got.from_plan_file);
+    assert!(got.plan_pending, "the second menu waits as the first did");
+    // A plan file written before that refusal is no second plan's menu.
+    write_plan(&l, &format!("p-of-{SESSION}.md"), PLAN_V2, ms("2026-11-24T21:46:02.500Z"));
+    let got = tile_answer(Some(l));
+    assert!(got.from_plan_file && !got.plan_pending);
+    // Refused without feedback and still open (no interrupt yet on disk): no
+    // second menu follows, nothing is pending.
+    let mut esc = t.clone();
+    let last = esc.len() - 1;
+    esc[last] = refused("r4", "toolu_p", None);
+    esc[last]["timestamp"] = json!("2026-11-24T21:46:03.000Z");
+    assert_eq!(whole(&lines(&esc)).plan_refused_ms, None);
+    // The first menu, as before: no ExitPlanMode on disk, the plan file newer.
+    let dir = tempfile::tempdir().unwrap();
+    let l = plan_tile(dir.path(), &menu_up(false));
+    write_plan(&l, &format!("p-of-{SESSION}.md"), PLAN_V1, ms("2026-11-24T21:45:57Z"));
+    let got = tile_answer(Some(l));
+    assert!(got.from_plan_file && got.plan_pending);
+}
+
+// ── The plan file is tied to the session, never guessed from a folder ────
+// Measured (2.1.332): a session's first ExitPlanMode can come with an empty
+// input (no `plan`, no `planFilePath`); every later one names the same file,
+// `<claude config>/plans/<slug>-of-<session id>.md`. A project's own
+// `docs/plans/*.md` written in the same span is not that file.
+
+const ROADMAP_PATH: &str = "/Users/someone/notes-app/docs/plans/roadmap.md";
+const ROADMAP: &str = "# Roadmap\n1. Ship the list.";
+
+/// The first plan of `STALE_AFTER_FEEDBACK` (its Write's result after its
+/// ExitPlanMode), ended by Esc, with an empty ExitPlanMode input; its Write
+/// goes to `path` with `content` when given.
+fn first_plan_with_empty_input(write: Option<(&str, &str)>) -> Vec<Value> {
+    let t = entries(STALE_AFTER_FEEDBACK);
+    let mut t = t[..=line_of(&t, 18)].to_vec();
+    let exit = line_of(&t, 15);
+    t[exit]["message"]["content"][0]["input"] = json!({});
+    if let Some((path, content)) = write {
+        let w = line_of(&t, 14);
+        t[w]["message"]["content"][0]["input"] = json!({"file_path": path, "content": content});
+        let r = line_of(&t, 16);
+        t[r]["toolUseResult"]["filePath"] = json!(path);
+        t[r]["toolUseResult"]["content"] = json!(content);
+    }
+    t.push(interrupt("u9", "msg_02"));
+    t
+}
+
+#[test]
+fn a_project_plans_folder_write_is_never_offered_as_a_plan_less_exit_plan_mode_s_plan() {
+    let mut t = finished_turn();
+    t.extend(first_plan_with_empty_input(Some((ROADMAP_PATH, ROADMAP))));
+    let p = whole(&lines(&t));
+    assert_ne!(text_of(&p), Some(ROADMAP));
+    // As a plan-less ExitPlanMode with no write of its plan: the turn has no
+    // answer of its own, the earlier one stands.
+    assert_eq!((p.turn, text_of(&p), p.earlier, p.plan_unread), (TurnState::Done, Some("Answer one."), true, false));
+    let alone = whole(&lines(&first_plan_with_empty_input(Some((ROADMAP_PATH, ROADMAP)))));
+    assert_eq!((text_of(&alone), alone.plan_unread), (None, false));
+}
+
+#[test]
+fn a_plan_less_exit_plan_mode_is_rebuilt_from_the_session_s_own_plan_file() {
+    // Rule (b): `plans/<slug>-of-<session id>.md`, the fixture's own file.
+    let p = whole(&lines(&first_plan_with_empty_input(None)));
+    assert_eq!(plan_of(&p), Some((PLAN_V1, AnswerKind::Plan)));
+    // Named for another session: not this one's plan.
+    let other = "/Users/someone/.claude/plans/tidy-the-list-of-00000000-0000-4000-8000-000000000002.md";
+    let p = whole(&lines(&first_plan_with_empty_input(Some((other, PLAN_V1)))));
+    assert_eq!((text_of(&p), p.plan_unread), (None, false));
+    // No session id on the entries: nothing ties the file to the session.
+    let mut t = first_plan_with_empty_input(None);
+    for e in &mut t {
+        if let Some(map) = e.as_object_mut() {
+            map.remove("sessionId");
+        }
+    }
+    assert_eq!(text_of(&whole(&lines(&t))), None);
+}
+
+#[test]
+fn a_plan_less_exit_plan_mode_is_rebuilt_from_the_file_a_later_exit_plan_mode_names() {
+    // Rule (a): the file name doesn't end in the session id, but a later
+    // turn's ExitPlanMode names it.
+    let path = "/Users/someone/.claude/plans/tidy-the-list.md";
+    let first = first_plan_with_empty_input(Some((path, PLAN_V1)));
+    assert_eq!(text_of(&whole(&lines(&first))), None, "alone, nothing ties it to the session");
+    let mut t = first;
+    t.extend([
+        in_mode(prompt("u5", None, json!("Plan it again.")), "plan"),
+        tool("a5", "m5", "toolu_p5", "ExitPlanMode", json!({"planFilePath": path})),
+        refused("r5", "toolu_p5", None),
+        interrupt("u6", "m5"),
+    ]);
+    let p = whole(&lines(&t));
+    assert_eq!((plan_of(&p), p.earlier), (Some((PLAN_V1, AnswerKind::Plan)), true));
+}
+
+#[test]
+fn the_plan_file_s_write_wins_over_a_later_write_to_a_project_plans_folder() {
+    let base = entries(STALE_AFTER_FEEDBACK);
+    let mut t = base[..=line_of(&base, 18)].to_vec();
+    let w = line_of(&t, 14);
+    t.insert(w + 1, tool("a9", "msg_09", "toolu_09", "Write", json!({"file_path": ROADMAP_PATH, "content": ROADMAP})));
+    let r = line_of(&t, 16);
+    t.insert(r + 1, result("r9", "toolu_09", false));
+    t.push(interrupt("u9", "msg_02"));
+    assert_eq!(plan_of(&whole(&lines(&t))), Some((PLAN_V1, AnswerKind::Plan)), "the ExitPlanMode names its file");
+    // The same with an empty input: the session's file still wins.
+    let exit = line_of(&t, 15);
+    t[exit]["message"]["content"][0]["input"] = json!({});
+    assert_eq!(plan_of(&whole(&lines(&t))), Some((PLAN_V1, AnswerKind::Plan)), "rule (b)");
 }

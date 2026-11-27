@@ -52,8 +52,9 @@ export interface WsCompare {
    *  tile finishes after it (memory only, never logged). */
   returnPending: ReturnPending | null;
   /** 1.177.1: that answer, held and offered back until a pass succeeds, the
-   *  member swaps, the pair changes or Compare goes off. Its text is held
-   *  here and nowhere else. */
+   *  member swaps, the pair changes or Compare goes off — 1.179.0: or its
+   *  tile finishes a newer answer that is not the answer to a pass
+   *  (`heldLapsed`). Its text is held here and nowhere else. */
   returnHeld: ReturnHeld | null;
   composer: Composer | null;
   /** A sentence for what happened after the composer was gone (text that
@@ -198,8 +199,10 @@ export const useCompare = create<CompareState>((set, get) => ({
         const returnHeld = answerToPass(w.returnPending, vendor, answer, Date.now());
         if (returnHeld) return { answers, planSeenAt, flipped, returnHeld, returnPending: null };
         // Review round 1 (H2): a held plan of a turn still open follows that
-        // turn (plan v2, then its final answer); a final one stays.
-        const held = nextHeld(w.returnHeld, vendor, answer, Date.now());
+        // turn (plan v2, then its final answer). 1.179.0: a final one lapses
+        // once its tile finishes a newer answer with no pass into it waited
+        // for (`heldLapsed`): the bar offers the newest again.
+        const held = nextHeld(w.returnHeld, vendor, answer, Date.now(), w.returnPending);
         return held !== w.returnHeld ? { answers, planSeenAt, flipped, returnHeld: held } : { answers, planSeenAt, flipped };
       }),
     ),

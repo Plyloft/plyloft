@@ -238,7 +238,10 @@ export function CompareBar({ workspaceId }: { workspaceId: string }) {
     const sent = w.sent;
     if (!sent) return;
     const target = facts.find((f) => f.id === pairIds[sent.to]);
-    if (sentOver(sent, target, w.answers[sent.to], now, outputActiveAfterPass(workspaceId, sent.to, pairIds[sent.to], now))) {
+    // 1.179.0: the other tile's answer too, as the view reads it (`bar`): a
+    // Put no longer in the box ends once that tile answered since.
+    const other = sent.to === "claude" ? "codex" : "claude";
+    if (sentOver(sent, target, w.answers[sent.to], now, outputActiveAfterPass(workspaceId, sent.to, pairIds[sent.to], now), w.answers[other])) {
       // 1.177.1: its text left the box with no turn (the member cleared it):
       // the tile's next answer is not the answer to this pass. Review round 1
       // (L3): read the answers once more first — a turn quicker than the bar's
