@@ -68,7 +68,7 @@ import {
 import { useCompare } from "../store/compareStore";
 import { comparePassNow } from "../store/compareActions";
 import { effectiveCenterMode, useUi } from "../store/uiStore";
-import { codexScreenFacts, liveScreenFacts, noteTileInput, registerTileScreen, workStamp } from "../lib/tileScreen";
+import { codexScreenFacts, liveScreenFacts, noteTileInput, registerTileScreen, screenShape, workStamp } from "../lib/tileScreen";
 import { inputRowCells } from "../lib/inputRow";
 import { DictationController } from "../lib/dictationController";
 import {
@@ -593,6 +593,7 @@ export function Terminal({
               lastDrawnAt: lastDrawnStamp > 0 ? lastDrawnStamp : null,
               lastInputAt,
               holds: (text) => (vendor === "codex" ? codexComposerHoldsPaste(settledTail(rows, 20).join("\n"), text) : null),
+              shape: screenShape(rows),
             };
           }, () => (lastDataStamp > 0 ? lastDataStamp : null), () => {
             // Round 8 (review M2): the member's text written straight to the PTY.

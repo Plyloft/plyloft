@@ -18,6 +18,7 @@ import {
   isCodexStartScreen,
   liveScreenFacts,
   outputIsRedraw,
+  screenShape,
   workStamp,
 } from "./tileScreen.ts";
 import { claudeTurnEnded, deliveryGate, openTurnStale, type TileFacts } from "./compareView.ts";
@@ -996,10 +997,10 @@ assert.equal(bad.length, 0, "\n" + bad.join("\n"));
 // was read): after the composer's preview shrank the tiles, ConPTY left
 // Claude's box with blank rows where its footer was. A fresh tile whose
 // conversation has no turn yet, and one after a turn, take a Put and a Send on
-// the transcript's word; an open turn, no transcript, a spinner, typed text,
-// or a rule on the screen's last row (the footer may be below the view) never
-// do. Windows only: on the Mac the same shape is a frame read halfway through
-// a redraw, never proof.
+// the transcript's word (a fresh tile's "known, no turn yet" is one); an open
+// turn, no transcript read, a spinner, typed text, or a question never do.
+// Windows only: on the Mac the same shape is a frame read halfway through a
+// redraw, never proof.
 {
   const fresh = screenRowsOf("claude-fresh-idle.txt");
   const lost = (rows: string[]) => [...rows, "", "", ""];
@@ -1021,6 +1022,7 @@ assert.equal(bad.length, 0, "\n" + bad.join("\n"));
   // macOS (the default here): no box, as before.
   setPlatformForTests("mac");
   assert.equal(claudeBoxProof(freshLost).drawn, false, "mac: a half-drawn frame is no box");
+  assert.equal(claudeBoxProof(fresh.slice(0, -2)).drawn, false, "mac: nor one that ends on the rule");
   assert.notEqual(deliveryGate("claude", facts(freshLost, false), none, "put"), null, "mac: no Put");
 
   setPlatformForTests("windows");
@@ -1056,8 +1058,18 @@ assert.equal(bad.length, 0, "\n" + bad.join("\n"));
       "  2. Yes, and manually approve edits", "  3. No, keep planning", "", ...fresh.slice(5, -2),
     ]);
     assert.equal(deliveryGate("claude", facts(plan, false), none, "put"), ASKS, "a plan question above the box");
-    // The bottom rule on the screen's last row: no box, as before.
-    assert.equal(claudeBoxProof(fresh.slice(0, -2)).drawn, false, "the footer may be below the view");
+    // Re-walk 2026-11-27 (step6.png, RECONSTRUCTED): while the tile is small
+    // the screen ends on the box's bottom rule, nothing under it (the rows
+    // read are the buffer's bottom page: nothing is below). The same box.
+    const shrunk = fresh.slice(0, -2);
+    assert.equal(claudeBoxProof(shrunk).boxMode, true, "the shrunk tile's box");
+    assert.equal(deliveryGate("claude", facts(shrunk, false), none, "put"), null, "shrunk, fresh: Put");
+    assert.equal(deliveryGate("claude", facts(shrunk, true), none, "put"), DRAFT, "shrunk, typed text");
+    assert.notEqual(deliveryGate("claude", facts(shrunk, false), open, "put"), null, "shrunk, an open turn");
+    // The log's classes of those rows, never their text.
+    assert.equal(screenShape(freshLost), "rows=11 under=3 tail=t,t,t,_,_,R,>t,R");
+    assert.equal(screenShape(shrunk), "rows=8 under=0 tail=t,t,t,_,_,R,>t,R");
+    assert.ok(!screenShape(fresh).includes("Try"), "no text in the shape");
     // A numbered row between the rules is a menu, never the box.
     const R56 = "─".repeat(56);
     assert.equal(claudeBoxProof(lost([...fresh.slice(0, 5), R56, "❯ 1. Yes, proceed", R56])).drawn, false);

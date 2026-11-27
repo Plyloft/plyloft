@@ -31,7 +31,10 @@ import {
   type BarView,
   type Pass,
   type PairsView,
+  type TileFacts,
 } from "../lib/compareView";
+import type { CompareAnswer } from "../lib/compareIpc";
+import { info as logInfo } from "@tauri-apps/plugin-log";
 import {
   COMPARE_ASK_LABEL,
   COMPARE_BACK,
@@ -48,6 +51,7 @@ import {
   historyDirection,
   pairRegionLabel,
   targetDraftWords,
+  targetUnknownWords,
   targetWorkingWords,
   thirdPlaceWords,
 } from "../lib/compareWords";
@@ -64,6 +68,22 @@ import { MenuButton, type MenuItem } from "./ux";
 import { useDismiss } from "./ux/MoreMenu";
 import { useEscapeFirst } from "./ux/useEscapeFirst";
 import { MarkdownText } from "./MarkdownText";
+
+/** 1.179.0 (Windows re-walk): what Compare saw of a tile when it couldn't
+ *  tell whether it is ready for a Put: its facts and the classes of its last
+ *  rows (`screenShape`), never their text. Logged once per change. */
+const cantTellLogged = new Map<string, string>();
+function logCantTell(facts: TileFacts, answer: CompareAnswer | null | undefined): void {
+  const shape = tileScreenNow(facts.id)?.shape ?? "unread";
+  const line =
+    `compare: can't tell ${facts.vendor} ready: ${shape} drawn=${facts.boxDrawn} ready=${facts.readyBox} ` +
+    `mode=${facts.boxMode} draft=${facts.draft} idle=${facts.promptIdle} working=${facts.working} ` +
+    `asks=${facts.question} turnOver=${facts.turnOverOnScreen} input=${facts.inputQuietMs} ` +
+    `conversation=${answer?.conversation ?? "unread"} turn=${answer?.turn ?? "unread"}`;
+  if (cantTellLogged.get(facts.id) === line) return;
+  cantTellLogged.set(facts.id, line);
+  logInfo(line).catch(() => {});
+}
 
 /** The shortcut's event: App.tsx answers the chord and asks the bar of the
  *  active workspace (every warmed workspace has its own). */
@@ -432,12 +452,17 @@ export function CompareBar({
     // carries its own text and is not affected).
     const fromFacts = facts.find((f) => f.id === (composer.from === "claude" ? pairIds.claude : pairIds.codex));
     const sourceNew = !composer.fromHistory && fromFacts?.newConversation === true;
-    const gateFor = (action: "send" | "put") =>
-      sourceNew
+    const gateFor = (action: "send" | "put") => {
+      const reason = sourceNew
         ? conversationUnknownWords(composer.from)
         : toFacts
           ? deliveryGate(composer.to, toFacts, w.answers[composer.to], action)
           : null;
+      if (action === "put" && toFacts && reason === targetUnknownWords(composer.to)) {
+        logCantTell(toFacts, w.answers[composer.to]);
+      }
+      return reason;
+    };
     return (
       <CompareComposer
         workspaceId={workspaceId}

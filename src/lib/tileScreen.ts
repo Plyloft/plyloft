@@ -67,6 +67,9 @@ export interface TileScreenNow {
   lastDrawnAt?: number | null;
   /** Whether the composer holds this pasted text (Codex only). */
   holds: (text: string) => boolean | null;
+  /** 1.179.0 (re-walk): `screenShape` of the rows read, for the log when
+   *  Compare can't tell (classes only, never text); absent: not read. */
+  shape?: string;
 }
 
 const readers = new Map<string, () => TileScreenNow | null>();
@@ -370,20 +373,37 @@ function claudeTurnEndRow(rows: readonly string[], top: number): boolean {
   return true;
 }
 
+/** 1.179.0 (re-walk): the shape of a screen's last `n` settled rows, one
+ *  class per row, never their text: `_` blank, `R` a rule, `>` the chevron
+ *  alone, `>t` the chevron with text, `M` Claude's mode line, `S` a spinner,
+ *  `D` a turn's done line, `t` other text; with how many blank rows the
+ *  settled rows leave under them and the screen's height. For the log when
+ *  Compare can't tell whether a tile is ready. */
+export function screenShape(screen: readonly string[], n = 8): string {
+  const rows = settledTail(screen, screen.length);
+  const classes = rows.slice(Math.max(0, rows.length - n)).map((r) => {
+    if (r.trim() === "") return "_";
+    if (CLAUDE_TOP_RULE.test(r) || CLAUDE_BOTTOM_RULE.test(r)) return "R";
+    if (/^[\s│|]*[>❯›]\s*$/.test(r)) return ">";
+    if (/^[\s│|]*[>❯›]\s/.test(r)) return ">t";
+    if (CLAUDE_MODE_FOOTER.test(r.trim())) return "M";
+    if (CLAUDE_SPINNER.test(r)) return "S";
+    if (CLAUDE_TURN_DONE.test(r)) return "D";
+    return "t";
+  });
+  return `rows=${screen.length} under=${screen.length - rows.length} tail=${classes.join(",")}`;
+}
+
 /** `BoxProof` of a Claude Code screen (its visible rows). */
 export function claudeBoxProof(screen: readonly string[]): BoxProof {
   const rows = settledTail(screen, screen.length);
-  // 1.179.0 Windows walk (step 7): the box with blank rows under its bottom
+  // 1.179.0 Windows walk (step 7): the box with nothing under its bottom
   // rule (`claudeFooterLostProof`), on Windows only: on the Mac that shape is
-  // a frame read halfway through a redraw, never proof. A bottom rule on the
-  // screen's last row says nothing (its footer may be below the view): no
-  // box, as before.
-  if (
-    isWindows() &&
-    rows.length >= 3 &&
-    rows.length < screen.length &&
-    CLAUDE_BOTTOM_RULE.test(rows[rows.length - 1])
-  ) {
+  // a frame read halfway through a redraw, never proof. The rows read are the
+  // buffer's bottom page (`Terminal.tsx` `screenRows`), so nothing is drawn
+  // below the last one: a rule there, or blank rows under it, is a footer
+  // that isn't drawn (re-walk 2026-11-27: the shrunk tile ends on the rule).
+  if (isWindows() && rows.length >= 3 && CLAUDE_BOTTOM_RULE.test(rows[rows.length - 1])) {
     return claudeFooterLostProof(rows);
   }
   // The footer: the rows under the box's bottom rule, at most a few.
@@ -435,11 +455,11 @@ export function claudeBoxProof(screen: readonly string[]): BoxProof {
  * 1.179.0 Windows walk (step 7, screenshots of Claude Code 2.1.332 in a
  * ConPTY): when a tile shrinks (the Compare composer's preview opens), ConPTY
  * drops the rows under Claude's cursor, which sits in its box, and Claude
- * doesn't draw its footer again: the box stays with blank rows under its
- * bottom rule, also once the tile grows back. With no footer `ready` can't be
- * proven, and the box read as no box at all ("Can't tell if Claude is ready")
- * however long the member waited or clicked. `rows` end with the bottom rule;
- * the screen had blank rows under it.
+ * doesn't draw its footer again: while the tile is small the screen ends on
+ * the box's bottom rule, and once it grows back blank rows are under it. With
+ * no footer `ready` can't be proven, and the box read as no box at all
+ * ("Can't tell if Claude is ready") however long the member waited or
+ * clicked. `rows` (the settled rows) end with the bottom rule.
  *
  * The box counts as drawn (the draft check reads it), never `ready` or
  * `turnOver` (the footer and the end row are what proved those). One row
