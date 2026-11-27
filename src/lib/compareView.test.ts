@@ -206,6 +206,11 @@ v = bar(input({ answers: { claude: ans("claude", { conversation: "ambiguous", tu
 assert.equal(v.line, "Can't tell which conversation this Claude tile is in. Send it one message first.");
 v = bar(input({ answers: { codex: ans("codex", { conversation: "unstarted", turn: "none", answer: undefined }) } }));
 assert.equal(v.line, W.COMPARE_NOTHING_YET);
+// 1.179.0: Claude's newest plan can't be read back: nothing offered, and why.
+v = bar(input({ answers: { claude: ans("claude", { answer: undefined, answerKind: undefined, planUnread: true }), codex: fresh("codex") } }));
+assert.equal(v.kind, "nothing");
+assert.equal(v.line, "Can't read Claude's newest plan. Ask Claude to show it again, then pass.");
+assert.equal(W.PLAN_UNREAD_WORDS, v.line);
 // A blank answer is no answer.
 v = bar(input({ answers: { claude: ans("claude", { answer: "  \n " }), codex: fresh("codex") } }));
 assert.equal(v.kind, "nothing");

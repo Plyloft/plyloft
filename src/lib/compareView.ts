@@ -18,6 +18,7 @@ import {
   COMPARE_NOTE_MAX,
   COMPARE_NOTHING_YET,
   ambiguousQuietWords,
+  PLAN_UNREAD_WORDS,
   PLAN_WAITING_WORDS,
   conversationUnknownWords,
   earlierTurnWords,
@@ -574,6 +575,9 @@ export function bar(input: BarInput): BarView {
     // A tile Plyloft can't place in a conversation: say so (a fresh one is
     // "unstarted", and has nothing to pass yet).
     const ambiguous = (["claude", "codex"] as const).find((v) => answers[v]?.conversation === "ambiguous");
+    // 1.179.0: Claude's newest plan can't be read, so nothing of it is
+    // offered; say why rather than "nothing yet".
+    if (answers.claude?.planUnread === true) return { ...base, kind: "nothing", line: PLAN_UNREAD_WORDS };
     return { ...base, kind: "nothing", line: ambiguous ? conversationUnknownWords(ambiguous) : COMPARE_NOTHING_YET };
   }
   const { from, to } = dir;
