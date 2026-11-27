@@ -300,6 +300,37 @@ fn session_in_any(file: &Path, wants: &[PathBuf], needles: &[String]) -> Option<
     Some((id, started, at))
 }
 
+/// How much of a rollout's end [`last_line_at`] reads.
+const LAST_LINE_TAIL: u64 = 256 * 1024;
+
+/// 1.179.0: when a rollout was last written, from its last complete line's
+/// own `timestamp` (unix ms). A Codex rollout's mtime does not advance on
+/// Windows as turns are appended, so the file's time can't say it. Only the
+/// tail is read; a half-written last line is skipped. `None` (unknown) when
+/// the file can't be read or that line has no timestamp, or is longer than
+/// the tail.
+pub(crate) fn last_line_at(file: &Path) -> Option<i64> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(file).ok()?;
+    let len = f.metadata().ok()?.len();
+    let start = len.saturating_sub(LAST_LINE_TAIL);
+    f.seek(SeekFrom::Start(start)).ok()?;
+    let mut tail = Vec::new();
+    f.take(LAST_LINE_TAIL).read_to_end(&mut tail).ok()?;
+    // Up to the last newline: what follows it is still being written.
+    let end = tail.iter().rposition(|b| *b == b'\n')?;
+    let complete = &tail[..end];
+    let line = match complete.iter().rposition(|b| *b == b'\n') {
+        Some(i) => &complete[i + 1..],
+        // The tail began inside this line: not all of it was read.
+        None if start > 0 => return None,
+        None => complete,
+    };
+    let record: serde_json::Value = serde_json::from_slice(line).ok()?;
+    let at = record.get("timestamp")?.as_str()?;
+    chrono::DateTime::parse_from_rfc3339(at).ok().map(|t| t.timestamp_millis())
+}
+
 /// The same folder however it was written (a trailing slash, `/tmp` for
 /// `/private/tmp`): canonical when it exists, as written otherwise.
 pub(crate) fn normalized(path: &Path) -> PathBuf {
@@ -504,5 +535,31 @@ mod tests {
         assert_eq!(uuid_v7_ms(&v7(T0, 9)), Some(T0));
         assert_eq!(uuid_v7_ms("0b8f1e2c-4a3d-4f6e-9a1b-2c3d4e5f6a7b"), None);
         assert_eq!(uuid_v7_ms("t3-id"), None);
+    }
+
+    /// 1.179.0: a rollout's last write is its last complete line's own time,
+    /// whatever the file's mtime says (it doesn't advance on Windows).
+    #[test]
+    fn a_rollout_s_last_write_is_its_last_complete_line_s_time() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("rollout.jsonl");
+        let line = |at: &str| format!("{{\"timestamp\":\"{at}\",\"type\":\"event_msg\",\"payload\":{{}}}}\n");
+        std::fs::write(&file, line("2026-09-29T13:28:47.971Z") + &line("2026-09-29T13:30:00.000Z")).unwrap();
+        assert_eq!(last_line_at(&file), Some(T0 + 72_029));
+        // A half-written last line is skipped: the one before it counts.
+        let mut text = std::fs::read_to_string(&file).unwrap();
+        text.push_str("{\"timestamp\":\"2026-09-29T13:31");
+        std::fs::write(&file, &text).unwrap();
+        assert_eq!(last_line_at(&file), Some(T0 + 72_029));
+        // A last line with no time, or no complete line: unknown.
+        std::fs::write(&file, line("2026-09-29T13:28:47.971Z") + "{\"type\":\"event_msg\"}\n").unwrap();
+        assert_eq!(last_line_at(&file), None);
+        std::fs::write(&file, "{\"timestamp\":\"2026-09-29T13:28:47.971Z\"").unwrap();
+        assert_eq!(last_line_at(&file), None);
+        assert_eq!(last_line_at(&dir.path().join("missing.jsonl")), None);
+        // A last line longer than the tail read: unknown, never a guess.
+        let long = format!("{{\"timestamp\":\"2026-09-29T13:28:47.971Z\",\"pad\":\"{}\"}}\n", "x".repeat(LAST_LINE_TAIL as usize));
+        std::fs::write(&file, long).unwrap();
+        assert_eq!(last_line_at(&file), None);
     }
 }
