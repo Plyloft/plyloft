@@ -42,7 +42,9 @@
 // can't appear without this guard counting it.
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative as relativeNative, sep } from "node:path";
+// Always "/" in a relative path, as on a Mac: the checks below compare it with text and lists written with "/".
+const relative = (from: string, to: string): string => relativeNative(from, to).split(sep).join("/");
 import { fileURLToPath } from "node:url";
 
 const SRC = fileURLToPath(new URL("..", import.meta.url));
@@ -383,7 +385,7 @@ function composed(source: string, possibleTags: readonly string[] = ERROR_TAGS):
 const files = walk(SRC);
 const tsx = files.filter((f) => f.endsWith(".tsx") && !/\.test\.tsx$/.test(f));
 const possibleTags = [...ERROR_TAGS];
-for (const abs of tsx.filter((f) => relative(SRC, f).startsWith(join("components", "errors")))) {
+for (const abs of tsx.filter((f) => relative(SRC, f).startsWith("components/errors"))) {
   const text = stripComments(readFileSync(abs, "utf8"));
   for (const d of declarations(text)) {
     if (/^[A-Z]/.test(d.name) && /\bexport\s/.test(text.slice(d.start, d.start + 20)) && /<ErrorBlock\b/.test(text.slice(d.start, d.end))) {

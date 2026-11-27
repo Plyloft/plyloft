@@ -6770,10 +6770,11 @@ version = "0.5.0"
         let saved = crate::worktrees::head_sha(repo.path()).unwrap();
         let mut card: KanbanCard = serde_json::from_str(&format!(
             r#"{{"id":"c","workspaceId":"ws-A","title":"c","columnId":"in_progress","createdAt":0,"updatedAt":0,
-                "verifyStatus":"passed","worktreePath":"{}","branchName":"plyloft/c",
+                "verifyStatus":"passed","worktreePath":{},"branchName":"plyloft/c",
                 "builder":{{"vendor":"claude","snapshots":[{{"n":1,"sha":"{saved}","at":1}}],
                     "review":{{"snapshotN":1,"provider":"claude","status":"done","verdict":"approve","reviewedRevision":"{saved}","at":1}}}}}}"#,
-            repo.path().display()
+            // JSON-encoded: a Windows path has backslashes.
+            serde_json::to_string(&repo.path().display().to_string()).unwrap()
         ))
         .unwrap();
         assert!(batch_ready_on_disk(&card, "main"));
