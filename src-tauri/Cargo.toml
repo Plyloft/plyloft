@@ -104,8 +104,10 @@ semver = "1"
 # before any target table. The config-managed features (`protocol-asset`)
 # must stay on that main entry; this one may only add `tray-icon`, which
 # neither manages. Moving `tauri` out of `[dependencies]` would make this
-# entry the checked one and fail the build.
-tauri = { version = "2", features = ["tray-icon"] }
+# entry the checked one and fail the build. From tauri-cli 2.12 a build
+# also writes the configured features (`protocol-asset`) into this entry, so
+# it is listed here too: otherwise every build leaves the file changed.
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 # WebView2's settings behind `with_webview` (browser accelerator keys off).
 # Already in the tree via tauri/wry, same version.
 webview2-com = "0.39"
