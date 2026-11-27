@@ -888,3 +888,145 @@ fn the_quit_s_last_look_claims_a_codex_session_and_never_waits_past_its_budget()
     assert!(started.elapsed() < std::time::Duration::from_secs(1), "{:?}", started.elapsed());
     reset_for_tests();
 }
+
+// ── 1.179.0: a Codex tile whose sister tile in the same folder closed ────
+
+/// Where [`codex_turn`] writes a session's rollout.
+fn codex_file(home: &std::path::Path, id: &str) -> std::path::PathBuf {
+    home.join(format!("sessions/2026/10/21/rollout-x-{id}.jsonl"))
+}
+
+fn set_mtime_ms(path: &std::path::Path, ms: i64) {
+    let at = std::time::UNIX_EPOCH + std::time::Duration::from_millis(ms as u64);
+    std::fs::File::options().write(true).open(path).unwrap().set_modified(at).unwrap();
+}
+
+fn ended_of(config: &std::path::Path, row: &str) -> i64 {
+    load(&path_for(config, "ws")).file.sessions.into_iter().find(|r| r.id == row).unwrap().ended_at.unwrap()
+}
+
+/// A claimed its session, B opened later in the same folder and claimed
+/// its own, then B closed: the first tile.
+struct SisterClosed {
+    _config: tempfile::TempDir,
+    codex: tempfile::TempDir,
+    _folder: tempfile::TempDir,
+    homes: CliHomes,
+    cwd: String,
+    b_started: i64,
+    b_ended: i64,
+}
+
+fn a_sister_tile_opens_claims_and_closes() -> SisterClosed {
+    let config = tempfile::tempdir().unwrap();
+    let codex = tempfile::tempdir().unwrap();
+    let homes = CliHomes { claude: None, codex: Some(codex.path().to_path_buf()) };
+    let folder = tempfile::tempdir().unwrap();
+    let cwd = folder.path().to_string_lossy().to_string();
+    let a = record_start(config.path(), "ws", "pty-a", SessionKind::Codex, &cwd, None).unwrap();
+    codex_turn(codex.path(), "a-own", &cwd, started_of(config.path(), &a) + 1_000, "first tile's work");
+    let got = live_conversation("pty-a", None, &homes).unwrap();
+    assert_eq!(got.id.as_deref(), Some("a-own"));
+    assert_eq!(got.file.as_deref(), Some(codex_file(codex.path(), "a-own").as_path()));
+    assert!(!got.newer_elsewhere);
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    let b = record_start(config.path(), "ws", "pty-b", SessionKind::Codex, &cwd, None).unwrap();
+    let b_started = started_of(config.path(), &b);
+    codex_turn(codex.path(), "b-own", &cwd, b_started + 1_000, "second tile's work");
+    let got = live_conversation("pty-b", None, &homes).unwrap();
+    assert_eq!(got.id.as_deref(), Some("b-own"), "the later tile claims its own");
+    assert!(!got.newer_elsewhere, "the first tile's is held by a running tile");
+    let got = live_conversation("pty-a", None, &homes).unwrap();
+    assert_eq!(got.id.as_deref(), Some("a-own"));
+    assert!(!got.newer_elsewhere, "the second tile's is held by a running tile");
+    record_end("pty-b");
+    let b_ended = ended_of(config.path(), &b);
+    // B's last write was before it closed.
+    set_mtime_ms(&codex_file(codex.path(), "b-own"), b_ended);
+    SisterClosed { _config: config, codex, _folder: folder, homes, cwd, b_started, b_ended }
+}
+
+#[test]
+fn a_codex_tile_keeps_its_session_after_a_later_tile_in_its_folder_closed() {
+    let _serial = serial();
+    reset_for_tests();
+    let s = a_sister_tile_opens_claims_and_closes();
+    let own = codex_file(s.codex.path(), "a-own");
+    // B wrote after A's last write: until A's next turn, B's could still be
+    // the one A is in (it is no running tile's).
+    set_mtime_ms(&own, s.b_ended - 1);
+    assert!(live_conversation("pty-a", None, &s.homes).unwrap().newer_elsewhere);
+    // A's next turn: A is still known, on its own rollout.
+    set_mtime_ms(&own, s.b_ended + 1_000);
+    let got = live_conversation("pty-a", None, &s.homes).unwrap();
+    assert_eq!(got.id.as_deref(), Some("a-own"));
+    assert_eq!(got.file.as_deref(), Some(own.as_path()));
+    assert!(!got.newer_elsewhere, "the closed tile's session is not A's");
+    // B's session written again after B closed (A resumed it): not A's for sure.
+    set_mtime_ms(&codex_file(s.codex.path(), "b-own"), s.b_ended + 2_000);
+    assert!(live_conversation("pty-a", None, &s.homes).unwrap().newer_elsewhere);
+    reset_for_tests();
+}
+
+#[test]
+fn two_codex_tiles_opened_together_in_one_folder_stay_unclaimed_and_ambiguous() {
+    let _serial = serial();
+    reset_for_tests();
+    let config = tempfile::tempdir().unwrap();
+    let codex = tempfile::tempdir().unwrap();
+    let homes = CliHomes { claude: None, codex: Some(codex.path().to_path_buf()) };
+    let folder = tempfile::tempdir().unwrap();
+    let cwd = folder.path().to_string_lossy().to_string();
+    record_start(config.path(), "ws", "pty-x", SessionKind::Codex, &cwd, None).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    let y = record_start(config.path(), "ws", "pty-y", SessionKind::Codex, &cwd, None).unwrap();
+    let ty = started_of(config.path(), &y);
+    // Both sessions began after both tiles: either could be either tile's.
+    codex_turn(codex.path(), "one", &cwd, ty + 1_000, "one tile's work");
+    codex_turn(codex.path(), "two", &cwd, ty + 2_000, "other tile's work");
+    for pty in ["pty-x", "pty-y", "pty-x"] {
+        let got = live_conversation(pty, None, &homes).unwrap();
+        assert_eq!(got.id, None, "{pty} claims nothing");
+        assert!(got.newer_elsewhere, "{pty} can't tell");
+    }
+    reset_for_tests();
+}
+
+#[test]
+fn a_codex_tile_whose_own_codex_started_a_newer_session_is_ambiguous() {
+    let _serial = serial();
+    reset_for_tests();
+    let config = tempfile::tempdir().unwrap();
+    let codex = tempfile::tempdir().unwrap();
+    let homes = CliHomes { claude: None, codex: Some(codex.path().to_path_buf()) };
+    let folder = tempfile::tempdir().unwrap();
+    let cwd = folder.path().to_string_lossy().to_string();
+    let a = record_start(config.path(), "ws", "pty-n", SessionKind::Codex, &cwd, None).unwrap();
+    let ta = started_of(config.path(), &a);
+    codex_turn(codex.path(), "a-own", &cwd, ta + 1_000, "first work");
+    assert_eq!(live_conversation("pty-n", None, &homes).unwrap().id.as_deref(), Some("a-own"));
+    // `/new` in the tile: a later session in the folder no tile ever claimed.
+    codex_turn(codex.path(), "a-new", &cwd, ta + 5_000, "fresh work");
+    set_mtime_ms(&codex_file(codex.path(), "a-own"), ta + 2_000);
+    set_mtime_ms(&codex_file(codex.path(), "a-new"), ta + 6_000);
+    let got = live_conversation("pty-n", None, &homes).unwrap();
+    assert_eq!(got.id.as_deref(), Some("a-own"), "the record doesn't follow it");
+    assert!(got.newer_elsewhere, "so the old one is not offered for sure");
+    reset_for_tests();
+}
+
+#[test]
+fn after_a_sister_tile_closed_a_session_no_tile_claimed_still_makes_a_codex_tile_ambiguous() {
+    let _serial = serial();
+    reset_for_tests();
+    let s = a_sister_tile_opens_claims_and_closes();
+    set_mtime_ms(&codex_file(s.codex.path(), "a-own"), s.b_ended + 1_000);
+    assert!(!live_conversation("pty-a", None, &s.homes).unwrap().newer_elsewhere);
+    // A third session in the folder, never claimed: it may be A's own `/new`.
+    codex_turn(s.codex.path(), "third", &s.cwd, s.b_started + 5_000, "unknown work");
+    set_mtime_ms(&codex_file(s.codex.path(), "third"), s.b_ended + 500);
+    let got = live_conversation("pty-a", None, &s.homes).unwrap();
+    assert_eq!(got.id.as_deref(), Some("a-own"));
+    assert!(got.newer_elsewhere, "only a closed tile's own session is let go");
+    reset_for_tests();
+}
