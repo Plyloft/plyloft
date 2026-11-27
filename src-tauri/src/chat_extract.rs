@@ -869,6 +869,44 @@ mod tests {
         assert!(docx_text(&bytes).unwrap_err().contains("no document part"));
     }
 
+    /// A stored (uncompressed) `.docx` with one `word/document.xml`, and where
+    /// its name sits in the local header and in the central directory.
+    fn stored_docx(xml: &[u8]) -> (Vec<u8>, usize, usize) {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("word/document.xml", options).unwrap();
+        std::io::Write::write_all(&mut zip, xml).unwrap();
+        let bytes = zip.finish().unwrap().into_inner();
+        let name = b"word/document.xml";
+        let mut at = bytes.windows(name.len()).enumerate().filter(|(_, w)| w == name).map(|(i, _)| i);
+        let local = at.next().expect("the name in the local header");
+        let central = at.next().expect("the name in the central directory");
+        (bytes, local, central)
+    }
+
+    #[test]
+    fn a_docx_whose_text_part_is_marked_encrypted_is_a_sentence_not_a_crash() {
+        let (mut bytes, local, central) = stored_docx(b"<w:document><w:body/></w:document>");
+        // General purpose bit 0 ("encrypted"): 24 bytes before the name in the
+        // local header, 38 before it in the central directory.
+        bytes[local - 24] |= 1;
+        bytes[central - 38] |= 1;
+        let error = docx_text(&bytes).unwrap_err();
+        assert!(error.contains("Word"), "{error}");
+    }
+
+    #[test]
+    fn a_docx_whose_directory_declares_a_huge_text_part_is_refused() {
+        let (mut bytes, _, central) = stored_docx(b"<w:document><w:body/></w:document>");
+        // The uncompressed size in the central directory: 22 bytes before the
+        // name. A size no real part has, far past the cap.
+        bytes[central - 22..central - 18].copy_from_slice(&0xFFFF_FFF0_u32.to_le_bytes());
+        match docx_text(&bytes) {
+            Err(error) => assert!(error.contains("Word"), "{error}"),
+            Ok(extracted) => assert!(extracted.text.len() <= MAX_TEXT_BYTES),
+        }
+    }
+
     #[test]
     fn plain_text_is_utf8_without_nul_and_capped() {
         assert_eq!(plain_text(b"\xEF\xBB\xBFhello").unwrap().text, "hello");

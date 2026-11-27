@@ -131,7 +131,7 @@ fn invoke(f: &Fixture, command: &str, body: serde_json::Value) -> Result<serde_j
             cmd: command.into(),
             callback: CallbackFn(0),
             error: CallbackFn(1),
-            url: "http://tauri.localhost".parse().unwrap(),
+            url: crate::test_env::local_invoke_url(),
             body: InvokeBody::Json(body),
             headers: Default::default(),
             invoke_key: tauri::test::INVOKE_KEY.to_string(),

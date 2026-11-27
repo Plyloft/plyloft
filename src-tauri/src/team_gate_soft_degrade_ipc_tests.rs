@@ -13,7 +13,7 @@ fn invoke(
             cmd: command.into(),
             callback: CallbackFn(0),
             error: CallbackFn(1),
-            url: "http://tauri.localhost".parse().expect("invoke URL"),
+            url: crate::test_env::local_invoke_url(),
             body: InvokeBody::Json(body),
             headers: Default::default(),
             invoke_key: tauri::test::INVOKE_KEY.to_string(),
