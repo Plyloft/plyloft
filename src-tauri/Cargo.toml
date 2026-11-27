@@ -80,7 +80,7 @@ ignore = "0.4"
 # the tree, here with flate2's deflate only: reading, no other codec) and
 # `quick-xml` (already in the tree, same version).
 pdf-extract = "0.12"
-zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 quick-xml = "0.37"
 # A card chat reads Claude's screen as a terminal would show it: an emulated
 # grid (rows x columns) fed every PTY byte, so cursor moves, partial
