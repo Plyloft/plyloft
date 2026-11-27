@@ -19,6 +19,15 @@ jobs:
       run:
         shell: bash
     steps:
+      # The tests make throwaway repositories and compare file contents byte
+      # for byte: they need an author identity, and no CRLF conversion. Set
+      # before the checkout, so the fixtures come out with their own endings.
+      - name: Git settings the tests rely on
+        run: |
+          git config --global user.name "Plyloft CI"
+          git config --global user.email "ci@example.invalid"
+          git config --global core.autocrlf false
+          git config --global init.defaultBranch main
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:

@@ -47,6 +47,15 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
+      # The tests make throwaway repositories and compare file contents byte
+      # for byte: they need an author identity, and no CRLF conversion. Set
+      # before the checkout, so the fixtures come out with their own endings.
+      - name: Git settings the tests rely on
+        run: |
+          git config --global user.name "Plyloft CI"
+          git config --global user.email "ci@example.invalid"
+          git config --global core.autocrlf false
+          git config --global init.defaultBranch main
       - uses: actions/checkout@v4
       # rust-toolchain.toml pins the channel and the aarch64-apple-darwin
       # target; rustup installs them on the first cargo call, so only the
@@ -68,9 +77,13 @@ jobs:
       # sidecar on disk at build time. Plain cargo, no Node.
       - name: Sidecar (ply-mcp)
         run: bash scripts/build-sidecar.sh
+      # Two tests start a deliberately damaged Mach-O and expect macOS to
+      # refuse or kill it the way a real Mac does; the hosted runner's
+      # virtual machine does not. They stay in the local gate
+      # (scripts/ppvp.sh), on a real Mac.
       - name: cargo test (lib)
         working-directory: src-tauri
-        run: cargo test --workspace --lib
+        run: cargo test --workspace --lib -- --skip broken_mach_o
 
   # The same job windows-check.yml runs (sidecar, cargo check, cargo test);
   # the NSIS bundle and the frontend job of windows-check stay manual.
