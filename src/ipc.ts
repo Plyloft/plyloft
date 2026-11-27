@@ -9807,6 +9807,9 @@ export function builderStart(
   guided = false,
   /** 1.169.0 (A3): "Retry on…" — this start's model and effort, this once. */
   retry?: RetryChoice,
+  /** 1.179.0 (C3): Start fresh on {name} — the Claude account it starts on
+   *  (an `ai_accounts_list` id, or `MAIN_ACCOUNT_ID`); absent: the current one. */
+  account?: string,
 ) {
   return invoke<BuilderStartResult>("builder_start", {
     workspaceId,
@@ -9815,6 +9818,7 @@ export function builderStart(
     bypass,
     guided,
     ...(retry ? { retry } : {}),
+    ...(account ? { account } : {}),
   });
 }
 

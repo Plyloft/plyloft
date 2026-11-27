@@ -46,6 +46,11 @@ pub const NAME_MAX_CHARS: usize = 40;
 pub const CONFIG_DIR_VAR: &str = "CLAUDE_CONFIG_DIR";
 /// Hex characters in an id Plyloft makes.
 const ID_LEN: usize = 8;
+/// 1.179.0 (C3): what the window sends to ask for Main by name (the
+/// new-session menu's `Claude on Main`, a Start fresh on Main) while another
+/// account is current: Main's row has no id, and an absent account means the
+/// current one. No id Plyloft makes is this (8 hex characters).
+pub const MAIN_ID: &str = "main";
 
 /// Plyloft's app config folder, told once at startup ([`init`]), so a spawn
 /// path deep in the app derives an account's folder exactly as the commands
@@ -519,10 +524,12 @@ pub fn for_new_session<R: Runtime>(app: &AppHandle<R>, provider: crate::coordina
 }
 
 /// A new session on the account the window asked for (`requested`), else
-/// on the current one. An id no account has is refused, never run on Main.
+/// on the current one. [`MAIN_ID`] asks for Main (`None`: no variable at the
+/// spawn). An id no account has is refused, never run on Main.
 pub fn chosen_in(accounts: &ClaudeAccountsSettings, requested: Option<&str>) -> Result<Option<String>, String> {
     match requested {
         None => Ok(current_in(accounts)),
+        Some(MAIN_ID) => Ok(None),
         Some(id) if find(accounts, id).is_some() => Ok(Some(id.to_string())),
         Some(_) => Err(UNKNOWN_ACCOUNT.into()),
     }
@@ -539,7 +546,7 @@ pub fn chosen<R: Runtime>(app: &AppHandle<R>, requested: Option<&str>) -> Result
 /// longer listed refuses the resume with [`ACCOUNT_REMOVED`].
 pub fn for_resume_in(accounts: &ClaudeAccountsSettings, recorded: Option<&str>) -> Result<Option<String>, String> {
     match recorded {
-        None => Ok(None),
+        None | Some(MAIN_ID) => Ok(None),
         Some(id) if find(accounts, id).is_some() => Ok(Some(id.to_string())),
         Some(_) => Err(ACCOUNT_REMOVED.into()),
     }
@@ -551,6 +558,7 @@ pub fn for_resume_in(accounts: &ClaudeAccountsSettings, recorded: Option<&str>) 
 /// names (the row's), else the one its record or its folder says — and an
 /// account removed since refuses it ([`ACCOUNT_REMOVED`]). Any other tile
 /// starts on `requested`, else on the account new sessions start on now.
+/// [`MAIN_ID`] asks for Main either way (C3), whatever is current.
 pub fn for_tile<R: Runtime>(
     app: &AppHandle<R>,
     workspace_id: Option<&str>,
@@ -583,7 +591,7 @@ pub fn for_tile<R: Runtime>(
 pub fn for_resume<R: Runtime>(app: &AppHandle<R>, recorded: Option<&str>) -> Result<Option<String>, String> {
     match app.try_state::<SettingsStore>() {
         Some(store) => for_resume_in(&store.snapshot().ai_accounts.claude, recorded),
-        None if recorded.is_none() => Ok(None),
+        None if matches!(recorded, None | Some(MAIN_ID)) => Ok(None),
         None => Err(ACCOUNT_REMOVED.into()),
     }
 }

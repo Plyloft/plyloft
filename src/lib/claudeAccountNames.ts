@@ -9,6 +9,11 @@
 
 import type { ClaudeAccountRow } from "../ipc.ts";
 
+/** 1.179.0 (C3): what is sent to ask for Main by name while another
+ *  account is current (`ai_accounts::MAIN_ID`): Main's row has no id, and
+ *  an absent account means the current one. Read back as Main here. */
+export const MAIN_ACCOUNT_ID = "main";
+
 /** Names are shown only when more than one Claude account exists. */
 export function accountNamesShown(rows: readonly ClaudeAccountRow[] | null | undefined): boolean {
   return (rows?.length ?? 0) > 1;
@@ -17,7 +22,7 @@ export function accountNamesShown(rows: readonly ClaudeAccountRow[] | null | und
 /** The name of account `id` (absent or null: Main), or null when no row
  *  has it (removed since) or the list isn't read yet. */
 export function accountName(rows: readonly ClaudeAccountRow[] | null | undefined, id: string | null | undefined): string | null {
-  const want = id ?? null;
+  const want = id === MAIN_ACCOUNT_ID ? null : (id ?? null);
   return rows?.find((r) => r.id === want)?.name ?? null;
 }
 
@@ -54,16 +59,38 @@ export function newSessionLabel(name: string): string {
 
 /**
  * The accounts the new-session menu offers, as the `account` each one is
- * spawned with. `pty_spawn` takes an account's id, and an absent one means
- * the account for new sessions: Main can't be asked for by name, so it is
- * offered only while it is that account (then nothing is sent). Nothing
- * with Main alone.
+ * spawned with: every account by its id, Main included (C3: by
+ * `MAIN_ACCOUNT_ID`, whichever account is current). Nothing with Main alone.
  */
-export function newSessionChoices(rows: readonly ClaudeAccountRow[] | null | undefined): { label: string; account: string | null }[] {
+export function newSessionChoices(rows: readonly ClaudeAccountRow[] | null | undefined): { label: string; account: string }[] {
   if (!rows || !accountNamesShown(rows)) return [];
-  return rows
-    .filter((r) => r.id !== null || r.isCurrent)
-    .map((r) => ({ label: newSessionLabel(r.name), account: r.id }));
+  return rows.map((r) => ({ label: newSessionLabel(r.name), account: r.id ?? MAIN_ACCOUNT_ID }));
+}
+
+export function startFreshOnLabel(name: string): string {
+  return `Start fresh on ${name}`;
+}
+
+export function startFreshOnTitle(name: string): string {
+  return `Ends this session and starts a new Builder on ${name} in the same copy. The files stay; the conversation starts again.`;
+}
+
+/**
+ * 1.179.0 (C3): the account a card's limit line offers to start fresh on,
+ * for a Builder on `builderAccount` (absent or null: Main): the one new
+ * sessions start on when it isn't the Builder's, else the first other one.
+ * `account` is what `builder_start` is sent. Null with Main alone, or before
+ * the list is read.
+ */
+export function startFreshOnChoice(
+  rows: readonly ClaudeAccountRow[] | null | undefined,
+  builderAccount: string | null | undefined,
+): { name: string; account: string } | null {
+  if (!rows || !accountNamesShown(rows)) return null;
+  const own = builderAccount === MAIN_ACCOUNT_ID ? null : (builderAccount ?? null);
+  const current = rows.find((r) => r.isCurrent);
+  const row = current && current.id !== own ? current : rows.find((r) => r.id !== own);
+  return row ? { name: row.name, account: row.id ?? MAIN_ACCOUNT_ID } : null;
 }
 
 /** The card's Run step sentence when names are shown. */

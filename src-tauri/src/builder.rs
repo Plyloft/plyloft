@@ -1670,6 +1670,9 @@ pub fn start(
     mode: StartMode,
     prompt: &str,
     retry: Option<crate::settings::ModelChoice>,
+    // 1.179.0 (C3): the Claude account a Start fresh on {name} asked for;
+    // `None`: the current one.
+    requested_account: Option<&str>,
 ) -> Result<BuilderStartResult, String> {
     let bypass = mode.bypass;
     let permission_mode = mode.permission_mode.clone();
@@ -1682,8 +1685,13 @@ pub fn start(
     let full_prompt = format!("{}{}", with_codex_rules(builder_preamble_for(&crate::issue_text::name_for_ai(&card), card.pr_review.is_some()), vendor), prompt);
     // 1.179.0: Start build, Start fresh and Retry start on the Claude account
     // new sessions start on now, read once here and recorded on the card.
+    // C3: a Start fresh on {name} (the member's press) starts on the one it
+    // names, and changes nothing about the current one.
     let account = if vendor == "claude" {
-        crate::ai_accounts::for_new_session(&app, crate::coordination::Provider::Claude)
+        match requested_account {
+            None => crate::ai_accounts::for_new_session(&app, crate::coordination::Provider::Claude),
+            Some(_) => crate::ai_accounts::chosen(&app, requested_account)?,
+        }
     } else {
         None
     };

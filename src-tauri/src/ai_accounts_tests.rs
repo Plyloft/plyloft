@@ -419,3 +419,54 @@ fn an_account_with_no_session_has_none_running() {
     let registry = crate::pty::PtyRegistry::default();
     assert_eq!(registry.sessions_on_account("a1b2c3d4"), 0);
 }
+
+// ── C3: Main by its id, and Start fresh on another account ─────────────
+
+/// The new-session menu's `Claude on Main` while another account is current
+/// asks for [`MAIN_ID`] and runs on Main as today (no `CLAUDE_CONFIG_DIR`);
+/// absent is still the current one. Asking changes nothing about it.
+#[test]
+fn main_is_asked_for_by_its_id_while_another_account_is_current() {
+    let config = tempfile::tempdir().unwrap();
+    let mut list = accounts(&[("a1b2c3d4", "Work")]);
+    list.current = Some("a1b2c3d4".into());
+    let main = chosen_in(&list, Some(MAIN_ID));
+    assert_eq!(main, Ok(None), "Main, not the current account");
+    assert_eq!(spawn_env_in(config.path(), main.unwrap().as_deref()), Some(Vec::new()), "no variable for Main");
+    assert_eq!(chosen_in(&list, None).unwrap().as_deref(), Some("a1b2c3d4"), "absent: the current one");
+    // A resumed tile that names Main by that id stays on Main.
+    assert_eq!(for_resume_in(&list, Some(MAIN_ID)), Ok(None));
+    // No id Plyloft makes (8 hex characters) is Main's.
+    assert!(!MAIN_ID.bytes().all(|b| b.is_ascii_hexdigit()));
+    assert_eq!(list.current.as_deref(), Some("a1b2c3d4"), "the current account is left as it was");
+}
+
+/// Start fresh on {name} (`builder_start`'s `account`, decided by
+/// [`chosen_in`] in `builder::start`): the new Builder runs on the account
+/// named, with its folder in `CLAUDE_CONFIG_DIR`; an id no account has is
+/// refused; absent is today's Start fresh, on the current one. The spawn
+/// itself needs an `AppHandle`, which no Builder start test has: this pins
+/// the decision and the variable it gives.
+#[test]
+fn start_fresh_on_an_account_runs_there_and_an_unknown_one_is_refused() {
+    let config = tempfile::tempdir().unwrap();
+    let mut list = accounts(&[("a1b2c3d4", "Work"), ("e5f6a7b8", "Second")]);
+    // The Builder stopped on Main, new sessions start on Main: on Work.
+    let chosen = chosen_in(&list, Some("a1b2c3d4")).unwrap();
+    assert_eq!(chosen.as_deref(), Some("a1b2c3d4"));
+    let dir = claude_dir_in(config.path(), chosen.as_deref()).unwrap();
+    assert_eq!(
+        spawn_env_in(config.path(), chosen.as_deref()),
+        Some(vec![(CONFIG_DIR_VAR.to_string(), dir.to_string_lossy().into_owned())])
+    );
+    assert_eq!(list.current, None, "nothing switches by itself");
+    // The Builder stopped on Work, the current one: Main, by its id.
+    list.current = Some("a1b2c3d4".into());
+    assert_eq!(chosen_in(&list, Some(MAIN_ID)), Ok(None));
+    // Unknown, or removed since the window read the list: refused.
+    assert_eq!(chosen_in(&list, Some("00000000")), Err(UNKNOWN_ACCOUNT.to_string()));
+    list.accounts.retain(|a| a.id != "e5f6a7b8");
+    assert_eq!(chosen_in(&list, Some("e5f6a7b8")), Err(UNKNOWN_ACCOUNT.to_string()));
+    // Absent: the current one, as Start fresh always started.
+    assert_eq!(chosen_in(&list, None).unwrap().as_deref(), Some("a1b2c3d4"));
+}

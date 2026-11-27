@@ -390,12 +390,12 @@ export function TileGrid({ env, workspace }: Props) {
       onSelect: onAddClaude,
     });
     // 1.179.0 (C2): with more than one Claude account, one entry per
-    // account; plain Claude keeps starting on the account for new sessions.
+    // account, Main included (C3); plain Claude keeps starting on the
+    // account for new sessions.
     for (const choice of newSessionChoices(accountRows)) {
       newItems.push({
         label: choice.label,
-        onSelect: () =>
-          showNewTile(useTiles.getState().addClaudeTile(ws.id, ws.cwd, choice.account ? { account: choice.account } : undefined)),
+        onSelect: () => showNewTile(useTiles.getState().addClaudeTile(ws.id, ws.cwd, { account: choice.account })),
       });
     }
   }

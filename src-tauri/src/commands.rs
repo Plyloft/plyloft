@@ -19595,6 +19595,7 @@ pub fn intake_read_transcript(
 /// only by its own test (`builder::guided_permission_mode`). Absent (an
 /// older caller) is an ordinary start.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn builder_start(
     app: tauri::AppHandle,
     workspace_id: String,
@@ -19604,10 +19605,19 @@ pub async fn builder_start(
     guided: Option<bool>,
     // A3: Retry on, this start only.
     retry: Option<crate::retry_on::RetryArg>,
+    // 1.179.0 (C3): Start fresh on {name}: the Claude account it starts on
+    // (an `ai_accounts_list` id, or `ai_accounts::MAIN_ID`); absent: the
+    // current one. Ignored for Codex.
+    account: Option<String>,
 ) -> Result<crate::builder::BuilderStartResult, String> {
     let guided = guided.unwrap_or(false);
     let log_card = card_id.clone();
     let retry = crate::retry_on::builder_retry_checked(&app, &workspace_id, &card_id, retry)?;
+    let account = if vendor == "claude" { account } else { None };
+    // C3: an account no longer listed is refused before the card moves.
+    if account.is_some() {
+        crate::ai_accounts::chosen(&app, account.as_deref())?;
+    }
     // OB-14 (§13.2): refused before the card moves or a worktree is made —
     // the chosen vendor's CLI isn't on this machine.
     if let Some(why) = crate::shell_env::try_get()
@@ -19647,7 +19657,7 @@ pub async fn builder_start(
             )?)?;
         }
         start_build_serialized(|| {}, || {
-            builder_start_blocking(app.clone(), &workspace_id, &card_id, &vendor, bypass, guided, continues, retry.clone())
+            builder_start_blocking(app.clone(), &workspace_id, &card_id, &vendor, bypass, guided, continues, retry.clone(), account.as_deref())
         })
     })
     .await
@@ -19776,6 +19786,7 @@ const START_AGAIN_FOR_SETUP: &str =
 
 /// Called with CARD_START_LOCK held (`start_build_serialized`), after the
 /// definition refresh.
+#[allow(clippy::too_many_arguments)]
 fn builder_start_blocking(
     app: tauri::AppHandle,
     workspace_id: &str,
@@ -19785,6 +19796,7 @@ fn builder_start_blocking(
     guided: bool,
     continues: bool,
     retry: Option<crate::settings::ModelChoice>,
+    account: Option<&str>,
 ) -> Result<crate::builder::BuilderStartResult, String> {
     let registry = app.state::<crate::builder::BuilderRegistry>();
     let pty_registry = app.state::<PtyRegistry>();
@@ -19891,6 +19903,7 @@ fn builder_start_blocking(
         mode,
         &prompt,
         retry,
+        account,
     )
 }
 

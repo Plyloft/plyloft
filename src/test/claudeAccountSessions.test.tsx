@@ -115,6 +115,20 @@ describe("New › Claude on {name}", () => {
     await waitFor(() => expect(seen.props).toContainEqual({ cli: "claude", account: "acct0001" }));
   });
 
+  it("offers Claude on Main while Work is current, and spawns it on Main by its id (C3)", async () => {
+    seen.props = [];
+    const r = grid({ ai_accounts_list: [{ ...MAIN, isCurrent: false }, { ...WORK, isCurrent: true }] });
+    await waitFor(() => expect(r.tauri.callsOf("ai_accounts_list").length).toBeGreaterThan(0));
+    await r.user.click(screen.getByRole("button", { name: "New" }));
+    const menu = screen.getByRole("menu", { name: "New session" });
+    await waitFor(() => expect(within(menu).getByRole("menuitem", { name: /^Claude on Main/ })).toBeTruthy());
+    expect(within(menu).getByRole("menuitem", { name: /^Claude on Work/ })).toBeTruthy();
+    await r.user.click(within(menu).getByRole("menuitem", { name: /^Claude on Main/ }));
+    await waitFor(() => expect(tiles()).toHaveLength(1));
+    expect(tiles()[0].account).toBe("main");
+    await waitFor(() => expect(seen.props).toContainEqual({ cli: "claude", account: "main" }));
+  });
+
   it("the plain Claude entry asks for no account (the one for new sessions)", async () => {
     seen.props = [];
     const r = grid(TWO);

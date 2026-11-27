@@ -89,7 +89,16 @@ import { modelSentenceWords } from "../lib/roleModels";
 import { openRepair } from "../lib/openRepair";
 import { pushErrorToast } from "../lib/errorToast";
 import { useClaudeAccountRows } from "../store/claudeAccountsStore";
-import { ACCOUNT_REMOVED, accountRemoved, buildsOnWords, resumeNoteFor, shownAccountName } from "../lib/claudeAccountNames";
+import {
+  ACCOUNT_REMOVED,
+  accountRemoved,
+  buildsOnWords,
+  resumeNoteFor,
+  shownAccountName,
+  startFreshOnChoice,
+  startFreshOnLabel,
+  startFreshOnTitle,
+} from "../lib/claudeAccountNames";
 
 /**
  * v1.106.0 (Builder/Challenger): the Run step when a card is built by a
@@ -314,6 +323,8 @@ export function BuilderRunStep({
   // 1.179.0 (C2): the Claude account the Builder runs on, named only with
   // more than one; Resume runs on it (`builder.account`; absent: Main).
   const accountRows = useClaudeAccountRows();
+  // C3: what stops the card's own Builder (`builder_session_blocks`).
+  const ownBlock = useBuilder((s) => s.sessionBlocks[card.id]);
 
   // Walk of #386 (step 7): a pull request's card has a Builder record from
   // the start (its reviews live there) though no session ever ran — a start
@@ -386,6 +397,17 @@ export function BuilderRunStep({
   // Walk 2026-10-23: "builds on gpt-6-astra with high effort".
   const sessionModel = modelSentenceWords(builder.model);
   const accountName = builder.vendor === "claude" ? shownAccountName(accountRows, builder.account) : null;
+  // 1.179.0 (C3): stopped by Claude's usage limit with another Claude account
+  // here, the limit line offers a new Builder on it, on the member's press
+  // only; Start fresh's AI must be Claude too.
+  const freshOn =
+    builder.ptyId &&
+    builder.vendor === "claude" &&
+    freshVendor === "claude" &&
+    ownBlock?.kind === "usageLimit" &&
+    ownBlock.vendor === "claude"
+      ? startFreshOnChoice(accountRows, builder.account)
+      : null;
   // A closed Claude session resumes on its own account: said when that
   // isn't the one new sessions start on, or when it was removed.
   const resumable = !builder.ptyId && !inTodo && !shippedClosed && builder.vendor === "claude";
@@ -582,6 +604,31 @@ export function BuilderRunStep({
               ]}
               mainProps={{ title: finishTitle, "data-ply-finish": "" }}
             />
+          )}
+          {freshOn && (
+            <CBtn
+              onClick={async () => {
+                // As Start fresh: the same posture and permissions, after
+                // this session is closed; then the new Builder on the
+                // account named. The current account is left as it is.
+                useBuilder.getState().setBypassPref(card.id, startFreshOffer(builder.vendor, freshVendor, builder.bypass).bypass);
+                setBusy(true);
+                try {
+                  if (!(await keepShownPermissions(card, freshVendor))) return;
+                  if (!(await useBuilder.getState().close(ws, card.id))) return;
+                  await start(ws, card.id, undefined, freshOn.account);
+                } catch {
+                  // toast already shown
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              disabled={busy || doneBusy}
+              title={startFreshOnTitle(freshOn.name)}
+              data-ply-start-fresh-on=""
+            >
+              {startFreshOnLabel(freshOn.name)}
+            </CBtn>
           )}
         </div>
       ) : resumeInNow || inTodo || shippedClosed ? null : (

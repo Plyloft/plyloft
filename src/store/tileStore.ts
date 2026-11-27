@@ -171,7 +171,7 @@ export interface Tile {
    *  copy (`lib/trySession.ts`). In memory only, never persisted. */
   tryOf?: TryOf;
   /** 1.179.0 (C2): claude only — the Claude account it runs on (an
-   *  `ai_accounts_list` id; null: Main). Set when it was asked for (the
+   *  `ai_accounts_list` id, or C3's `MAIN_ACCOUNT_ID`; null: Main). Set when it was asked for (the
    *  new-session menu, a resumed row's), then from each look at its title
    *  (`terminal_tile_title`); absent until either. A string is what its
    *  spawn asks for. In memory only, never persisted. */
