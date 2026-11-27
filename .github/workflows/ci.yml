@@ -1,0 +1,78 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: tsc
+        run: npx tsc --noEmit
+      - name: vite build
+        run: npx vite build
+      - name: vitest
+        run: npx vitest run --maxWorkers=2
+      - name: pure contracts (src/lib/*.test.ts)
+        run: |
+          fail=0
+          for t in src/lib/*.test.ts; do
+            node --experimental-strip-types "$t" > /dev/null || { echo "FAIL $t"; fail=1; }
+          done
+          exit $fail
+      - name: ux-check
+        run: node scripts/ux-check.mjs
+
+  rust-mac:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      # rust-toolchain.toml pins the channel and the aarch64-apple-darwin
+      # target; rustup installs them on the first cargo call, so only the
+      # rustup toolchain itself is set up here.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      # tauri's generate_context! needs the frontendDist folder (../dist) to
+      # exist at compile time. The lib tests never load it, so an empty
+      # placeholder is enough; no frontend build is needed here.
+      - name: Placeholder dist/
+        run: |
+          mkdir -p dist
+          [ -e dist/index.html ] || echo '<!doctype html><title>ci</title>' > dist/index.html
+      # tauri.conf.json bundle.externalBin needs the target-suffixed ply-mcp
+      # sidecar on disk at build time. Plain cargo, no Node.
+      - name: Sidecar (ply-mcp)
+        run: bash scripts/build-sidecar.sh
+      - name: cargo test (lib)
+        working-directory: src-tauri
+        run: cargo test --workspace --lib
+
+  # The same job windows-check.yml runs (sidecar, cargo check, cargo test);
+  # the NSIS bundle and the frontend job of windows-check stay manual.
+  rust-windows:
+    uses: ./.github/workflows/windows-rust.yml

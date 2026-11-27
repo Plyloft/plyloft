@@ -1,0 +1,75 @@
+# The Windows Rust job: sidecar, cargo check, cargo test (lib). Called from
+# ci.yml (pull requests, pushes to main) and from windows-check.yml.
+name: windows-rust
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  rust:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Sidecar (ply-mcp)
+        id: sidecar
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          bash scripts/build-sidecar.sh --target x86_64-pc-windows-msvc 2>&1 | tee out/sidecar.txt
+          exit ${PIPESTATUS[0]}
+      - name: cargo check (workspace, all targets)
+        id: check
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          cargo check --manifest-path src-tauri/Cargo.toml --workspace --all-targets --message-format short 2>&1 | tee out/check.txt
+          exit ${PIPESTATUS[0]}
+      - name: cargo test (lib)
+        id: test
+        if: steps.check.outcome == 'success'
+        continue-on-error: true
+        env:
+          PLY_TEST_REQUIRE_ALL: "1"
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml --workspace --lib --no-fail-fast 2>&1 | tee out/test.txt
+          exit ${PIPESTATUS[0]}
+      - name: Summary
+        if: always()
+        run: |
+          mkdir -p out
+          {
+            echo "sidecar=${{ steps.sidecar.outcome }} check=${{ steps.check.outcome }} test=${{ steps.test.outcome }}"
+            echo "errors: $(grep -c ': error' out/check.txt 2>/dev/null || echo 0)"
+            echo "warnings: $(grep -c ': warning' out/check.txt 2>/dev/null || echo 0)"
+            grep -E '^test result|FAILED|panicked' out/test.txt 2>/dev/null | tail -40 || true
+          } | tee out/summary.txt
+          cat out/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-out
+          path: out/
+      # The steps above keep going so every output is saved; the run still
+      # fails when any of them did (a skipped test step included).
+      - name: Gate
+        if: always()
+        run: |
+          for outcome in "${{ steps.sidecar.outcome }}" "${{ steps.check.outcome }}" "${{ steps.test.outcome }}"; do
+            [ "$outcome" = success ] || { echo "a step did not pass: sidecar=${{ steps.sidecar.outcome }} check=${{ steps.check.outcome }} test=${{ steps.test.outcome }}"; exit 1; }
+          done
