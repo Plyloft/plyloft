@@ -1564,12 +1564,14 @@ fn pressure_already_there_is_a_fix_not_pressure() {
 
 #[test]
 fn made_up_places_and_inside_sources_are_dropped() {
-    let exists = |p: &Path| p.starts_with("/copy") && !p.to_string_lossy().contains("missing");
+    // A bare "/copy" is not absolute on Windows (no drive letter).
+    let root = if cfg!(windows) { "C:/copy" } else { "/copy" };
+    let exists = |p: &Path| p.starts_with(root) && !p.to_string_lossy().contains("missing");
     let mut idea = checked_idea("Pricing: one table");
     idea.where_ = vec![
         "src/pages/pricing.astro:40-212".into(),
         "./AGENTS.md".into(),
-        "/copy/site/src/a.astro:3".into(),
+        format!("{root}/site/src/a.astro:3"),
         "src/missing.astro:4".into(),
         "../secrets.txt".into(),
         "/etc/passwd".into(),
@@ -1582,7 +1584,7 @@ fn made_up_places_and_inside_sources_are_dropped() {
         "https://github.com/matteob-adv/plyloft-site/blob/main/x.astro".into(),
         "https://github.com/someone/else".into(),
     ];
-    let (out, missing) = ground(vec![idea], Path::new("/copy"), "site", "https://www.example.com", Some("MatteoB-adv/plyloft-site"), &exists);
+    let (out, missing) = ground(vec![idea], Path::new(root), "site", "https://www.example.com", Some("MatteoB-adv/plyloft-site"), &exists);
     assert_eq!(missing, vec![false]);
     assert_eq!(out[0].where_, vec!["src/pages/pricing.astro:40-212", "AGENTS.md", "site/src/a.astro:3"]);
     assert_eq!(out[0].sources, vec!["https://baymard.com/blog/pricing", "https://github.com/someone/else"]);

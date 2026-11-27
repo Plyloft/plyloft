@@ -663,7 +663,11 @@ fn rename_skill(clone: &Path, plugin: &str, from: &str, to: &str) {
         clone.join("library/codex/plugins").join(plugin).join("skills"),
     ] {
         if parent.join(from).is_dir() {
-            fs::rename(parent.join(from), parent.join(to)).unwrap();
+            // `git mv`, not a plain rename: the script's executable bit lives
+            // only in the index on Windows (no file mode), and a plain rename
+            // would let the next `git add -A` record it as 100644.
+            let rel = |name: &str| parent.join(name).strip_prefix(clone).unwrap().to_string_lossy().replace('\\', "/");
+            run_git(clone, &["mv", &rel(from), &rel(to)]);
         }
     }
 }

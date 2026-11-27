@@ -6285,9 +6285,11 @@ mod tests {
         assert!(parse_git_dirs("/p/.git/worktrees/c\n--path-format=absolute\n/p/.git\n").is_err());
         assert!(parse_git_dirs("/p/.git/worktrees/c\n.git\n").is_err());
         assert!(parse_git_dirs("/p/.git/worktrees/c\n").is_err());
+        // A bare "/p" has no drive letter, so it is not absolute on Windows.
+        let root = if cfg!(windows) { "C:/p" } else { "/p" };
         assert_eq!(
-            parse_git_dirs("/p/.git/worktrees/c\n/p/.git\n").unwrap(),
-            ("/p/.git/worktrees/c".to_string(), "/p/.git".to_string())
+            parse_git_dirs(&format!("{root}/.git/worktrees/c\n{root}/.git\n")).unwrap(),
+            (format!("{root}/.git/worktrees/c"), format!("{root}/.git"))
         );
     }
 

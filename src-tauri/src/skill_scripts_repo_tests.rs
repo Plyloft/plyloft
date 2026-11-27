@@ -325,8 +325,9 @@ fn the_sheet_says_an_ok_that_followed_a_rename() {
     let commit = f.commit("add");
     let review = repo_review(&f.clone, "acme", "team-check", SKILL, &[], &f.state()).unwrap().unwrap();
     record(&f.config, &f.clone, "acme", "team-check", SKILL, &commit, &review.scripts_ids[0], 1_760_000_000_000).unwrap();
-    let parent = f.clone.join("library/claude/acme/skills");
-    fs::rename(parent.join("team-check"), parent.join("team-verify")).unwrap();
+    // `git mv` keeps the script's executable bit, which on Windows lives only in
+    // the index (a plain rename lets `git add -A` record it as 100644).
+    run_git(&f.clone, &["mv", SKILL, "library/claude/acme/skills/team-verify"]);
     f.commit("rename");
     let renamed = "library/claude/acme/skills/team-verify";
     let again = repo_review(&f.clone, "acme", "team-verify", renamed, &[], &f.state()).unwrap().expect("Install still asks");

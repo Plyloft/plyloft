@@ -46,7 +46,9 @@
 // slot, the one wrap).
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative as relativeNative, sep } from "node:path";
+// Always "/" in a relative path, as on a Mac: the checks below compare it with text and lists written with "/".
+const relative = (from: string, to: string): string => relativeNative(from, to).split(sep).join("/");
 import { fileURLToPath } from "node:url";
 import { tableLayout } from "./uxRow.ts";
 
