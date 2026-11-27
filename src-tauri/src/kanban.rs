@@ -705,6 +705,14 @@ pub struct BuilderState {
     /// while `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pr_draft: Option<crate::pr_draft::PrDraftRecord>,
+    /// 1.179.0: the Claude account this session started on
+    /// (`ai_accounts`; an id Plyloft made). Its conversation is kept in that
+    /// account's folder, so Resume runs on it whatever new sessions start on
+    /// now; an account no longer listed refuses the Resume. `None` = Main,
+    /// and on every record before it. Left out of the file while `None`, so
+    /// an older Plyloft reads the card as it did (and resumes on Main).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
 }
 
 /// CL-5: how many review rounds a card keeps; the oldest go first.
@@ -7980,6 +7988,43 @@ mod tests {
         let back = store.load("ws-pf").unwrap();
         assert_eq!(back[0].builder.as_ref().unwrap().claude_session_id.as_deref(), Some("sid-builder"));
         assert_eq!(back[1].build_both.as_ref().unwrap().lanes[0].claude_session_id.as_deref(), Some("sid-lane"));
+    }
+
+    /// 1.179.0 (C2) schema migration (PPVP Tier 2): a Builder written before
+    /// Claude accounts loads on Main (`account: None`) and re-saves without
+    /// the key; a session started on an account keeps it across a save and
+    /// a load, which is what its Resume reads.
+    #[test]
+    fn a_builder_before_claude_accounts_loads_on_main_and_an_account_round_trips() {
+        let tmp = tempdir().unwrap();
+        let store = KanbanStore::new(tmp.path().to_path_buf()).unwrap();
+        let path = tmp.path().join(KANBAN_SUBDIR).join("ws-acc.json");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        let json = br#"{
+            "version": 1,
+            "cards": [{
+                "id": "c1",
+                "workspaceId": "ws-acc",
+                "title": "started before accounts",
+                "columnId": "in_progress",
+                "builder": {"vendor": "claude", "startedAt": 3, "claudeSessionId": "00000000-0000-4000-8000-000000000001"},
+                "createdAt": 100,
+                "updatedAt": 200
+            }]
+        }"#;
+        fs::write(&path, json).unwrap();
+        let mut cards = store.load("ws-acc").unwrap();
+        assert_eq!(cards[0].builder.as_ref().unwrap().account, None, "Main");
+        store.save("ws-acc", cards.clone()).unwrap();
+        let written = fs::read_to_string(&path).unwrap();
+        assert!(!written.contains("\"account\""), "{written}");
+
+        cards[0].builder.as_mut().unwrap().account = Some("a1b2c3d4".into());
+        store.save("ws-acc", cards).unwrap();
+        let written = fs::read_to_string(&path).unwrap();
+        assert!(written.contains("\"account\": \"a1b2c3d4\""), "{written}");
+        let back = store.load("ws-acc").unwrap();
+        assert_eq!(back[0].builder.as_ref().unwrap().account.as_deref(), Some("a1b2c3d4"));
     }
 
     /// UX P-C schema migration (PPVP Tier 2): a builder record written

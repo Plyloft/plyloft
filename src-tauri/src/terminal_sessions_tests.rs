@@ -26,6 +26,7 @@ fn row(id: &str, started_at: i64) -> SessionRow {
         resumed_from: None,
         passed_name: None,
         open_at_quit: None,
+        account: None,
         extra: Default::default(),
     }
 }
@@ -701,7 +702,7 @@ fn resume_shows_a_tile_that_runs_it_and_refuses_a_gone_folder_a_gone_file_or_one
     for id in ["s-ok", "s-tile", "s-open"] {
         write(&claude.path().join(format!("projects/{key}/{id}.jsonl")), &[claude_line(&cwd, "x")]);
     }
-    let check = |id: &str, dir: &std::path::Path| resume_check(&homes, SessionKind::Claude, id, dir);
+    let check = |id: &str, dir: &std::path::Path| resume_check(&homes, SessionKind::Claude, id, dir, None);
     assert_eq!(check("s-ok", &folder), ResumeCheck::Ready);
     assert_eq!(check("s-missing", &folder), ResumeCheck::ConversationGone);
     assert_eq!(check("s-ok", std::path::Path::new("/no/such/folder")), ResumeCheck::FolderGone);
@@ -1088,4 +1089,115 @@ fn after_a_sister_tile_closed_a_session_no_tile_claimed_still_makes_a_codex_tile
         assert!(s.a_started < s.b_started);
         reset_for_tests();
     }
+}
+
+// ── 1.179.0 (C2): Claude accounts ───────────────────────────────────────
+
+/// Schema migration (PPVP Tier 2): a row written before Claude accounts
+/// reads as Main and writes back without the key; a row on an account keeps
+/// it through a write and a read.
+#[test]
+fn a_row_before_claude_accounts_reads_as_main_and_an_account_round_trips() {
+    let old: SessionRow =
+        serde_json::from_value(json!({ "id": "r1", "kind": "claude", "cwd": "/p", "startedAt": 5 })).unwrap();
+    assert_eq!(old.account, None, "Main");
+    assert!(serde_json::to_value(&old).unwrap().get("account").is_none(), "left out while Main");
+    let mut r = row("r2", 6);
+    r.account = Some("a1b2c3d4".into());
+    let v = serde_json::to_value(&r).unwrap();
+    assert_eq!(v["account"], "a1b2c3d4");
+    let back: SessionRow = serde_json::from_value(v).unwrap();
+    assert_eq!(back.account.as_deref(), Some("a1b2c3d4"));
+}
+
+/// A test project with Main's folder and one account's, `a1b2c3d4`, under
+/// a temporary app config folder (`ai_accounts::test_root`, this thread).
+struct TwoAccounts {
+    config: tempfile::TempDir,
+    _main: tempfile::TempDir,
+    _project: tempfile::TempDir,
+    homes: CliHomes,
+    folder: std::path::PathBuf,
+    cwd: String,
+    account_dir: std::path::PathBuf,
+}
+
+const ACCOUNT: &str = "a1b2c3d4";
+
+fn two_accounts() -> TwoAccounts {
+    let config = tempfile::tempdir().unwrap();
+    let main = tempfile::tempdir().unwrap();
+    let project = tempfile::tempdir().unwrap();
+    let folder = crate::platform::canonicalize(project.path()).unwrap();
+    let cwd = folder.to_string_lossy().to_string();
+    crate::ai_accounts::test_root::set(Some(config.path().to_path_buf()));
+    let account_dir = config.path().join("ai-accounts").join("claude").join(ACCOUNT);
+    std::fs::create_dir_all(&account_dir).unwrap();
+    let homes = CliHomes { claude: Some(main.path().to_path_buf()), codex: None };
+    TwoAccounts { config, _main: main, _project: project, homes, folder, cwd, account_dir }
+}
+
+/// A conversation kept in an account's folder is found for a row recorded
+/// on that account, and not for a row recorded on Main: Resume…'s check,
+/// History and the project's list all look where the row's account keeps
+/// it, and the list says which account that is.
+#[test]
+fn a_conversation_in_an_accounts_folder_is_found_for_its_row_and_not_for_main() {
+    let _serial = serial();
+    reset_for_tests();
+    let t = two_accounts();
+    let key = claude_project_key(&t.cwd);
+    write(&t.account_dir.join(format!("projects/{key}/s-acc.jsonl")), &[claude_line(&t.cwd, "tidy the footer")]);
+    let on = |account: Option<&str>| resume_check(&t.homes, SessionKind::Claude, "s-acc", &t.folder, account);
+    assert_eq!(on(Some(ACCOUNT)), ResumeCheck::Ready);
+    assert_eq!(on(None), ResumeCheck::ConversationGone, "Main's folder never holds it");
+
+    record_start_on(t.config.path(), "ws", "pty-acc", SessionKind::Claude, &t.cwd, Some("s-acc".into()), Some(ACCOUNT.into()))
+        .unwrap();
+    record_start(t.config.path(), "ws", "pty-main", SessionKind::Claude, &t.cwd, Some("s-acc".into())).unwrap();
+    reset_for_tests();
+    let history = history_all(t.config.path(), &["ws".to_string()], &t.homes);
+    let of = |account: Option<&str>| {
+        history.sessions.iter().find(|s| s.session.row.account.as_deref() == account).expect("its row")
+    };
+    assert!(of(Some(ACCOUNT)).resumable && of(Some(ACCOUNT)).gone.is_none());
+    assert_eq!(of(None).gone, Some(Gone::Conversation));
+
+    let listed = conversations(t.config.path(), "ws", &t.folder, &t.homes);
+    let found = listed.iter().find(|c| c.cli_session_id == "s-acc").expect("listed from the account's folder");
+    assert_eq!(found.account.as_deref(), Some(ACCOUNT));
+    crate::ai_accounts::test_root::set(None);
+    reset_for_tests();
+}
+
+/// A row whose account was removed (its folder with it) is not resumed on
+/// another account: Resume…'s check and History say so, in the words
+/// `ai_accounts::ACCOUNT_REMOVED` gives the window.
+#[test]
+fn a_row_whose_account_was_removed_is_not_resumable() {
+    let _serial = serial();
+    reset_for_tests();
+    let t = two_accounts();
+    let key = claude_project_key(&t.cwd);
+    // The same conversation id in Main's folder must not stand in for it.
+    write(&t.homes.claude.clone().unwrap().join(format!("projects/{key}/s-gone.jsonl")), &[claude_line(&t.cwd, "x")]);
+    record_start_on(t.config.path(), "ws", "pty-gone", SessionKind::Claude, &t.cwd, Some("s-gone".into()), Some(ACCOUNT.into()))
+        .unwrap();
+    reset_for_tests();
+    std::fs::remove_dir_all(&t.account_dir).unwrap();
+    assert_eq!(
+        resume_check(&t.homes, SessionKind::Claude, "s-gone", &t.folder, Some(ACCOUNT)),
+        ResumeCheck::AccountRemoved
+    );
+    let history = history_all(t.config.path(), &["ws".to_string()], &t.homes);
+    let row = &history.sessions[0];
+    assert_eq!((row.resumable, row.gone), (false, Some(Gone::Account)));
+    assert_eq!(serde_json::to_value(row).unwrap()["gone"], "account");
+    assert_eq!(
+        serde_json::to_value(ResumeCheck::AccountRemoved).unwrap(),
+        json!({ "kind": "accountRemoved" })
+    );
+    assert_eq!(crate::ai_accounts::ACCOUNT_REMOVED, "Its account was removed from Plyloft.");
+    crate::ai_accounts::test_root::set(None);
+    reset_for_tests();
 }

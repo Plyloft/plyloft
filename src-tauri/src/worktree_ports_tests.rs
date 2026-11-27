@@ -416,6 +416,7 @@ fn a_session_in_a_card_worktree_gets_its_ports_and_one_elsewhere_does_not() {
                     run_id: None,
                     retention_class: RetentionClass::Ephemeral,
                     objective: None,
+                    account: None,
                 },
                 30,
             )

@@ -57,8 +57,14 @@ pub fn init(config_dir: &Path) {
     let _ = CONFIG_ROOT.set(config_dir.to_path_buf());
 }
 
-fn config_root() -> Option<&'static Path> {
-    CONFIG_ROOT.get().map(PathBuf::as_path)
+fn config_root() -> Option<PathBuf> {
+    // Tests point a thread at a temporary folder instead (`test_root`), so
+    // no test calls [`init`] and leaves a global behind for another.
+    #[cfg(test)]
+    if let Some(root) = test_root::get() {
+        return Some(root);
+    }
+    CONFIG_ROOT.get().cloned()
 }
 
 // ── Words a person reads ───────────────────────────────────────────────
@@ -130,19 +136,63 @@ pub fn claude_dir_in(config_dir: &Path, account: Option<&str>) -> Option<PathBuf
 pub fn claude_dir(account: Option<&str>) -> Option<PathBuf> {
     match account {
         None => crate::claude_session::claude_config_dir(),
-        Some(_) => claude_dir_in(config_root()?, account),
+        Some(_) => claude_dir_in(&config_root()?, account),
     }
+}
+
+/// The folders of the Claude accounts other than Main that a reader of
+/// every conversation covers besides Main's (History, Resume…): each
+/// account folder on disk under `<config>/ai-accounts/claude`, by id. A
+/// removed account's folder went with it, so it is not here.
+pub fn account_dirs() -> Vec<(Option<String>, PathBuf)> {
+    config_root().map(|root| account_dirs_in(&root)).unwrap_or_default()
+}
+
+/// Each account folder under `config_dir` that is a real folder (never a
+/// link) named by an id Plyloft makes, by id.
+pub fn account_dirs_in(config_dir: &Path) -> Vec<(Option<String>, PathBuf)> {
+    let mut found: Vec<(Option<String>, PathBuf)> = std::fs::read_dir(claude_accounts_root(config_dir))
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+                .filter_map(|entry| {
+                    let id = entry.file_name().to_str().filter(|id| valid_id(id))?.to_string();
+                    Some((Some(id), entry.path()))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    found.sort();
+    found
+}
+
+/// The folder of a session recorded on `account`, for a reader of its
+/// files: Main's, or the account's while its folder is there. `None` once
+/// the account was removed (its folder went with it): nothing of it is read
+/// from another folder in its place.
+pub fn recorded_claude_dir(account: Option<&str>) -> Option<PathBuf> {
+    match account {
+        None => claude_dir(None),
+        Some(_) => claude_dir(account).filter(|dir| dir.is_dir()),
+    }
+}
+
+/// Whether a session recorded on `account` lost it: an account whose folder
+/// is gone (Remove deletes the folder before the entry). Main never is.
+pub fn recorded_account_removed(account: Option<&str>) -> bool {
+    account.is_some() && recorded_claude_dir(account).is_none()
 }
 
 /// The environment a Claude session on `account` gets on top of today's:
 /// nothing for Main, `CLAUDE_CONFIG_DIR=<its folder>` for another account.
 /// `None` when the account's folder can't be told: the caller refuses the
-/// start instead of running it on Main without saying so.
-#[allow(dead_code)] // C2's spawn paths are its callers.
+/// start instead of running it on Main without saying so
+/// (`pty::account_env`).
 pub fn spawn_env(account: Option<&str>) -> Option<Vec<(String, String)>> {
     match account {
         None => Some(Vec::new()),
-        Some(_) => spawn_env_in(config_root()?, account),
+        Some(_) => spawn_env_in(&config_root()?, account),
     }
 }
 
@@ -254,7 +304,7 @@ pub fn protected_dirs_in(config_dir: &Path) -> Vec<PathBuf> {
 
 /// [`protected_dirs_in`] under the app config folder [`init`] was told.
 pub fn protected_dirs() -> Vec<PathBuf> {
-    config_root().map(protected_dirs_in).unwrap_or_default()
+    config_root().map(|root| protected_dirs_in(&root)).unwrap_or_default()
 }
 
 // ── Signed in ──────────────────────────────────────────────────────────
@@ -433,14 +483,109 @@ pub fn setup_folders(accounts: &ClaudeAccountsSettings) -> Vec<AccountFolder> {
 
 // ── Sessions on an account (seam) ──────────────────────────────────────
 
-/// How many sessions run on account `id` now: tiles, Builders, reviewers,
-/// chats. **Seam (C1):** no session can start on an account before C2, so
-/// this answers 0; C2 counts the sessions it records an account for
-/// (PtyRegistry, AgentRegistry, ChatRegistry, CodexAppRegistry) here, and
-/// Remove is refused while it is above 0.
+/// How many sessions run on account `id` now: every Claude PTY Plyloft
+/// started on it (tiles, Builders, reviewers, intake, card chats, Plan with
+/// two AIs, discussions, agent runs), counted by `PtyRegistry`, which notes
+/// each one's account at its start and forgets it when it ends. Setup's
+/// sign-in or sign-out for an account is refused separately
+/// ([`ai_account_remove`]). Remove is refused while this is above 0.
 pub fn sessions_running_on<R: Runtime>(app: &AppHandle<R>, id: &str) -> usize {
-    let _ = (app, id);
-    0
+    app.try_state::<crate::pty::PtyRegistry>()
+        .map(|registry| registry.sessions_on_account(id))
+        .unwrap_or(0)
+}
+
+// ── Which account a session runs on (C2) ───────────────────────────────
+
+/// What a session recorded on an account that is no longer listed says
+/// (History, Resume…, a card's Resume): it is not resumed anywhere else.
+pub const ACCOUNT_REMOVED: &str = "Its account was removed from Plyloft.";
+
+/// The account a new Claude session starts on: `aiAccounts.claude.current`
+/// while it names a listed account, else Main (`None`). Read once where the
+/// session starts and passed down; never read again by what follows it.
+pub fn current_in(accounts: &ClaudeAccountsSettings) -> Option<String> {
+    accounts.current_id().map(str::to_string)
+}
+
+/// [`current_in`] from the app's settings; `None` (Main) for a provider
+/// other than Claude, and while the settings aren't loaded.
+pub fn for_new_session<R: Runtime>(app: &AppHandle<R>, provider: crate::coordination::Provider) -> Option<String> {
+    if provider != crate::coordination::Provider::Claude {
+        return None;
+    }
+    let settings = app.try_state::<SettingsStore>()?.snapshot();
+    current_in(&settings.ai_accounts.claude)
+}
+
+/// A new session on the account the window asked for (`requested`), else
+/// on the current one. An id no account has is refused, never run on Main.
+pub fn chosen_in(accounts: &ClaudeAccountsSettings, requested: Option<&str>) -> Result<Option<String>, String> {
+    match requested {
+        None => Ok(current_in(accounts)),
+        Some(id) if find(accounts, id).is_some() => Ok(Some(id.to_string())),
+        Some(_) => Err(UNKNOWN_ACCOUNT.into()),
+    }
+}
+
+/// [`chosen_in`] from the app's settings.
+pub fn chosen<R: Runtime>(app: &AppHandle<R>, requested: Option<&str>) -> Result<Option<String>, String> {
+    let accounts = store(app)?.snapshot().ai_accounts.claude;
+    chosen_in(&accounts, requested)
+}
+
+/// The account a recorded session resumes on: the one it was started on,
+/// whatever new sessions start on now. Main stays Main; an account no
+/// longer listed refuses the resume with [`ACCOUNT_REMOVED`].
+pub fn for_resume_in(accounts: &ClaudeAccountsSettings, recorded: Option<&str>) -> Result<Option<String>, String> {
+    match recorded {
+        None => Ok(None),
+        Some(id) if find(accounts, id).is_some() => Ok(Some(id.to_string())),
+        Some(_) => Err(ACCOUNT_REMOVED.into()),
+    }
+}
+
+/// The Claude account a Claude tile runs on. A tile that resumes a
+/// conversation (`--resume <id>`: Resume…, History, Reopen the sessions)
+/// runs on the account that conversation is kept on — the one `requested`
+/// names (the row's), else the one its record or its folder says — and an
+/// account removed since refuses it ([`ACCOUNT_REMOVED`]). Any other tile
+/// starts on `requested`, else on the account new sessions start on now.
+pub fn for_tile<R: Runtime>(
+    app: &AppHandle<R>,
+    workspace_id: Option<&str>,
+    cwd: Option<&str>,
+    args: &[String],
+    requested: Option<&str>,
+) -> Result<Option<String>, String> {
+    match (requested, crate::terminal_sessions::claude_resumed_session(args)) {
+        (Some(_), Some(_)) => for_resume(app, requested),
+        (Some(_), None) => chosen(app, requested),
+        (None, Some(conversation)) => {
+            let recorded = match (app.path().app_config_dir(), workspace_id, cwd) {
+                (Ok(config), Some(ws), Some(dir)) => crate::terminal_sessions::account_of_conversation(
+                    &config,
+                    ws,
+                    &crate::terminal_sessions::CliHomes::real(),
+                    Path::new(dir),
+                    &conversation,
+                ),
+                _ => None,
+            };
+            for_resume(app, recorded.as_deref())
+        }
+        (None, None) => Ok(for_new_session(app, crate::coordination::Provider::Claude)),
+    }
+}
+
+/// [`for_resume_in`] from the app's settings. With no settings loaded,
+/// only Main resumes.
+pub fn for_resume<R: Runtime>(app: &AppHandle<R>, recorded: Option<&str>) -> Result<Option<String>, String> {
+    match app.try_state::<SettingsStore>() {
+        Some(store) => for_resume_in(&store.snapshot().ai_accounts.claude, recorded),
+        None if recorded.is_none() => Ok(None),
+        None => Err(ACCOUNT_REMOVED.into()),
+    }
 }
 
 // ── Commands ───────────────────────────────────────────────────────────
@@ -467,7 +612,7 @@ pub fn ai_accounts_list(app: AppHandle) -> Result<Vec<AccountRow>, String> {
 #[tauri::command(async)]
 pub fn ai_account_add(app: AppHandle, name: String) -> Result<AccountRow, String> {
     let store = store(&app)?;
-    let config = config_root().ok_or_else(|| folder_not_made(&clean_name(&name)))?;
+    let config = &config_root().ok_or_else(|| folder_not_made(&clean_name(&name)))?;
     let before = store.snapshot().ai_accounts.claude;
     let name = check_name(&before, Target::New, &name)?;
     let root = claude_accounts_root(config);
@@ -582,7 +727,7 @@ pub fn ai_account_remove(app: AppHandle, id: String, sign_out: bool) -> Result<R
     let store = store(&app)?;
     let accounts = store.snapshot().ai_accounts.claude;
     let entry = find(&accounts, &id).cloned().ok_or_else(|| UNKNOWN_ACCOUNT.to_string())?;
-    let config = config_root().ok_or_else(|| folder_not_deleted(&entry.name))?;
+    let config = &config_root().ok_or_else(|| folder_not_deleted(&entry.name))?;
     let running = sessions_running_on(&app, &id);
     if running > 0 {
         return Err(sessions_running(running, &entry.name));
@@ -632,3 +777,24 @@ pub fn ai_account_show_folder(app: AppHandle, id: Option<String>) -> Result<(), 
 #[cfg(test)]
 #[path = "ai_accounts_tests.rs"]
 mod tests;
+
+/// Tests: the app config folder the account folders are under, for this
+/// thread only (`config_root`), so tests of other modules can run a session
+/// on an account without calling [`init`].
+#[cfg(test)]
+pub(crate) mod test_root {
+    use std::cell::RefCell;
+    use std::path::PathBuf;
+
+    thread_local! {
+        static ROOT: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+    }
+
+    pub(crate) fn set(root: Option<PathBuf>) {
+        ROOT.with(|r| *r.borrow_mut() = root);
+    }
+
+    pub(crate) fn get() -> Option<PathBuf> {
+        ROOT.with(|r| r.borrow().clone())
+    }
+}

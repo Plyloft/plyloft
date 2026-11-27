@@ -1955,7 +1955,13 @@ where
         Some(worktree.path().to_string_lossy().into_owned()),
         Some(knowledge),
         Vec::new(),
-        discussion_spawn_intent(&record, leg, kind, worktree.path()),
+        {
+            let mut intent = discussion_spawn_intent(&record, leg, kind, worktree.path());
+            // 1.179.0: a Claude leg starts on the account new sessions
+            // start on now (nothing of a discussion is resumed later).
+            intent.account = crate::ai_accounts::for_new_session(app, leg.provider);
+            intent
+        },
         record.budgets.provider_timeout_seconds,
     ) {
         Ok(outcome) => outcome,
@@ -2222,6 +2228,7 @@ fn discussion_spawn_intent(
         run_id: Some(record.id.clone()),
         retention_class: crate::coordination::RetentionClass::Unattended,
         objective: Some(format!("Read-only discussion {}", record.id)),
+        account: None,
     }
 }
 

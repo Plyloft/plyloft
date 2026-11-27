@@ -617,6 +617,11 @@ pub struct PtyRegistry {
     /// copy stops it first (`try_session::stop_card_try_sessions`). In
     /// memory only. Shared with each session's exit thread, which removes it.
     try_sessions: Arc<Mutex<HashMap<String, crate::try_session::TrySession>>>,
+    /// 1.179.0: the Claude account each live session started on another
+    /// account than Main runs on (PTY id → account id, and the session's
+    /// reaped flag), for [`Self::sessions_on_account`]. In memory only;
+    /// pruned as sessions end.
+    accounts: Arc<Mutex<HashMap<String, (String, Arc<std::sync::atomic::AtomicBool>)>>>,
     /// Unix: the sessions (their ids, = the child's pid: portable-pty calls
     /// `setsid`) a tile close is still ending on its own thread, so the
     /// quit's `kill_all` waits for them too. Pruned as each ends.
@@ -895,13 +900,10 @@ enum SessionStep {
 }
 
 impl SessionWatch {
-    fn new(session_id: String, startup_net: Option<Duration>) -> Self {
-        #[cfg(test)]
-        let config_dir = TEST_CLAUDE_CONFIG_DIR
-            .with(|dir| dir.borrow().clone())
-            .or_else(crate::claude_session::claude_config_dir);
-        #[cfg(not(test))]
-        let config_dir = crate::claude_session::claude_config_dir();
+    /// `config_dir`: the folder of the Claude account the session runs on
+    /// ([`session_config_dir`]), where its transcript is looked for, never
+    /// another account's.
+    fn new(session_id: String, startup_net: Option<Duration>, config_dir: Option<std::path::PathBuf>) -> Self {
         Self {
             session_id,
             config_dir,
@@ -1150,6 +1152,31 @@ pub(crate) fn session_env(
     }
 }
 
+/// 1.179.0: what a session on Claude account `account` gets on top of the
+/// managed launch's variables (last, so it wins over a `CLAUDE_CONFIG_DIR`
+/// Plyloft's own process carries): nothing for Main, so Main's sessions
+/// start exactly as before; `CLAUDE_CONFIG_DIR=<its folder>` for another
+/// account. An account whose folder can't be told refuses the start: it
+/// never runs on Main in its place. The cached PATH is set as before
+/// (`session_env`); this only adds.
+pub(crate) fn account_env(account: Option<&str>) -> Result<Vec<(String, String)>, String> {
+    crate::ai_accounts::spawn_env(account).ok_or_else(|| crate::ai_accounts::UNKNOWN_ACCOUNT.to_string())
+}
+
+/// 1.179.0: the Claude folder a collected session on `account` writes its
+/// transcript in. Tests point Main at a temporary folder
+/// ([`TEST_CLAUDE_CONFIG_DIR`]); an account's folder comes from
+/// `ai_accounts` (its own test root).
+pub(crate) fn session_config_dir(account: Option<&str>) -> Option<std::path::PathBuf> {
+    #[cfg(test)]
+    if account.is_none() {
+        if let Some(dir) = TEST_CLAUDE_CONFIG_DIR.with(|dir| dir.borrow().clone()) {
+            return Some(dir);
+        }
+    }
+    crate::ai_accounts::claude_dir(account)
+}
+
 /// OB-11: removed from every guided (Setup) run's environment before the
 /// run's own variables are added.
 pub const SETUP_SCRUBBED_ENV: [&str; 2] = ["GH_TOKEN", "GITHUB_TOKEN"];
@@ -1239,6 +1266,10 @@ impl PtyRegistry {
         requested_id: Option<String>,
     ) -> Result<String, String> {
         intent.validate()?;
+        // 1.179.0: refused before anything starts when the account's folder
+        // can't be told.
+        let account = intent.account.clone();
+        let account_vars = account_env(account.as_deref())?;
         let id = crate::pty_tile_id::tile_pty_id(requested_id.as_deref())?;
         if self.sessions.lock().contains_key(&id) {
             return Err(crate::pty_tile_id::PTY_ID_IN_USE.into());
@@ -1294,8 +1325,10 @@ impl PtyRegistry {
         // `spawn_collect` so internal verify runs don't get OSC 133 bytes
         // mixed into their captured output.
         // Last, so a managed launch's own value (v1.116.0: CODEX_HOME for the
-        // team-skills overlay) wins over the defaults.
-        session_env(&mut command, &env.path, true, &ports, &injection.env);
+        // team-skills overlay) wins over the defaults; 1.179.0: the
+        // account's folder after it.
+        let managed: Vec<(String, String)> = injection.env.iter().cloned().chain(account_vars).collect();
+        session_env(&mut command, &env.path, true, &ports, &managed);
 
         let mut reservation = self.begin_coordination(intent)?;
         // GH #124: held from before the child exists until it is
@@ -1363,6 +1396,7 @@ impl PtyRegistry {
             Self::fail_coordination(&mut reservation, &error);
             return Err(error);
         }
+        self.note_account(&id, account.as_deref(), &reaped);
         if let Some(dir) = shell_tile_cwd {
             self.shell_tile_cwds.lock().insert(id.clone(), dir);
         }
@@ -1727,6 +1761,25 @@ impl PtyRegistry {
         }
     }
 
+    /// 1.179.0: a session started on another Claude account than Main
+    /// counts for that account ([`Self::sessions_on_account`]) until it ends.
+    fn note_account(&self, id: &str, account: Option<&str>, reaped: &Arc<std::sync::atomic::AtomicBool>) {
+        if let Some(account) = account {
+            self.accounts.lock().insert(id.to_string(), (account.to_string(), Arc::clone(reaped)));
+        }
+    }
+
+    /// 1.179.0: how many sessions run on Claude account `account` now — a
+    /// session still registered whose child hasn't been reaped. What Remove
+    /// is refused on (`ai_accounts::sessions_running_on`). The ended ones are
+    /// forgotten on the way.
+    pub fn sessions_on_account(&self, account: &str) -> usize {
+        let sessions = self.sessions.lock();
+        let mut accounts = self.accounts.lock();
+        accounts.retain(|id, (_, reaped)| sessions.contains_key(id) && !reaped.load(Ordering::SeqCst));
+        accounts.values().filter(|(on, _)| on == account).count()
+    }
+
     /// Record a spawned child, or — after `kill_all` — kill it.
     fn register(&self, id: String, mut session: PtySession) -> Result<(), String> {
         let mut guard = self.sessions.lock();
@@ -1770,6 +1823,9 @@ impl PtyRegistry {
         activity: Option<Arc<AtomicI64>>,
     ) -> Result<String, String> {
         intent.validate()?;
+        // 1.179.0: see spawn_tile — refused before anything starts.
+        let account = intent.account.clone();
+        let account_vars = account_env(account.as_deref())?;
         let pty_system = pty_system();
         let pair = pty_system
             .openpty(PtySize {
@@ -1799,8 +1855,9 @@ impl PtyRegistry {
         }
         // v1.20.5: see spawn() for rationale. spawn_with_capture also
         // backs visible shell tiles (intake conversations), so the gate
-        // must be opt-in here too.
-        session_env(&mut command, &env.path, true, &ports, &injection.env);
+        // must be opt-in here too. 1.179.0: the account's folder last.
+        let managed: Vec<(String, String)> = injection.env.iter().cloned().chain(account_vars).collect();
+        session_env(&mut command, &env.path, true, &ports, &managed);
 
         let id = Uuid::new_v4().to_string();
         let mut reservation = self.begin_coordination(intent)?;
@@ -1868,6 +1925,7 @@ impl PtyRegistry {
             Self::fail_coordination(&mut reservation, &error);
             return Err(error);
         }
+        self.note_account(&id, account.as_deref(), &reaped);
         drop(spawning);
         let tracking = match reservation.take() {
             Some(reservation) => match reservation.mark_spawned(id.clone(), process_id) {
@@ -2106,10 +2164,13 @@ impl PtyRegistry {
                 root.display()
             ));
         }
+        // 1.179.0: the chat's Claude account (see spawn_tile).
+        let account = intent.account.clone();
+        let account_vars = account_env(account.as_deref())?;
         let env = shell_env::get();
         let mut command = pty_command(cmd, &args, &env.path)?;
         command.cwd(cwd);
-        session_env(&mut command, &env.path, false, &extra_env, &[]);
+        session_env(&mut command, &env.path, false, &extra_env, &account_vars);
         for key in crate::claude_session::CHILD_SESSION_ENV {
             command.env_remove(key);
         }
@@ -2167,6 +2228,7 @@ impl PtyRegistry {
             Self::fail_coordination(&mut reservation, &error);
             return Err(error);
         }
+        self.note_account(&id, account.as_deref(), &reaped);
         drop(spawning);
         let tracking = match reservation.take() {
             Some(reservation) => match reservation.mark_spawned(id.clone(), process_id) {
@@ -2251,6 +2313,10 @@ impl PtyRegistry {
         // terminal or the cached PATH — `pty_command` refuses too, but only
         // after `shell_env::get()`, which panics before `shell_env::init()`.
         refuse_print_mode(cmd, &args)?;
+        // 1.179.0: the session's Claude account (see spawn_tile), and the
+        // folder its transcript is read from.
+        let account = intent.account.clone();
+        let account_vars = account_env(account.as_deref())?;
         // A collected Claude session under the session root runs in a plain
         // folder, which inherits the root's trust; a git root there would
         // stop at Claude's trust question again.
@@ -2293,7 +2359,8 @@ impl PtyRegistry {
         // The caller's environment (a card Verify's shared Cargo target),
         // then a managed launch's own value, which wins.
         let extra_env: Vec<(String, String)> = extra_env.into_iter().chain(ports).collect();
-        session_env(&mut command, &env.path, false, &extra_env, &injection.env);
+        let managed: Vec<(String, String)> = injection.env.iter().cloned().chain(account_vars).collect();
+        session_env(&mut command, &env.path, false, &extra_env, &managed);
         // An interactive Claude session collected through its transcript
         // (`claude_session`): a Claude parent's markers would turn the
         // transcript off, and the session would never end.
@@ -2357,6 +2424,7 @@ impl PtyRegistry {
             Self::fail_coordination(&mut reservation, &error);
             return Err(error);
         }
+        self.note_account(&id, account.as_deref(), &reaped);
         drop(spawning);
         let tracking = match reservation.take() {
             Some(reservation) => match reservation.mark_spawned(id.clone(), process_id) {
@@ -2417,7 +2485,8 @@ impl PtyRegistry {
                 reader_done,
                 reader_thread,
                 tracking,
-                session_watch: claude_session.map(|session| SessionWatch::new(session, startup_net)),
+                session_watch: claude_session
+                    .map(|session| SessionWatch::new(session, startup_net, session_config_dir(account.as_deref()))),
                 deadline: Instant::now() + Duration::from_secs(timeout_secs),
             }),
         })
@@ -2898,6 +2967,7 @@ mod tests {
             run_id: None,
             retention_class: RetentionClass::Interactive,
             objective: None,
+            account: None,
         };
         assert!(counts_as_tile(&intent(ExecutionKind::ShellTile, None, None)));
         assert!(counts_as_tile(&intent(ExecutionKind::ProviderTile, None, None)));
@@ -3369,6 +3439,7 @@ mod tests {
                     run_id: None,
                     retention_class: RetentionClass::Ephemeral,
                     objective: None,
+                    account: None,
                 },
                 60,
             )
@@ -3400,6 +3471,7 @@ mod tests {
             run_id: None,
             retention_class: RetentionClass::Ephemeral,
             objective: None,
+            account: None,
         }
     }
 
@@ -3569,6 +3641,71 @@ mod tests {
         assert!(gone(shell), "the CLI was reaped");
         assert!(gone(child), "its child was killed with the group");
         assert!(!registry.contains(&id));
+    }
+
+    /// 1.179.0 (C2): Main's sessions get no new variable; a session on
+    /// another Claude account gets its folder in `CLAUDE_CONFIG_DIR`; an
+    /// account whose folder can't be told is refused, never run on Main.
+    #[test]
+    fn only_a_session_on_an_account_gets_its_config_dir() {
+        let config = tempfile::tempdir().unwrap();
+        crate::ai_accounts::test_root::set(Some(config.path().to_path_buf()));
+        assert_eq!(account_env(None), Ok(Vec::new()));
+        let folder = config.path().join("ai-accounts").join("claude").join("a1b2c3d4");
+        assert_eq!(
+            account_env(Some("a1b2c3d4")),
+            Ok(vec![("CLAUDE_CONFIG_DIR".to_string(), folder.to_string_lossy().into_owned())])
+        );
+        assert_eq!(account_env(Some("../x")), Err(crate::ai_accounts::UNKNOWN_ACCOUNT.to_string()));
+        crate::ai_accounts::test_root::set(None);
+        assert_eq!(
+            account_env(Some("a1b2c3d4")),
+            Err(crate::ai_accounts::UNKNOWN_ACCOUNT.to_string()),
+            "no config folder known: refused"
+        );
+    }
+
+    /// 1.179.0 (C2): a collected session started on an account runs with
+    /// that account's folder (the fake CLI writes its transcript under
+    /// `$CLAUDE_CONFIG_DIR`), is read from there, and counts for that
+    /// account while it runs. Main's folder never holds it.
+    #[cfg(unix)]
+    #[test]
+    fn a_collected_session_on_an_account_reads_its_own_folder() {
+        crate::shell_env::init();
+        let registry = PtyRegistry::default();
+        let config = tempfile::tempdir().unwrap();
+        let main = tempfile::tempdir().unwrap();
+        let account = "a1b2c3d4";
+        let folder = config.path().join("ai-accounts").join("claude").join(account);
+        std::fs::create_dir_all(&folder).unwrap();
+        let session = Uuid::new_v4().to_string();
+        let answer = r#"{"type":"assistant","message":{"id":"msg_01","content":[{"type":"text","text":"On the account."}],"stop_reason":"end_turn","usage":{"output_tokens":3}}}"#;
+        let end = r#"{"type":"system","subtype":"turn_duration"}"#;
+        let script = format!(
+            "d=\"$CLAUDE_CONFIG_DIR/projects/-fake-cwd\"; mkdir -p \"$d\" && printf '%s\\n' '{answer}' '{end}' > \"$d/{session}.jsonl\"; sleep 60"
+        );
+        let args = vec!["-c".into(), script, "sh".into(), "--session-id".into(), session.clone()];
+        crate::ai_accounts::test_root::set(Some(config.path().to_path_buf()));
+        TEST_CLAUDE_CONFIG_DIR.with(|d| *d.borrow_mut() = Some(main.path().to_path_buf()));
+        let intent = crate::coordination::SpawnIntent { account: Some(account.into()), ..collect_intent() };
+        let started = registry.begin_collect("/bin/sh", args, None, None, Vec::new(), intent, 20).expect("begin_collect");
+        assert_eq!(registry.sessions_on_account(account), 1, "it counts while it runs");
+        assert_eq!(registry.sessions_on_account("e5f6a7b8"), 0, "and for no other account");
+        let outcome = started.wait(None).expect("wait");
+        assert!(!outcome.timed_out, "the turn was read from the account's folder");
+        let output = String::from_utf8_lossy(&outcome.output);
+        let last: serde_json::Value = serde_json::from_str(output.trim_end().lines().last().unwrap()).unwrap();
+        assert_eq!(last["result"], "On the account.");
+        assert!(folder.join("projects").join("-fake-cwd").join(format!("{session}.jsonl")).is_file());
+        // A session recorded on Main looks in Main's folder only.
+        let on_main = session_config_dir(None).unwrap();
+        assert_eq!(on_main, main.path());
+        assert_eq!(crate::claude_session::find_transcript(&on_main, &session), None);
+        assert!(crate::claude_session::find_transcript(&session_config_dir(Some(account)).unwrap(), &session).is_some());
+        assert_eq!(registry.sessions_on_account(account), 0, "an ended session no longer counts");
+        TEST_CLAUDE_CONFIG_DIR.with(|d| *d.borrow_mut() = None);
+        crate::ai_accounts::test_root::set(None);
     }
 
     /// Cancelling a collected session waited for on another thread
@@ -3948,8 +4085,7 @@ mod tests {
     }
 
     fn trust_watch(config: &std::path::Path, confirm: Duration) -> SessionWatch {
-        let mut watch = SessionWatch::new("s-1".into(), None);
-        watch.config_dir = Some(config.to_path_buf());
+        let mut watch = SessionWatch::new("s-1".into(), None, Some(config.to_path_buf()));
         watch.trust_confirm = confirm;
         watch
     }
@@ -4084,6 +4220,7 @@ mod tests {
                 run_id: None,
                 retention_class: RetentionClass::Ephemeral,
                 objective: None,
+                account: None,
             },
             5,
         );

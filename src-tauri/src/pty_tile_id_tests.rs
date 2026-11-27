@@ -67,6 +67,7 @@ fn shell_intent() -> crate::coordination::SpawnIntent {
         run_id: None,
         retention_class: RetentionClass::Interactive,
         objective: None,
+        account: None,
     }
 }
 

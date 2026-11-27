@@ -1704,7 +1704,9 @@ pub fn start_point_for_app<R: tauri::Runtime>(
     let configs = app.state::<crate::project_config::ProjectConfigStore>();
     point.gone = crate::move_shared_setup::branch_gone_refusal(&configs, workspace_id, &target);
     if count_changed {
-        point.claude_trusted = crate::claude_session::folder_trusted(&cwd);
+        // 1.179.0: as the account new sessions start on answered it.
+        let account = crate::ai_accounts::for_new_session(app, crate::coordination::Provider::Claude);
+        point.claude_trusted = crate::claude_session::folder_trusted(&cwd, account.as_deref());
     }
     Ok(point)
 }

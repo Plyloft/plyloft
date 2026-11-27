@@ -210,6 +210,8 @@ impl IntakeRegistry {
                 intake: true,
                 kind: crate::builder::SessionBlockKind::Trust,
                 resets_at: None,
+                // 1.179.0: the intake's account isn't kept on its record.
+                account: None,
             })
             .collect();
         out.sort_by(|a, b| a.key.cmp(&b.key));
@@ -1535,6 +1537,13 @@ pub fn start_intake(
     // for this vendor — the same resolution as the Builder's.
     let model = crate::settings::model_for_card(&app, workspace_id, card_models.as_ref(), vendor, crate::settings::AgentRole::Builder);
 
+    // 1.179.0: a Claude intake starts on the account new sessions start on
+    // now, read once here.
+    let account = if vendor == "codex" {
+        None
+    } else {
+        crate::ai_accounts::for_new_session(&app, crate::coordination::Provider::Claude)
+    };
     let (binary, args, mcp_provider, coord_provider) = if vendor == "codex" {
         // OB-14 (§13.3, MEASUREMENTS §6 candidate (c)): the Codex TUI in a
         // PTY, read-only in the workspace (AGENTS.md loads, the tree stays
@@ -1573,7 +1582,7 @@ pub fn start_intake(
 
         let args = claude_intake_args(full_prompt, &model);
         // GH #69: the intake conversation draws for Ply's effective theme.
-        let args = crate::claude_theme::session_args(&app, args);
+        let args = crate::claude_theme::session_args(&app, args, account.as_deref());
         (
             claude_path,
             args,
@@ -1619,6 +1628,7 @@ pub fn start_intake(
                 run_id: None,
                 retention_class: crate::coordination::RetentionClass::Interactive,
                 objective: None,
+                account,
             },
             120,
             32,
@@ -3176,6 +3186,7 @@ mod tests {
                 intake: true,
                 kind: crate::builder::SessionBlockKind::Trust,
                 resets_at: None,
+                account: None,
             }]
         );
     }

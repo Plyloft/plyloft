@@ -299,3 +299,123 @@ fn nothing_here_reads_a_secret_or_runs_a_program() {
         assert!(!code.contains(forbidden), "ai_accounts.rs must not use `{forbidden}`");
     }
 }
+
+// ── C2: every session's reader follows its account ─────────────────────
+
+/// What reads Claude's one folder without asking which account: Main's
+/// folder (`claude_session::claude_config_dir`) or the variable that moves
+/// it. Each such read outside the files below would read Main's files for a
+/// session on another account (a transcript not found, the wrong answer
+/// pasted by Compare, the wrong trust or settings).
+const SINGLE_FOLDER_READS: [&str; 3] = ["claude_config_dir()", "var(\"CLAUDE_CONFIG_DIR\")", "var_os(\"CLAUDE_CONFIG_DIR\")"];
+
+/// The files allowed to read it, how many times, and why.
+const SINGLE_FOLDER_ALLOWED: &[(&str, usize, &str)] = &[
+    ("ai_accounts.rs", 2, "the accessor: Main's folder is `claude_dir(None)`"),
+    ("claude_session.rs", 3, "defines Main's folder and Main's `.claude.json`; an account's go through `ai_accounts`"),
+    ("claude_theme.rs", 1, "Main's own theme (`main_config_dir`); an account's is read from its folder"),
+    ("cli_health.rs", 1, "Diagnostics and Repair inputs, Main's row (rows per account are card C7)"),
+    ("doctor_reads.rs", 1, "Diagnostics' update channel, read from Main only"),
+    ("claude_auth.rs", 1, "Main's signed-in check; an account's is `read_for_dir` on its folder"),
+];
+
+/// A file's code: its tests and comment lines left out.
+fn code_of(source: &str) -> String {
+    let end = ["\n#[cfg(test)]\nmod tests", "\n#[cfg(test)]\n#[path"]
+        .iter()
+        .filter_map(|marker| source.find(marker))
+        .min()
+        .unwrap_or(source.len());
+    source[..end]
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
+    for entry in std::fs::read_dir(dir).unwrap().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            rust_files(&path, out);
+        } else if path.extension().is_some_and(|e| e == "rs")
+            && !path.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.ends_with("_tests.rs"))
+        {
+            out.push(path);
+        }
+    }
+}
+
+/// 1.179.0 (C2): no new read of Claude's single folder appears outside
+/// `ai_accounts` and the reasoned list above; a reader of a session's files
+/// asks for the folder of the session's account
+/// (`ai_accounts::claude_dir`, `recorded_claude_dir`, `CliHomes::claude_for`).
+#[test]
+fn no_reader_takes_claudes_single_folder_outside_the_allowed_list() {
+    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+    let mut files = Vec::new();
+    rust_files(&src, &mut files);
+    assert!(files.len() > 100, "the crate's sources were found");
+    for file in files {
+        let code = code_of(&std::fs::read_to_string(&file).unwrap());
+        let found: usize = SINGLE_FOLDER_READS.iter().map(|read| code.matches(read).count()).sum();
+        let name = file.strip_prefix(&src).unwrap().to_string_lossy().replace('\\', "/");
+        let allowed = SINGLE_FOLDER_ALLOWED.iter().find(|(allowed, _, _)| *allowed == name);
+        match allowed {
+            Some((_, most, why)) => assert!(
+                found <= *most,
+                "{name} reads Claude's single folder {found} times, past its {most} ({why}): ask for the session's account's folder"
+            ),
+            None => assert_eq!(found, 0, "{name} reads Claude's single folder: ask for the session's account's folder (`ai_accounts`)"),
+        }
+    }
+}
+
+// ── C2: which account a session runs on ────────────────────────────────
+
+#[test]
+fn a_new_session_takes_the_current_account_and_a_resume_its_recorded_one() {
+    let mut list = accounts(&[("a1b2c3d4", "Work"), ("e5f6a7b8", "Second")]);
+    assert_eq!(current_in(&list), None, "Main until one is chosen");
+    list.current = Some("a1b2c3d4".into());
+    assert_eq!(current_in(&list).as_deref(), Some("a1b2c3d4"));
+    assert_eq!(chosen_in(&list, None).unwrap().as_deref(), Some("a1b2c3d4"), "absent: the current one");
+    assert_eq!(chosen_in(&list, Some("e5f6a7b8")).unwrap().as_deref(), Some("e5f6a7b8"));
+    assert_eq!(chosen_in(&list, Some("00000000")), Err(UNKNOWN_ACCOUNT.to_string()), "never Main in its place");
+    // Started on Work; new sessions then switched to Main: Resume stays on Work.
+    list.current = None;
+    assert_eq!(for_resume_in(&list, Some("a1b2c3d4")).unwrap().as_deref(), Some("a1b2c3d4"));
+    assert_eq!(for_resume_in(&list, None).unwrap(), None, "Main stays Main");
+    // Work removed: its sessions are not resumed anywhere else.
+    list.accounts.retain(|a| a.id != "a1b2c3d4");
+    assert_eq!(for_resume_in(&list, Some("a1b2c3d4")), Err(ACCOUNT_REMOVED.to_string()));
+    assert_eq!(ACCOUNT_REMOVED, "Its account was removed from Plyloft.");
+    // A `current` naming no listed account reads as Main.
+    list.current = Some("a1b2c3d4".into());
+    assert_eq!(current_in(&list), None);
+}
+
+#[test]
+fn a_recorded_accounts_folder_is_read_only_while_it_is_there() {
+    let config = tempfile::tempdir().unwrap();
+    test_root::set(Some(config.path().to_path_buf()));
+    let dir = create_folder_in(config.path(), "a1b2c3d4").unwrap();
+    assert_eq!(recorded_claude_dir(Some("a1b2c3d4")), Some(dir.clone()));
+    assert!(!recorded_account_removed(Some("a1b2c3d4")));
+    assert_eq!(recorded_claude_dir(None), crate::claude_session::claude_config_dir(), "Main");
+    assert!(!recorded_account_removed(None), "Main is never removed");
+    assert_eq!(account_dirs(), vec![(Some("a1b2c3d4".to_string()), dir)]);
+    remove_folder_in(config.path(), "a1b2c3d4").unwrap();
+    assert_eq!(recorded_claude_dir(Some("a1b2c3d4")), None, "never another folder in its place");
+    assert!(recorded_account_removed(Some("a1b2c3d4")));
+    assert!(account_dirs().is_empty());
+    test_root::set(None);
+}
+
+/// Remove counts the sessions running on the account (`PtyRegistry`); an
+/// empty registry has none.
+#[test]
+fn an_account_with_no_session_has_none_running() {
+    let registry = crate::pty::PtyRegistry::default();
+    assert_eq!(registry.sessions_on_account("a1b2c3d4"), 0);
+}

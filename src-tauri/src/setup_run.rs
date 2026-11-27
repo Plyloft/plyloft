@@ -684,8 +684,10 @@ impl<R: Runtime> Observer for SystemObserver<R> {
             },
             // Read only: Claude writes its own state, Plyloft never does.
             Watch::ClaudeFolderTrust => match self.app.path().app_config_dir() {
+                // 1.179.0: Setup's step is Main's (its tile opens on Main).
                 Ok(config) => folder_trust_seen(crate::claude_session::folder_trusted(
                     &crate::claude_session::sessions_root(&config),
+                    None,
                 )),
                 Err(_) => Observed::Unknown,
             },
@@ -1247,6 +1249,7 @@ pub fn setup_intent(action: ActionId) -> crate::coordination::SpawnIntent {
         run_id: None,
         retention_class: RetentionClass::Ephemeral,
         objective: Some(action.id().into()),
+        account: None,
     }
 }
 
