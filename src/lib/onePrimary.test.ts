@@ -101,6 +101,7 @@ const BASELINE: Baseline[] = [
   { file: "components/setup/TeamStep.tsx", component: "JoinedPanel", count: 2, reason: "TeamProjects' primary and InvitePeople's can show together on the joined team" },
   { file: "components/setup/TeamStep.tsx", component: "TeamStep", count: 5, possible: 3, reason: "Setup's team step draws JoinPanel (2), CreatePanel and JoinedPanel (2): the panels are branches that never show together, but JoinedPanel's two can; plus the panels' error blocks, each with its own primary way out" },
   { file: "components/tutorial/GuidePanel.tsx", component: "GuidePanel", count: 0, perRow: 1, reason: "the guide's step rows: only the current step's row draws its Next, drawn inside the .map" },
+  { file: "components/settings/ClaudeAccountsSection.tsx", component: "ClaudeAccountsSection", count: 3, reason: "draws AddSheet, RenameSheet or SignInSheet: one sheet open at a time, and the section itself has no filled button" },
   { file: "components/tutorial/HelpSheets.tsx", component: "HelpSheets", count: 2, reason: "draws WhatsNewSheet or GetHelpSheet: one sheet open at a time" },
   { file: "components/ux/ErrorBlock.tsx", component: "ErrorBlock", count: 0, perRow: 1, reason: "its ways out come from a list: only the one marked primary is filled, drawn inside the .map (each call site counts once in a view)" },
 ];

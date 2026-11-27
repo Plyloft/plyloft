@@ -60,7 +60,7 @@ assert.equal(
 assert.equal(buildsOnWords("Work", "opus"), "Builds on Claude (Work) with opus");
 assert.equal(inboxLimitWords("Work", "6pm"), "Claude (Work) usage limit · resets 6pm");
 assert.equal(ACCOUNT_REMOVED, "Its account was removed from Plyloft.");
-assert.equal(SETUP_SECOND_ACCOUNT, "Have a second Claude subscription? Add it in Settings › AI and models.");
+assert.equal(SETUP_SECOND_ACCOUNT, "Have a second Claude subscription? Add it in Settings › Cards › AI and models.");
 
 // The new-session menu: every added account by its id; Main only while it
 // is the account for new sessions (it can't be asked for by id).

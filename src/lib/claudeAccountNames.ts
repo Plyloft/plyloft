@@ -93,5 +93,5 @@ export function inboxLimitWords(name: string, resetsAt: string | null | undefine
 /** Setup's "Your AI" step: where a second subscription is added. The
  *  line is drawn as the question and its link (the second part). */
 export const SETUP_SECOND_ACCOUNT_ASK = "Have a second Claude subscription?";
-export const SETUP_SECOND_ACCOUNT_LINK = "Add it in Settings › AI and models.";
+export const SETUP_SECOND_ACCOUNT_LINK = "Add it in Settings › Cards › AI and models.";
 export const SETUP_SECOND_ACCOUNT = `${SETUP_SECOND_ACCOUNT_ASK} ${SETUP_SECOND_ACCOUNT_LINK}`;
