@@ -1471,6 +1471,9 @@ impl PtyRegistry {
         // v1.20.3: stamp activity only after a fully successful write +
         // flush. A failed write must not extend the session's idle window.
         stamp_activity(&session.activity);
+        // 1.179.0: a Codex tile's Enter, for its `/resume` claim
+        // (`terminal_sessions::codex_claim`). In memory only.
+        crate::terminal_sessions::note_input(id, data);
         Ok(())
     }
 
@@ -2777,7 +2780,9 @@ impl PtySessions {
         let mut guard = self.0.lock();
         let session = guard.get_mut(id).ok_or_else(|| "pty not found".to_string())?;
         session.writer.write_all(data).map_err(|e| format!("write: {e}"))?;
-        session.writer.flush().map_err(|e| format!("flush: {e}"))
+        session.writer.flush().map_err(|e| format!("flush: {e}"))?;
+        crate::terminal_sessions::note_input(id, data);
+        Ok(())
     }
 
     pub(crate) fn contains(&self, id: &str) -> bool {

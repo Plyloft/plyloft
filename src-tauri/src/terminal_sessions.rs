@@ -398,6 +398,7 @@ pub fn record_start_on(
 /// A tile's PTY ended (its exit thread): the row's end time. Nothing when
 /// the PTY was not a recorded tile.
 pub fn record_end(pty_id: &str) {
+    entered().lock().remove(pty_id);
     let mut guard = store().lock();
     let Some((path, row_id)) = guard.live.remove(pty_id) else { return };
     let at = now_ms();
@@ -746,12 +747,190 @@ fn codex_claim(homes: &CliHomes, rows: &[SessionRow], row: &SessionRow, live: &H
     let claimed: HashSet<&str> = rows.iter().filter_map(|r| r.cli_session_id.as_deref()).collect();
     // Review round 2 (R2-M1): Plyloft's own Codex card intake runs in the
     // project folder too; it is never a tile's.
-    let mut mine = crate::codex_sessions::rollouts_for_folder(&root, Path::new(&row.cwd), Some(row.started_at))
+    let mine: Vec<String> = crate::codex_sessions::rollouts_for_folder(&root, Path::new(&row.cwd), Some(row.started_at))
         .into_iter()
         .filter(|(started, id, _)| *started >= row.started_at && *started < until && !claimed.contains(id.as_str()))
-        .filter(|(_, _, path)| !crate::intake::rollout_is_intake(path));
-    let first = mine.next()?;
-    mine.next().is_none().then_some(first.1)
+        .filter(|(_, _, path)| !crate::intake::rollout_is_intake(path))
+        .map(|(_, id, _)| id)
+        .collect();
+    match mine.len() {
+        0 => {}
+        1 => return mine.into_iter().next(),
+        _ => return None,
+    }
+    // 1.179.0 Windows walk (step 14): the tile's first action was Codex's own
+    // `/resume` of an older session, so no session began after it. An older
+    // session of its folder that got new lines after a look since the tile
+    // started (`codex_appended_since`: the length, not the file's time, which
+    // stays put on Windows) is the one it resumed only when:
+    //  - this tile's own PTY took an Enter after it started and no later than
+    //    the look that saw the growth (a `codex` outside Plyloft or a card's
+    //    Builder writing there never gives this tile an Enter);
+    //  - no other Codex tile runs in that folder, in any workspace (two
+    //    waiting tiles can't be told apart, and a running tile that resumed
+    //    that session itself holds only its own first id);
+    //  - no running tile holds it, and no tile that held it ended after the
+    //    look before the growth (its own last lines);
+    //  - it is the only such session.
+    // A tile that held it and closed before that doesn't stop it. Every
+    // rollout is stat'ed (the lengths stay current); only the grown ones are
+    // opened.
+    if waiting.len() != 1 {
+        return None;
+    }
+    let paths = crate::codex_sessions::rollout_paths(&root);
+    // Forget the lengths of this folder's rollouts that are gone.
+    let here: HashSet<&PathBuf> = paths.iter().collect();
+    codex_seen().lock().retain(|p, _| !p.starts_with(&root) || here.contains(p));
+    let grown: Vec<(PathBuf, (i64, i64))> = paths
+        .iter()
+        .filter_map(|path| codex_appended_since(path, row.started_at).map(|window| (path.clone(), window)))
+        .collect();
+    if grown.is_empty() {
+        return None;
+    }
+    let enter_at = row.pty_id.as_deref().and_then(last_enter);
+    let cwd = Path::new(&row.cwd);
+    if other_live_codex_in(&folder, &row.id) {
+        return None;
+    }
+    let held = live_cli_ids();
+    let ended = ended_codex_claims(rows);
+    let mut resumed = grown.into_iter().filter_map(|(path, (after, by))| {
+        if !enter_at.is_some_and(|at| at >= row.started_at && at <= by) {
+            return None;
+        }
+        let (id, started) = crate::codex_sessions::session_of(&path, cwd)?;
+        if ended.get(&id).is_some_and(|&end| end >= after) {
+            return None;
+        }
+        (started < row.started_at && !held.contains(&id) && !crate::intake::rollout_is_intake(&path)).then_some(id)
+    });
+    let first = resumed.next()?;
+    resumed.next().is_none().then_some(first)
+}
+
+/// 1.179.0: what the looks saw of one Codex rollout (in memory only).
+#[derive(Clone, Copy)]
+struct Seen {
+    /// Its length at the latest look.
+    len: u64,
+    /// When that look was.
+    looked: i64,
+    /// The time of its last complete line at this length; `None`: not read.
+    last: Option<Option<i64>>,
+    /// The latest look that saw it shorter: it grew after that time.
+    grew_after: Option<i64>,
+    /// The look that first saw that growth: it grew no later than this.
+    grew_seen: Option<i64>,
+}
+
+fn codex_seen() -> &'static Mutex<HashMap<PathBuf, Seen>> {
+    static SEEN: OnceLock<Mutex<HashMap<PathBuf, Seen>>> = OnceLock::new();
+    SEEN.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Stats a rollout and notes its length: its mtime (unix ms) and what the
+/// looks have seen of it now. `None` when it can't be read.
+fn codex_look(path: &Path) -> Option<(Option<i64>, Seen)> {
+    let meta = std::fs::metadata(path).ok()?;
+    let modified = meta
+        .modified()
+        .ok()
+        .and_then(|at| at.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64);
+    let len = meta.len();
+    let now = now_ms();
+    let mut map = codex_seen().lock();
+    let seen = match map.get(path).copied() {
+        Some(s) if s.len == len => Seen { looked: now, ..s },
+        Some(s) => Seen { len, looked: now, last: None, grew_after: Some(s.looked), grew_seen: Some(now) },
+        None => Seen { len, looked: now, last: None, grew_after: None, grew_seen: None },
+    };
+    map.insert(path.to_path_buf(), seen);
+    Some((modified, seen))
+}
+
+/// 1.179.0: whether a Codex rollout was written at or after `since` (unix
+/// ms). Its mtime says so where it follows the writes (macOS). On Windows it
+/// can stay at the file's creation while Codex appends (measured), so a
+/// rollout that grew between two looks is dated by its last complete line
+/// instead (`codex_sessions::last_line_at`: its tail only, read once per
+/// length). One first seen with an older mtime isn't read: nothing says it
+/// grew. Each look stats every rollout, which keeps the lengths current.
+fn codex_written_since(path: &Path, since: i64) -> bool {
+    let Some((modified, seen)) = codex_look(path) else { return false };
+    if modified.is_some_and(|m| m >= since) {
+        return true;
+    }
+    if seen.grew_after.is_none() {
+        return false;
+    }
+    let last = match seen.last {
+        Some(last) => last,
+        None => {
+            let last = crate::codex_sessions::last_line_at(path);
+            if let Some(s) = codex_seen().lock().get_mut(path) {
+                if s.len == seen.len {
+                    s.last = Some(last);
+                }
+            }
+            last
+        }
+    };
+    last.is_some_and(|at| at >= since)
+}
+
+/// 1.179.0: a Codex rollout a look at or after `since` saw, that has grown
+/// since: lines were appended to a file that was already there, after
+/// `since`. Its growth window: after the first time, no later than the
+/// second. `None` for a file first seen already written (a session begun
+/// elsewhere before the tile and written meanwhile can't be told from one
+/// the tile resumed by its file alone).
+fn codex_appended_since(path: &Path, since: i64) -> Option<(i64, i64)> {
+    let (_, seen) = codex_look(path)?;
+    match (seen.grew_after, seen.grew_seen) {
+        (Some(after), Some(by)) if after >= since => Some((after, by)),
+        _ => None,
+    }
+}
+
+/// 1.179.0 (review of the resume fallback): when each PTY last took an
+/// Enter (in memory only; gone when the PTY ends).
+fn entered() -> &'static Mutex<HashMap<String, i64>> {
+    static ENTERED: OnceLock<Mutex<HashMap<String, i64>>> = OnceLock::new();
+    ENTERED.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Bytes written to PTY `pty_id` (`PtyRegistry::write`: the member's keys,
+/// Plyloft's own writes): an Enter, a carriage return outside a bracketed
+/// paste, is noted with its time. A Codex tile only submits a `/resume`
+/// or a turn with one.
+pub fn note_input(pty_id: &str, data: &[u8]) {
+    if data.contains(&b'\r') && !data.windows(6).any(|w| w == b"\x1b[200~") {
+        entered().lock().insert(pty_id.to_string(), now_ms());
+    }
+}
+
+/// When PTY `pty_id` last took an Enter.
+fn last_enter(pty_id: &str) -> Option<i64> {
+    entered().lock().get(pty_id).copied()
+}
+
+/// A running Codex tile other than row `row_id`, in any workspace, whose
+/// folder is `folder` (normalized).
+fn other_live_codex_in(folder: &Path, row_id: &str) -> bool {
+    let live: Vec<(PathBuf, String)> = store().lock().live.values().cloned().collect();
+    let mut files: HashMap<PathBuf, Vec<SessionRow>> = HashMap::new();
+    live.into_iter().any(|(path, id)| {
+        if id == row_id {
+            return false;
+        }
+        let rows = files.entry(path.clone()).or_insert_with(|| load(&path).file.sessions);
+        rows.iter().find(|r| r.id == id).is_some_and(|r| {
+            r.kind == SessionKind::Codex && crate::codex_sessions::normalized(Path::new(&r.cwd)) == folder
+        })
+    })
 }
 
 /// P2: look at a live tile's conversation again — follow a `/clear` to the
@@ -832,8 +1011,15 @@ pub fn refresh_title(pty_id: &str, pid: Option<u32>, homes: &CliHomes) -> Option
             i = rows.len() - 1;
             changed = true;
         } else if let Some(id) = adopt {
-            // Not taken by another row meanwhile.
-            if rows[i].cli_session_id.is_none() && !rows.iter().any(|r| r.cli_session_id.as_deref() == Some(id.as_str())) {
+            // Not taken by another row meanwhile. 1.179.0: for Codex, by
+            // another running tile's row — a closed tile's row may name the
+            // session this tile resumed (`codex_claim`).
+            let taken = rows.iter().any(|r| {
+                r.id != row_id
+                    && (row.kind != SessionKind::Codex || live.contains(&r.id))
+                    && r.cli_session_id.as_deref() == Some(id.as_str())
+            });
+            if rows[i].cli_session_id.is_none() && !taken {
                 rows[i].cli_session_id = Some(id);
                 changed = true;
             }
@@ -1517,9 +1703,16 @@ fn live_cli_ids() -> HashSet<String> {
 fn codex_unclaimed_since(codex: &Path, row: &SessionRow) -> bool {
     let cwd = Path::new(&row.cwd);
     let claimed = live_cli_ids();
-    crate::codex_sessions::rollout_paths(&codex.join("sessions")).into_iter().any(|path| {
-        mtime_ms(&path).is_some_and(|w| w >= row.started_at)
-            && crate::codex_sessions::session_of(&path, cwd).is_some_and(|(id, _)| !claimed.contains(&id))
+    // 1.179.0: written since, by the file's time or its last line's
+    // (`codex_written_since`). Every rollout is looked at (`filter` then
+    // `any` would stop at the first): the lengths stay current for the next
+    // look.
+    let written: Vec<PathBuf> = crate::codex_sessions::rollout_paths(&codex.join("sessions"))
+        .into_iter()
+        .filter(|path| codex_written_since(path, row.started_at))
+        .collect();
+    written.into_iter().any(|path| {
+        crate::codex_sessions::session_of(&path, cwd).is_some_and(|(id, _)| !claimed.contains(&id))
             && !crate::intake::rollout_is_intake(&path)
     })
 }
@@ -1568,8 +1761,13 @@ fn codex_written_elsewhere(
         if path == own_file {
             return false;
         }
-        // Stat first: nothing last written before the tile started matters.
-        let Some(written) = mtime_ms(&path).filter(|w| *w >= row.started_at) else { return false };
+        // Stat first: nothing last written before the tile started matters
+        // (1.179.0: by the file's time or, where that stays put, its last
+        // line's: `codex_written_since`).
+        if !codex_written_since(&path, row.started_at) {
+            return false;
+        }
+        let written = mtime_ms(&path).unwrap_or(i64::MIN);
         let Some((id, started)) = crate::codex_sessions::session_of(&path, cwd) else { return false };
         if id == own || claimed.contains(&id) {
             return false;
@@ -1583,8 +1781,20 @@ fn codex_written_elsewhere(
                 }
             }
         }
-        ((started > own_started && started >= row.started_at) || written > own_written)
-            && !crate::intake::rollout_is_intake(&path)
+        // 1.179.0: on Windows both files' times can stay at their creation,
+        // so "written later than the tile's own" is also read from the lines
+        // (the Mac keeps the file times, which follow the writes there).
+        let later = written > own_written
+            || (cfg!(windows)
+                && match (
+                    crate::codex_sessions::last_line_at(&path),
+                    *own_last.get_or_init(|| crate::codex_sessions::last_line_at(own_file)),
+                ) {
+                    (Some(last), Some(own_at)) => last > own_at,
+                    // A time that can't be read: it may be the later one.
+                    _ => true,
+                });
+        ((started > own_started && started >= row.started_at) || later) && !crate::intake::rollout_is_intake(&path)
     })
 }
 
@@ -1623,4 +1833,5 @@ pub fn link_for_tests(path: &Path, pty_id: &str, row_id: &str) {
 #[cfg(test)]
 pub fn reset_for_tests() {
     store().lock().live.clear();
+    entered().lock().clear();
 }

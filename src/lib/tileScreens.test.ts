@@ -22,6 +22,7 @@ import {
 } from "./tileScreen.ts";
 import { claudeTurnEnded, deliveryGate, openTurnStale, type TileFacts } from "./compareView.ts";
 import type { CompareAnswer } from "./compareIpc.ts";
+import { setPlatformForTests } from "./platform.ts";
 
 const R = "─".repeat(120);
 const D = "╌".repeat(120);
@@ -989,6 +990,80 @@ assert.equal(bad.length, 0, "\n" + bad.join("\n"));
   assert.equal(workStamp(100, 10_000, true, 0, 0), 10_000, "a real change");
   assert.equal(workStamp(100, 10_000, true, 10_500, 0), 100, "inside the refit window");
   assert.equal(workStamp(100, 10_000, true, 0, 9_000), 100, "the reflow after a size change");
+}
+
+// 1.179.0 Windows walk (step 7), RECONSTRUCTED from its screenshots (no grid
+// was read): after the composer's preview shrank the tiles, ConPTY left
+// Claude's box with blank rows where its footer was. A fresh tile whose
+// conversation has no turn yet, and one after a turn, take a Put and a Send on
+// the transcript's word; an open turn, no transcript, a spinner, typed text,
+// or a rule on the screen's last row (the footer may be below the view) never
+// do. Windows only: on the Mac the same shape is a frame read halfway through
+// a redraw, never proof.
+{
+  const fresh = screenRowsOf("claude-fresh-idle.txt");
+  const lost = (rows: string[]) => [...rows, "", "", ""];
+  const freshLost = lost(fresh.slice(0, -2));
+  const facts = (rows: string[], plain: boolean): TileFacts => {
+    const live = liveScreenFacts("claude", rows, cellsOf("claude", rows, plain));
+    return {
+      id: "t", vendor: "claude", label: "t", live: true, ended: false,
+      question: live.decision, draft: live.draft, promptIdle: live.promptIdle, working: live.working,
+      quietMs: 60_000, turnOverOnScreen: live.turnOver, readyBox: live.readyBox, boxDrawn: live.boxDrawn, boxMode: live.boxMode,
+      inputQuietMs: Number.POSITIVE_INFINITY, echoPending: false,
+    };
+  };
+  const none: CompareAnswer = { vendor: "claude", conversation: "known", turn: "none", cut: false };
+  const open: CompareAnswer = { vendor: "claude", conversation: "known", turn: "open", cut: false };
+  const ASKS = "Claude is asking you something. Answer it in its tile first.";
+  const DRAFT = "Claude's box has text you typed. Send it or clear it first.";
+
+  // macOS (the default here): no box, as before.
+  setPlatformForTests("mac");
+  assert.equal(claudeBoxProof(freshLost).drawn, false, "mac: a half-drawn frame is no box");
+  assert.notEqual(deliveryGate("claude", facts(freshLost, false), none, "put"), null, "mac: no Put");
+
+  setPlatformForTests("windows");
+  try {
+    assert.deepEqual(
+      claudeBoxProof(freshLost),
+      { drawn: true, ready: false, turnOver: false, idleShape: false, askedShape: false, boxMode: true, running: false, asks: false },
+      "the box with its footer gone",
+    );
+    assert.equal(deliveryGate("claude", facts(freshLost, false), none, "put"), null, "fresh, no turn yet: Put");
+    assert.equal(deliveryGate("claude", facts(freshLost, false), none, "send"), null, "fresh, no turn yet: Send");
+    const afterTurn = lost(screenRowsOf("claude-named-idle-after-turn.txt").slice(0, -1));
+    assert.equal(deliveryGate("claude", facts(afterTurn, false), answer("claude"), "put"), null, "after a turn: Put");
+    // No proof without the transcript's word: an open turn, or none read.
+    assert.notEqual(deliveryGate("claude", facts(freshLost, false), open, "put"), null, "an open turn");
+    assert.notEqual(deliveryGate("claude", facts(freshLost, false), null, "put"), null, "no transcript read");
+    // The placeholder drawn plain is typed text; so is a paste waiting in the box.
+    assert.equal(deliveryGate("claude", facts(freshLost, true), none, "put"), DRAFT);
+    const pasted = lost([...fresh.slice(0, 6), "❯ [Pasted text #1 +20 lines]", fresh[7]]);
+    assert.equal(deliveryGate("claude", facts(pasted, true), none, "put"), DRAFT, "a paste in the box");
+    // A spinner above the box: a turn running.
+    const spinning = lost([...fresh.slice(0, 3), "❯ Fix the build.", "", "✶ Thinking…", ...fresh.slice(5, -2)]);
+    assert.equal(claudeBoxProof(spinning).boxMode, false, "a spinner");
+    assert.notEqual(deliveryGate("claude", facts(spinning, false), none, "put"), null);
+    // A permission or a plan question above the box: asking.
+    const permission = lost([
+      ...fresh.slice(0, 3), "", "● Bash(npm run build)", "", " Do you want to proceed?", "❯ 1. Yes", "  2. No", "",
+      ...fresh.slice(5, -2),
+    ]);
+    assert.equal(deliveryGate("claude", facts(permission, false), none, "put"), ASKS, "a permission above the box");
+    const plan = lost([
+      ...fresh.slice(0, 3), "", " Would you like to proceed?", "", "❯ 1. Yes, and auto-accept edits",
+      "  2. Yes, and manually approve edits", "  3. No, keep planning", "", ...fresh.slice(5, -2),
+    ]);
+    assert.equal(deliveryGate("claude", facts(plan, false), none, "put"), ASKS, "a plan question above the box");
+    // The bottom rule on the screen's last row: no box, as before.
+    assert.equal(claudeBoxProof(fresh.slice(0, -2)).drawn, false, "the footer may be below the view");
+    // A numbered row between the rules is a menu, never the box.
+    const R56 = "─".repeat(56);
+    assert.equal(claudeBoxProof(lost([...fresh.slice(0, 5), R56, "❯ 1. Yes, proceed", R56])).drawn, false);
+  } finally {
+    setPlatformForTests(null);
+  }
 }
 
 console.log("tileScreens: all verdicts as expected\n" + got.join("\n"));

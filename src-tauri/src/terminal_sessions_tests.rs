@@ -1047,6 +1047,203 @@ fn two_codex_tiles_opened_together_in_one_folder_stay_unclaimed_and_ambiguous() 
     reset_for_tests();
 }
 
+// ── 1.179.0 Windows walk (step 14): a fresh Codex tile's own `/resume` ──
+
+/// A fresh Codex tile's world: an older session `older` of its folder, begun
+/// four hours ago.
+struct Resumable {
+    config: tempfile::TempDir,
+    codex: tempfile::TempDir,
+    _folder: tempfile::TempDir,
+    homes: CliHomes,
+    cwd: String,
+}
+
+fn an_older_session(mtimes: Mtimes) -> Resumable {
+    let config = tempfile::tempdir().unwrap();
+    let codex = tempfile::tempdir().unwrap();
+    let homes = CliHomes { claude: None, codex: Some(codex.path().to_path_buf()) };
+    let folder = tempfile::tempdir().unwrap();
+    let cwd = folder.path().to_string_lossy().to_string();
+    let hours_ago = chrono::Utc::now().timestamp_millis() - 4 * 60 * 60 * 1000;
+    codex_turn(codex.path(), "older", &cwd, hours_ago, "earlier work");
+    codex_append(codex.path(), "older", hours_ago + 2_000, mtimes);
+    Resumable { config, codex, _folder: folder, homes, cwd }
+}
+
+/// Tile `pty` starts in that folder; returns when it started.
+fn a_tile(w: &Resumable, pty: &str, session: Option<&str>) -> i64 {
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    let row = record_start(w.config.path(), "ws", pty, SessionKind::Codex, &w.cwd, session.map(str::to_string)).unwrap();
+    started_of(w.config.path(), &row)
+}
+
+/// The tile resumed a session held by a tile that closed earlier: once its
+/// own Enter and a turn's lines in that session, it is in it, whether or not
+/// the rollout's mtime moves.
+#[test]
+fn a_fresh_codex_tile_that_resumed_an_older_session_is_in_it() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        a_tile(&w, "pty-old", Some("older"));
+        record_end("pty-old");
+        let tr = a_tile(&w, "pty-r", None);
+        let got = live_conversation("pty-r", None, &w.homes).unwrap();
+        assert_eq!(got.id, None, "{mtimes:?}: no turn yet");
+        assert!(!got.newer_elsewhere, "{mtimes:?}: nothing written since it started");
+        note_input("pty-r", b"\r");
+        codex_append(w.codex.path(), "older", tr + 1_000, mtimes);
+        let got = live_conversation("pty-r", None, &w.homes).unwrap();
+        assert_eq!(got.id.as_deref(), Some("older"), "{mtimes:?}: the session it resumed");
+        assert_eq!(got.file.as_deref(), Some(codex_file(w.codex.path(), "older").as_path()), "{mtimes:?}");
+        assert!(!got.newer_elsewhere, "{mtimes:?}");
+        reset_for_tests();
+    }
+}
+
+/// No Enter into the tile before the growth was seen: never its. An Enter
+/// after that look doesn't make that growth its; the next one, after it, does.
+#[test]
+fn a_resumed_session_is_the_tile_s_only_after_its_own_enter() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        let tr = a_tile(&w, "pty-r", None);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None);
+        // Written by something else (no key went into the tile).
+        codex_append(w.codex.path(), "older", tr + 1_000, mtimes);
+        let got = live_conversation("pty-r", None, &w.homes).unwrap();
+        assert_eq!(got.id, None, "{mtimes:?}: no Enter in the tile");
+        assert!(got.newer_elsewhere, "{mtimes:?}: so it can't tell");
+        // A paste with line breaks is no Enter.
+        note_input("pty-r", b"\x1b[200~two\rlines\x1b[201~");
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{mtimes:?}: a paste");
+        std::thread::sleep(std::time::Duration::from_millis(3));
+        note_input("pty-r", b"\r");
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{mtimes:?}: an Enter after that look");
+        codex_append(w.codex.path(), "older", tr + 2_000, mtimes);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id.as_deref(), Some("older"), "{mtimes:?}");
+        reset_for_tests();
+    }
+}
+
+/// Another running Codex tile in the folder, holding its own session: the
+/// older session's new lines may be its (its own `/resume`), so the fresh
+/// tile takes nothing, Enter or not.
+#[test]
+fn a_fresh_codex_tile_beside_a_running_one_never_takes_a_resumed_session() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        let tu = a_tile(&w, "pty-u", None);
+        codex_turn(w.codex.path(), "u-own", &w.cwd, tu + 1_000, "the other tile's work");
+        assert_eq!(live_conversation("pty-u", None, &w.homes).unwrap().id.as_deref(), Some("u-own"));
+        let tr = a_tile(&w, "pty-r", None);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None);
+        note_input("pty-r", b"\r");
+        codex_append(w.codex.path(), "older", tr + 1_000, mtimes);
+        let got = live_conversation("pty-r", None, &w.homes).unwrap();
+        assert_eq!(got.id, None, "{mtimes:?}: it may be the running tile's");
+        assert!(got.newer_elsewhere, "{mtimes:?}: can't tell");
+        reset_for_tests();
+    }
+}
+
+/// The same resume with two Codex tiles waiting in the folder: either could
+/// have resumed it, so neither takes it and both can't tell.
+#[test]
+fn a_resumed_session_with_two_codex_tiles_waiting_in_its_folder_is_claimed_by_neither() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        a_tile(&w, "pty-x", None);
+        let ty = a_tile(&w, "pty-y", None);
+        for pty in ["pty-x", "pty-y"] {
+            assert_eq!(live_conversation(pty, None, &w.homes).unwrap().id, None);
+            note_input(pty, b"\r");
+        }
+        codex_append(w.codex.path(), "older", ty + 1_000, mtimes);
+        for pty in ["pty-x", "pty-y", "pty-x"] {
+            let got = live_conversation(pty, None, &w.homes).unwrap();
+            assert_eq!(got.id, None, "{mtimes:?}: {pty} claims nothing");
+            assert!(got.newer_elsewhere, "{mtimes:?}: {pty} can't tell");
+        }
+        reset_for_tests();
+    }
+}
+
+/// A tile that held the session wrote its last lines and closed after the
+/// look before them: those lines are its, never the fresh tile's.
+#[test]
+fn a_closing_tile_s_last_lines_are_not_taken_by_a_fresh_one() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        a_tile(&w, "pty-h", Some("older"));
+        let tr = a_tile(&w, "pty-r", None);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None);
+        note_input("pty-r", b"\r");
+        codex_append(w.codex.path(), "older", tr + 1_000, mtimes);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{mtimes:?}: held");
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        record_end("pty-h");
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{mtimes:?}: the closed tile's lines");
+        reset_for_tests();
+    }
+}
+
+/// The first look ever at the session comes after it grew: nothing says when,
+/// so not the tile's. Its next growth after the tile's Enter is.
+#[test]
+fn a_session_first_seen_already_grown_is_taken_only_at_its_next_growth() {
+    let _serial = serial();
+    for mtimes in [Mtimes::Advance, Mtimes::StayAtCreation] {
+        reset_for_tests();
+        let w = an_older_session(mtimes);
+        let tr = a_tile(&w, "pty-r", None);
+        note_input("pty-r", b"\r");
+        codex_append(w.codex.path(), "older", tr + 1_000, mtimes);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{mtimes:?}: first seen grown");
+        codex_append(w.codex.path(), "older", tr + 2_000, mtimes);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id.as_deref(), Some("older"), "{mtimes:?}");
+        reset_for_tests();
+    }
+}
+
+/// An older session that grew is never the tile's when it is Plyloft's own
+/// card intake, or not the interactive CLI's (`codex exec`).
+#[test]
+fn a_grown_intake_or_non_cli_session_is_never_a_resumed_one() {
+    let _serial = serial();
+    for kind in ["intake", "exec"] {
+        reset_for_tests();
+        let w = an_older_session(Mtimes::StayAtCreation);
+        let hours_ago = chrono::Utc::now().timestamp_millis() - 3 * 60 * 60 * 1000;
+        let ts = chrono::DateTime::from_timestamp_millis(hours_ago).unwrap().to_rfc3339();
+        if kind == "intake" {
+            let text = format!("Instructions.\n\n{}\n\n---\n\nCard title: x", crate::intake::codex_intake_marker("intake-1"));
+            codex_turn(w.codex.path(), "other", &w.cwd, hours_ago, &text);
+        } else {
+            write(&codex_file(w.codex.path(), "other"), &[
+                json!({"type": "session_meta", "payload": {"id": "other", "cwd": w.cwd.as_str(), "source": "exec", "timestamp": ts}}),
+                json!({"type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "A task."}]}}),
+            ]);
+        }
+        let tr = a_tile(&w, "pty-r", None);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None);
+        note_input("pty-r", b"\r");
+        codex_append(w.codex.path(), "other", tr + 1_000, Mtimes::StayAtCreation);
+        assert_eq!(live_conversation("pty-r", None, &w.homes).unwrap().id, None, "{kind}");
+        reset_for_tests();
+    }
+}
+
 #[test]
 fn a_codex_tile_whose_own_codex_started_a_newer_session_is_ambiguous() {
     let _serial = serial();
