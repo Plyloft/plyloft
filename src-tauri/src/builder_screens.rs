@@ -391,6 +391,7 @@ mod tests {
             intake,
             kind: SessionBlockKind::Trust,
             resets_at: None,
+            account: None,
         };
         let mut blocks = vec![block("dead", false), block("live", false), block("intake", true)];
         retain_live_blocks(&mut blocks, |key| Some(format!("pty-{key}")), |pty| pty == "pty-dead" || pty == "pty-intake");

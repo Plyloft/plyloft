@@ -232,6 +232,10 @@ pub(crate) struct ChatSnapshot {
     /// 2): the member's own keystrokes reach Claude as in any Claude tile;
     /// only Plyloft's own writes wait for an idle composer.
     pub pty_id: Option<String>,
+    /// 1.179.0: the Claude account the conversation's session was started
+    /// on, which a resume runs on (`None`: Main, or a Codex conversation).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
 }
 
 /// `chat_screen`: a live Claude chat's terminal, to start "Show terminal".
@@ -1216,6 +1220,7 @@ impl ChatRegistry {
         let conversation = file.conversation(vendor);
         let mut messages = conversation.map(|c| c.messages.clone()).unwrap_or_default();
         let usage = conversation.map(|c| c.usage.clone()).unwrap_or_default();
+        let account = conversation.and_then(|c| c.account.clone());
         let attachments = file.attachments.clone();
         let mine = slot.vendor == Some(vendor);
         // An answer still marked streaming with no turn running is as
@@ -1236,6 +1241,7 @@ impl ChatRegistry {
             usage,
             attachments,
             pty_id: if mine { slot.pty_id() } else { None },
+            account,
         })
     }
 
@@ -1894,18 +1900,32 @@ impl ChatRegistry {
             Some(program) => program.clone(),
             None => crate::doctor::require("claude")?,
         };
-        let claude_config = self.inner.claude_config();
         let key = slot.key.clone();
         let session_dir = self.inner.lane_dir_for(&key)?;
         let reseed = slot.reseed.take();
         let conversation = slot.file_for_change(&config)?.conversation_mut(ChatVendor::Claude, now_ms());
         // A resume needs the transcript: Claude removes old ones
         // (`cleanupPeriodDays`), and then the chat goes on in a new session.
+        // 1.179.0: looked for in the folder of the account the session was
+        // started on, and resumed there; an account removed since (its
+        // folder went with it) has no transcript to resume, so the chat
+        // starts afresh, on the account new sessions start on now.
         let previous = conversation.session_id.clone();
-        let transcript = previous.as_deref().and_then(|id| {
-            claude_config.as_deref().and_then(|dir| crate::claude_session::find_transcript(dir, id))
-        });
+        let recorded = conversation.account.clone();
+        let resumed_on = crate::ai_accounts::for_resume(app, recorded.as_deref()).ok();
+        let transcript = match (previous.as_deref(), &resumed_on) {
+            (Some(id), Some(account)) => self
+                .inner
+                .claude_config(account.as_deref())
+                .and_then(|dir| crate::claude_session::find_transcript(&dir, id)),
+            _ => None,
+        };
         let resumable = transcript.is_some();
+        let account = match resumed_on {
+            Some(account) if resumable => account,
+            _ => crate::ai_accounts::for_new_session(app, crate::coordination::Provider::Claude),
+        };
+        let claude_config = self.inner.claude_config(account.as_deref());
         let session_id = match (&previous, resumable) {
             (Some(id), true) => id.clone(),
             _ => uuid::Uuid::new_v4().to_string(),
@@ -1941,6 +1961,7 @@ impl ChatRegistry {
         }
         if !resumable {
             conversation.session_id = Some(session_id.clone());
+            conversation.account = account.clone();
             conversation.begin_session();
         }
         conversation.session_dir = Some(session_dir.to_string_lossy().into_owned());
@@ -1990,6 +2011,7 @@ impl ChatRegistry {
                 }
                 .into(),
             ),
+            account,
         };
         // What a resumed session's transcript already holds: its first read
         // only catches up, and is no sign the session runs.
@@ -2441,8 +2463,13 @@ impl Inner {
         log_screen_to(self.overrides.screen_log.as_deref(), what, rows);
     }
 
-    fn claude_config(&self) -> Option<PathBuf> {
-        self.overrides.claude_config.clone().or_else(crate::claude_session::claude_config_dir)
+    /// 1.179.0: the folder of the Claude account a chat session runs on.
+    /// Main is the tests' override, else Main's own folder.
+    fn claude_config(&self, account: Option<&str>) -> Option<PathBuf> {
+        match account {
+            None => self.overrides.claude_config.clone().or_else(|| crate::ai_accounts::claude_dir(None)),
+            Some(_) => crate::ai_accounts::claude_dir(account),
+        }
     }
 
     fn emit(&self, event: &str, payload: impl Serialize) {

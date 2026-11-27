@@ -1439,12 +1439,19 @@ pub fn pty_spawn(
     try_target: Option<PtyTryArg>,
     cli: Option<String>,
     id: Option<String>, // 1.176.0 R7: the id the tile already listens under (`pty_tile_id`)
+    account: Option<String>, // 1.179.0: the Claude account asked for (absent: `ai_accounts::for_tile`)
 ) -> Result<String, String> {
     // 1.176.0 R3: a Claude/Codex tile is known by its declared kind and runs
     // the backend's path for it, checked on disk now (`cli_fresh`).
     let (cmd, provider) = crate::cli_fresh::tile_program(cli.as_deref(), cmd)?;
     let try_target = try_target_for(try_target, workspace_id.as_deref(), provider.is_some())?;
     crate::pr_review::refuse_terminal(&app, workspace_id.as_deref(), cwd.as_deref())?; // 1.175.0 G7
+    let account = match provider {
+        Some(crate::mcp_launch::Provider::Claude) => {
+            crate::ai_accounts::for_tile(&app, workspace_id.as_deref(), cwd.as_deref(), &args, account.as_deref())?
+        }
+        _ => None,
+    };
     let project = match (&workspace_id, &cwd) {
         (Some(workspace_id), Some(cwd)) => crate::coordination::SpawnProject::Project {
             workspace_id: workspace_id.clone(),
@@ -1485,6 +1492,7 @@ pub fn pty_spawn(
         run_id: None,
         retention_class: crate::coordination::RetentionClass::Interactive,
         objective: None,
+        account: account.clone(),
     };
     // Terminals block P1: the workspace the tile's row is recorded under.
     let record_ws = workspace_id.clone();
@@ -1507,7 +1515,7 @@ pub fn pty_spawn(
     };
     // GH #69: a Claude tile draws for Ply's effective theme at spawn.
     let args = if matches!(provider, Some(crate::mcp_launch::Provider::Claude)) {
-        crate::claude_theme::session_args(&app, args)
+        crate::claude_theme::session_args(&app, args, account.as_deref())
     } else {
         args
     };
@@ -1542,7 +1550,7 @@ pub fn pty_spawn(
         match app.path().app_config_dir() {
             Ok(config_dir) => {
                 if let Err(error) =
-                    crate::terminal_sessions::record_start(&config_dir, &ws, &id, kind, &dir, cli_session_id)
+                    crate::terminal_sessions::record_start_on(&config_dir, &ws, &id, kind, &dir, cli_session_id, account)
                 {
                     log::warn!("terminal sessions: start not saved: {error}");
                 }
@@ -1631,12 +1639,14 @@ pub fn terminal_resume_check(
     kind: crate::terminal_sessions::SessionKind,
     cli_session_id: String,
     cwd: String,
+    account: Option<String>, // 1.179.0: the account the conversation is kept on (its row's; absent: Main)
 ) -> Result<crate::terminal_sessions::ResumeCheck, String> {
     Ok(crate::terminal_sessions::resume_check(
         &crate::terminal_sessions::CliHomes::real(),
         kind,
         &cli_session_id,
         std::path::Path::new(&cwd),
+        account.as_deref(),
     ))
 }
 
@@ -2862,8 +2872,11 @@ pub fn claude_review_trust_status(app: tauri::AppHandle) -> Result<ClaudeReviewT
     // can start in it.
     let folder = crate::claude_session::sessions_root(&config);
     std::fs::create_dir_all(&folder).map_err(|e| format!("create {}: {e}", folder.display()))?;
+    // 1.179.0: as the account the read-only sessions start on now answered
+    // it (each Claude account answers for itself).
+    let account = crate::ai_accounts::for_new_session(&app, crate::coordination::Provider::Claude);
     Ok(ClaudeReviewTrust {
-        trusted: crate::claude_session::folder_trusted(&folder),
+        trusted: crate::claude_session::folder_trusted(&folder, account.as_deref()),
         folder: folder.to_string_lossy().into_owned(),
     })
 }
@@ -19582,6 +19595,7 @@ pub fn intake_read_transcript(
 /// only by its own test (`builder::guided_permission_mode`). Absent (an
 /// older caller) is an ordinary start.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn builder_start(
     app: tauri::AppHandle,
     workspace_id: String,
@@ -19591,10 +19605,19 @@ pub async fn builder_start(
     guided: Option<bool>,
     // A3: Retry on, this start only.
     retry: Option<crate::retry_on::RetryArg>,
+    // 1.179.0 (C3): Start fresh on {name}: the Claude account it starts on
+    // (an `ai_accounts_list` id, or `ai_accounts::MAIN_ID`); absent: the
+    // current one. Ignored for Codex.
+    account: Option<String>,
 ) -> Result<crate::builder::BuilderStartResult, String> {
     let guided = guided.unwrap_or(false);
     let log_card = card_id.clone();
     let retry = crate::retry_on::builder_retry_checked(&app, &workspace_id, &card_id, retry)?;
+    let account = if vendor == "claude" { account } else { None };
+    // C3: an account no longer listed is refused before the card moves.
+    if account.is_some() {
+        crate::ai_accounts::chosen(&app, account.as_deref())?;
+    }
     // OB-14 (§13.2): refused before the card moves or a worktree is made —
     // the chosen vendor's CLI isn't on this machine.
     if let Some(why) = crate::shell_env::try_get()
@@ -19634,7 +19657,7 @@ pub async fn builder_start(
             )?)?;
         }
         start_build_serialized(|| {}, || {
-            builder_start_blocking(app.clone(), &workspace_id, &card_id, &vendor, bypass, guided, continues, retry.clone())
+            builder_start_blocking(app.clone(), &workspace_id, &card_id, &vendor, bypass, guided, continues, retry.clone(), account.as_deref())
         })
     })
     .await
@@ -19763,6 +19786,7 @@ const START_AGAIN_FOR_SETUP: &str =
 
 /// Called with CARD_START_LOCK held (`start_build_serialized`), after the
 /// definition refresh.
+#[allow(clippy::too_many_arguments)]
 fn builder_start_blocking(
     app: tauri::AppHandle,
     workspace_id: &str,
@@ -19772,6 +19796,7 @@ fn builder_start_blocking(
     guided: bool,
     continues: bool,
     retry: Option<crate::settings::ModelChoice>,
+    account: Option<&str>,
 ) -> Result<crate::builder::BuilderStartResult, String> {
     let registry = app.state::<crate::builder::BuilderRegistry>();
     let pty_registry = app.state::<PtyRegistry>();
@@ -19878,6 +19903,7 @@ fn builder_start_blocking(
         mode,
         &prompt,
         retry,
+        account,
     )
 }
 

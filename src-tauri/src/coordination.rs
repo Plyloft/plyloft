@@ -74,6 +74,11 @@ pub struct SpawnIntent {
     pub run_id: Option<String>,
     pub retention_class: RetentionClass,
     pub objective: Option<String>,
+    /// 1.179.0: the Claude account the session runs on (`ai_accounts`).
+    /// `None` is Main: today's folder, and no variable added. Set where the
+    /// session starts: the account new sessions start on, or the one a
+    /// resumed session was recorded on. In memory only; never recorded here.
+    pub account: Option<String>,
 }
 
 impl SpawnIntent {
@@ -1068,6 +1073,7 @@ mod tests {
             run_id: Some("r1".into()),
             retention_class: RetentionClass::Unattended,
             objective: Some("Do the work".into()),
+            account: None,
         }
     }
 
@@ -1163,6 +1169,7 @@ mod tests {
             run_id: None,
             retention_class: RetentionClass::Ephemeral,
             objective: None,
+            account: None,
         };
         registry
             .begin(intent(Provider::Claude, ExecutionKind::ReviewerProbe))

@@ -376,8 +376,9 @@ interface BuilderStore {
   ackVerdict: (workspaceId: string, cardId: string, owed: VerdictOwed) => Promise<boolean>;
 
   /** `retry` (1.169.0 A3): "Retry on…" — this start's model and effort,
-   *  this once; only this press carries it. */
-  start: (workspaceId: string, cardId: string, retry?: RetryChoice) => Promise<void>;
+   *  this once; only this press carries it. `account` (1.179.0 C3): Start
+   *  fresh on {name}'s Claude account; absent: the current one. */
+  start: (workspaceId: string, cardId: string, retry?: RetryChoice, account?: string) => Promise<void>;
   resume: (workspaceId: string, cardId: string) => Promise<void>;
   /** Build done. With the repository's self-check on and a live session,
    *  it first sends the Builder the self-check and resolves with null; the
@@ -1386,7 +1387,7 @@ export const useBuilder = create<BuilderStore>((set, get) => ({
     });
   },
 
-  start: async (workspaceId, cardId, retry) => {
+  start: async (workspaceId, cardId, retry, account) => {
     // GH #135: `Skip review` does not outlive its press — a new session is
     // a new decision, and a choice made for a Build done that never came
     // must not surprise the next one.
@@ -1467,7 +1468,7 @@ export const useBuilder = create<BuilderStore>((set, get) => ({
           const onboarding = useSettings.getState().settings.onboarding;
           const guided =
             now != null && now.builderPermissions == null && boundedStartApplies(onboarding, workspaceId, now, bypass);
-          await builderStart(workspaceId, cardId, vendor, bypass, guided, retry);
+          await builderStart(workspaceId, cardId, vendor, bypass, guided, retry, account);
           await useKanban.getState().loadFromDisk(workspaceId, true);
         },
         notify: ({ setUp, ...notice }) => {

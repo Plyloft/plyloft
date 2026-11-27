@@ -20,6 +20,8 @@ import { setupIsOpen } from "../store/setupStore";
 import { openCenterMode, useUi } from "../store/uiStore";
 import { machineWords } from "../lib/platform";
 import { CBtn, Sheet } from "./ux";
+import { useClaudeAccountRows } from "../store/claudeAccountsStore";
+import { resumeNoteFor, shownAccountName, tileAccountWords } from "../lib/claudeAccountNames";
 
 /**
  * Terminals block P4: New › Resume… — the project's Claude and Codex
@@ -51,6 +53,12 @@ export function ResumeConversationSheet({
   // the project folder.
   const [inProjectFor, setInProjectFor] = useState<TerminalConversation | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
+  // 1.179.0 (C2): with more than one Claude account, a row names its own.
+  const accountRows = useClaudeAccountRows();
+  const kindWords = (c: TerminalConversation): string => {
+    const name = c.kind === "claude" ? shownAccountName(accountRows, c.account) : null;
+    return name ? tileAccountWords(name) : KIND_WORD[c.kind];
+  };
   const kinds = useMemo(() => resumableKinds(env), [env]);
   const now = useMemo(() => Date.now(), [rows]);
 
@@ -106,7 +114,16 @@ export function ResumeConversationSheet({
     // 1.174.0 walk G3b: a copy's conversation resumes in that copy's folder.
     const where = inProject ? cwd : (c.cwd ?? cwd);
     const out = await resumeConversation(
-      { workspaceId, cwd: where, kind: c.kind, cliSessionId: c.cliSessionId, title: c.title, titleSource: c.titleSource, livePtyId: c.livePtyId },
+      {
+        workspaceId,
+        cwd: where,
+        kind: c.kind,
+        cliSessionId: c.cliSessionId,
+        title: c.title,
+        titleSource: c.titleSource,
+        livePtyId: c.livePtyId,
+        account: c.account ?? null,
+      },
       env,
       { anyway },
     );
@@ -189,7 +206,7 @@ export function ResumeConversationSheet({
               >
                 <span className="resume-row-title">{conversationTitle(c)}</span>
                 <span className="resume-row-meta">
-                  {KIND_WORD[c.kind]} · {c.live ? "open now" : lastUsed(c.updatedAt, now)}
+                  {kindWords(c)} · {c.live ? "open now" : lastUsed(c.updatedAt, now)}
                 </span>
                 {(() => {
                   const detail = resumeDetail(c, twice.has(conversationTitle(c)), (at) => timelineWhen(at, now));
@@ -200,6 +217,15 @@ export function ResumeConversationSheet({
           ))}
         </ul>
       )}
+      {(() => {
+        // 1.179.0 (C2): a Resume that won't run on the account for new sessions.
+        const note = current && current.kind === "claude" && !current.live ? resumeNoteFor(accountRows, current.account) : null;
+        return note ? (
+          <p className="resume-list-note" data-ply-resume-account="">
+            {note}
+          </p>
+        ) : null;
+      })()}
       {/* 1.174.0 E9 (T9): one door to every project's sessions, in the same
           order. */}
       <p className="resume-list-foot">

@@ -1940,13 +1940,19 @@ impl AgentRegistry {
                 &app,
             );
         }
+        // 1.179.0: a Claude run starts on the account new sessions start on
+        // now, read once here; its settings and theme are that account's.
+        let account = match provider {
+            Provider::Claude => crate::ai_accounts::for_new_session(&app, crate::coordination::Provider::Claude),
+            Provider::Codex => None,
+        };
         let args: Vec<String> = match provider {
             Provider::Claude => {
-                let writer = crate::claude_session::writer_mode(&project_cwd);
+                let writer = crate::claude_session::writer_mode(&project_cwd, account.as_deref());
                 match build_claude_argv(config.runtime_mode, &prompt, &config, writer, swarm_id.is_some(), &run_model) {
                     // GH #69: a REPL run draws for Ply's theme; a collected
                     // session (nobody sees its screen) comes back unchanged.
-                    Ok(a) => crate::claude_theme::session_args(&app, a),
+                    Ok(a) => crate::claude_theme::session_args(&app, a, account.as_deref()),
                     Err(e) => return self.finalize_error(&run_json_path, run, &e, &app),
                 }
             }
@@ -2046,6 +2052,7 @@ impl AgentRegistry {
                 .lines()
                 .find(|line| !line.trim().is_empty())
                 .map(|line| line.trim().to_string()),
+            account,
         };
         // A Claude oneshot run starts here (writer admission is decided now,
         // on this thread) and is waited for on its own thread below, once

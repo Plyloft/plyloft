@@ -184,6 +184,13 @@ pub(crate) struct Conversation {
     pub created_at: i64,
     #[serde(default)]
     pub updated_at: i64,
+    /// 1.179.0: the Claude account the current session was started on
+    /// (`ai_accounts`; `None`: Main, and every record before it). Its
+    /// transcript is in that account's folder, so the chat resumes there;
+    /// an account removed since starts the chat afresh on the current one.
+    /// Left out of the file while `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
 }
 
 impl Conversation {
@@ -197,6 +204,7 @@ impl Conversation {
             session_usage: TokenUsage::default(),
             created_at: now,
             updated_at: now,
+            account: None,
         }
     }
 
@@ -359,6 +367,29 @@ mod tests {
         assert_eq!(on_disk["conversations"][0]["messages"][0]["text"], "hi");
         let leftovers: Vec<_> = std::fs::read_dir(dir.path()).unwrap().collect();
         assert_eq!(leftovers.len(), 1, "atomic: no temp file left");
+    }
+
+    /// 1.179.0 (C2) schema migration: a conversation written before Claude
+    /// accounts reads on Main and is written back without the key; one on
+    /// an account keeps it.
+    #[test]
+    fn a_conversation_before_claude_accounts_reads_on_main_and_an_account_round_trips() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("chat.json");
+        std::fs::write(
+            &path,
+            r#"{"version":1,"conversations":[{"vendor":"claude","sessionId":"00000000-0000-4000-8000-000000000001","messages":[]}]}"#,
+        )
+        .unwrap();
+        let (mut file, writable) = load(&path).unwrap();
+        assert!(writable);
+        assert_eq!(file.conversation(ChatVendor::Claude).unwrap().account, None, "Main");
+        save(&path, &file).unwrap();
+        assert!(!std::fs::read_to_string(&path).unwrap().contains("\"account\""));
+        file.conversation_mut(ChatVendor::Claude, 1).account = Some("a1b2c3d4".into());
+        save(&path, &file).unwrap();
+        let (back, _) = load(&path).unwrap();
+        assert_eq!(back.conversation(ChatVendor::Claude).unwrap().account.as_deref(), Some("a1b2c3d4"));
     }
 
     #[test]

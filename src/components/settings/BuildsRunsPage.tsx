@@ -7,6 +7,7 @@ import { ChooseField, ResetThisPage, SettingsPage, TextRow, ToggleRow } from "./
 import { useMacSettings } from "./useMacSettings";
 import { newCardsLine } from "../../lib/settingsShape";
 import { WorkspaceModelsSection, catalogName, onlyInTitle } from "./WorkspaceModelsSection";
+import { ClaudeAccountsSection } from "./ClaudeAccountsSection";
 import { useWorkspaces } from "../../store/workspaceStore";
 import { AFTER_FIX_ROUND_SETTING_HINT } from "../../lib/fixRoundCheck";
 import { onlyInSummary, onlyInVendor, vendorSummary } from "../../lib/workspaceModels";
@@ -221,6 +222,9 @@ export function BuildsRunsPage({
           />
         ))}
       </Section>
+
+      {/* 1.179.0 (C1): the Claude accounts new sessions can start on. */}
+      <ClaudeAccountsSection />
 
       {/* 1.174.0 (DS4, scene 6): one row per AI, its four controls on a
           sub-page behind Change…, and the open project's own rows. */}

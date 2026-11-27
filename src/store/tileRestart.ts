@@ -1,5 +1,6 @@
 import { ptyKill, terminalResumeCheck } from "../ipc";
 import { FOLDER_GONE, OPEN_ELSEWHERE } from "../lib/terminalConversations";
+import { ACCOUNT_REMOVED } from "../lib/claudeAccountNames";
 import { machineWords } from "../lib/platform";
 import { pushToast } from "./toastStore";
 import { confirmSheet } from "./confirmStore";
@@ -40,7 +41,9 @@ export async function restartSession(tile: Tile, how: RestartHow | "auto" = "aut
   if (!cli) return restart(tile.id);
   const going: RestartHow = how === "auto" ? (canContinue(tile) ? "continue" : "fresh") : how;
   if (going === "fresh" || !tile.cliSessionId) return restart(tile.id, "fresh");
-  const check = await terminalResumeCheck(cli, tile.cliSessionId, tile.cwd).catch(() => null);
+  // 1.179.0 (C2): checked in the folder of the account it ran on.
+  const account = cli === "claude" && typeof tile.account === "string" ? tile.account : null;
+  const check = await terminalResumeCheck(cli, tile.cliSessionId, tile.cwd, account).catch(() => null);
   if (!check) {
     pushToast({ kind: "error", title: "Plyloft couldn't check this conversation", body: "Try Continue again in a moment, or Start fresh." });
     return null;
@@ -63,6 +66,9 @@ export async function restartSession(tile: Tile, how: RestartHow | "auto" = "aut
       return null;
     case "folderGone":
       pushToast({ kind: "error", title: "This session can't start again here", body: FOLDER_GONE });
+      return null;
+    case "accountRemoved":
+      pushToast({ kind: "error", title: "This session can't start again here", body: ACCOUNT_REMOVED });
       return null;
     case "conversationGone": {
       // Claude saves a conversation at its first message: a session closed

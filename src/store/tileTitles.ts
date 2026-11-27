@@ -40,6 +40,8 @@ async function look(): Promise<void> {
       const current = store.getTileByPtyId(ptyId);
       if (!current) continue;
       if (got.cliSessionId) store.setCliSession(current.id, got.cliSessionId);
+      // 1.179.0 (C2): the account the backend spawned it on (absent: Main).
+      if (current.kind === "claude") store.setTileAccount(current.id, got.account ?? null);
       const name = current.labelSource === "user" ? current.userName : undefined;
       if (name) {
         if (got.followed && !got.conversationNamed) {

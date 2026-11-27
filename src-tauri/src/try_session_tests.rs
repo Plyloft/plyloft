@@ -47,7 +47,7 @@ fn the_tile_spawn_puts_the_try_env_through_session_env() {
     let body = &body[..body.find("\n    pub fn write(").unwrap()];
     let env = body.find("crate::try_session::spawn_env(").expect("spawn_env");
     let ports = body.find("crate::worktree_ports::env_for_cwd(").expect("env_for_cwd");
-    let session = body.find("session_env(&mut command, &env.path, true, &ports, &injection.env)").expect("session_env");
+    let session = body.find("session_env(&mut command, &env.path, true, &ports, &managed)").expect("session_env");
     assert!(env < ports && ports < session);
     assert!(body.contains("try_session.is_some()"));
 }
@@ -68,6 +68,7 @@ fn a_try_session_never_makes_its_card_busy() {
         run_id: None,
         retention_class: RetentionClass::Interactive,
         objective: None,
+        account: None,
     };
     let t = target("w", "c1", None);
     assert!(crate::pty::tile_keeps_folder_busy(&intent(ExecutionKind::ShellTile), None));
@@ -379,6 +380,7 @@ fn a_real_try_session_ends_its_running_job() {
             run_id: None,
             retention_class: RetentionClass::Interactive,
             objective: None,
+            account: None,
         };
         registry.spawn_tile(
             app.handle().clone(),

@@ -938,6 +938,8 @@ const PAGES_OF_FILE: Record<string, EntryId[]> = {
   "SetupPage.tsx": ["setup"],
   // OB-7b: the GitHub accounts section, drawn inside Account › Setup.
   "GitHubAccountsSection.tsx": ["setup"],
+  // 1.179.0 (C1): the Claude accounts section, drawn inside AI and models.
+  "ClaudeAccountsSection.tsx": ["claude-codex"],
   // CL-4: the workspace's own models, drawn inside AI and models; 1.174.0
   // (DS4): and the team's suggestions, drawn inside General.
   "WorkspaceModelsSection.tsx": ["claude-codex", "general"],
@@ -990,6 +992,7 @@ const DRAWN_INSIDE: Record<string, string> = {
   "ResetPage.tsx": "DiagnosticsPage.tsx",
   "RepairGroup.tsx": "DiagnosticsPage.tsx",
   "GitHubAccountsSection.tsx": "SetupPage.tsx",
+  "ClaudeAccountsSection.tsx": "BuildsRunsPage.tsx",
   "WorkspaceModelsSection.tsx": "BuildsRunsPage.tsx",
   "ProgramFoldersRow.tsx": "ThisMacPages.tsx",
 };

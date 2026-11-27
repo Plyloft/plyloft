@@ -171,6 +171,10 @@ type Props = {
    *  (`cliFreshCheck`) and spawned as that CLI. Read once when the terminal
    *  is created; a tile's kind never changes. */
   cli?: TileCli;
+  /** 1.179.0 (C2): the Claude account to spawn a Claude tile on (an
+   *  `ai_accounts_list` id); absent: the backend's choice. Read once when
+   *  the terminal is created, like `tryTarget`. */
+  account?: string;
   /** 1.176.0 R7: a Claude or Codex tile whose CLI didn't start (the rule in
    *  `lib/startFailure.ts`), told before `onExit`. */
   onStartFailed?: (failure: StartFailure) => void;
@@ -210,6 +214,7 @@ export function Terminal({
   readiness: readinessKind,
   tryTarget,
   cli,
+  account,
   onStartFailed,
   screenTileId,
 }: Props) {
@@ -926,6 +931,7 @@ export function Terminal({
           tryTarget: tryTarget ?? null,
           cli: cli ?? null,
           id: wantedId,
+          account: cli === "claude" ? (account ?? null) : null,
         });
         if (cancelled && ptyId) {
           gate.close();

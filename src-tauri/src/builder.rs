@@ -58,6 +58,9 @@ pub struct BuilderSession {
     pub claude_session_id: Option<String>,
     /// Where that transcript was found, once it was (runtime cache).
     transcript: Arc<Mutex<TranscriptRead>>,
+    /// 1.179.0: the Claude account the session runs on (`None`: Main):
+    /// whose folder its transcript is in.
+    pub account: Option<String>,
 }
 
 /// `card_id → BuilderSession`. One session per card.
@@ -101,6 +104,7 @@ impl BuilderRegistry {
             last_activity_at: Arc::new(AtomicI64::new(0)),
             claude_session_id: None,
             transcript: Arc::default(),
+            account: None,
         });
     }
     /// As [`Self::insert_for_test`], for a Claude session whose transcript
@@ -116,6 +120,7 @@ impl BuilderRegistry {
             last_activity_at: Arc::new(AtomicI64::new(0)),
             claude_session_id: Some(session_id.into()),
             transcript: Arc::new(Mutex::new(TranscriptRead { path: transcript, ..TranscriptRead::default() })),
+            account: None,
         });
     }
     /// v1.154.1 (F17): `pty_id` is a session Resume spawned at `at`.
@@ -230,11 +235,11 @@ impl BuilderRegistry {
                     intake: false,
                     kind: SessionBlockKind::Trust,
                     resets_at: None,
+                    account: s.account.clone(),
                 };
                 (b, s.capture.clone(), s.claude_session_id.clone(), s.transcript.clone())
             })
             .collect();
-        let config = crate::claude_session::claude_config_dir();
         let mut out: Vec<SessionBlock> = live
             .into_iter()
             .filter_map(|(b, capture, session_id, transcript)| {
@@ -258,6 +263,8 @@ impl BuilderRegistry {
                         return Some(SessionBlock { kind, resets_at, ..b });
                     }
                 }
+                // 1.179.0: in the folder of the account the session runs on.
+                let config = crate::ai_accounts::recorded_claude_dir(b.account.as_deref());
                 let resets_at = builder_transcript_limit(config.as_deref()?, session_id.as_deref()?, &transcript)?;
                 Some(SessionBlock { kind: SessionBlockKind::UsageLimit, resets_at, ..b })
             })
@@ -293,6 +300,10 @@ pub struct SessionBlock {
     /// A usage limit's reset time as Claude wrote it ("3pm"), when it did.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resets_at: Option<String>,
+    /// 1.179.0: the Claude account the stopped session runs on (`None`:
+    /// Main): the Inbox's usage-limit row names it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
 }
 
 /// UX P-F: the menu rules ([`session_menu_block`]) read the bytes macOS's
@@ -1493,6 +1504,7 @@ fn spawn_session(
     vendor: &str,
     args: Vec<String>,
     claude_session_id: Option<String>,
+    account: Option<String>,
 ) -> Result<String, String> {
     let worktree = card
         .worktree_path
@@ -1510,6 +1522,7 @@ fn spawn_session(
         vendor,
         args,
         claude_session_id,
+        account,
     )
 }
 
@@ -1530,7 +1543,12 @@ pub(crate) fn spawn_session_at(
     vendor: &str,
     args: Vec<String>,
     claude_session_id: Option<String>,
+    // 1.179.0: the Claude account it runs on (`None`: Main), chosen by the
+    // caller — the current one for a new session, the recorded one for a
+    // Resume. Never anything for Codex.
+    account: Option<String>,
 ) -> Result<String, String> {
+    let account = if vendor == "claude" { account } else { None };
     let worktree = worktree.to_string();
     if !Path::new(&worktree).exists() {
         return Err(format!("The card's copy of the repository is gone ({worktree})."));
@@ -1593,6 +1611,7 @@ pub(crate) fn spawn_session_at(
                 run_id: None,
                 retention_class: crate::coordination::RetentionClass::Interactive,
                 objective: None,
+                account: account.clone(),
             },
             120,
             32,
@@ -1609,6 +1628,7 @@ pub(crate) fn spawn_session_at(
         last_activity_at,
         claude_session_id,
         transcript: Arc::default(),
+        account,
     });
     Ok(pty_id)
 }
@@ -1650,6 +1670,9 @@ pub fn start(
     mode: StartMode,
     prompt: &str,
     retry: Option<crate::settings::ModelChoice>,
+    // 1.179.0 (C3): the Claude account a Start fresh on {name} asked for;
+    // `None`: the current one.
+    requested_account: Option<&str>,
 ) -> Result<BuilderStartResult, String> {
     let bypass = mode.bypass;
     let permission_mode = mode.permission_mode.clone();
@@ -1660,7 +1683,19 @@ pub fn start(
         return Err(why);
     }
     let full_prompt = format!("{}{}", with_codex_rules(builder_preamble_for(&crate::issue_text::name_for_ai(&card), card.pr_review.is_some()), vendor), prompt);
-    let theme = if vendor == "claude" { crate::claude_theme::theme_for_spawn(&app) } else { None };
+    // 1.179.0: Start build, Start fresh and Retry start on the Claude account
+    // new sessions start on now, read once here and recorded on the card.
+    // C3: a Start fresh on {name} (the member's press) starts on the one it
+    // names, and changes nothing about the current one.
+    let account = if vendor == "claude" {
+        match requested_account {
+            None => crate::ai_accounts::for_new_session(&app, crate::coordination::Provider::Claude),
+            Some(_) => crate::ai_accounts::chosen(&app, requested_account)?,
+        }
+    } else {
+        None
+    };
+    let theme = if vendor == "claude" { crate::claude_theme::theme_for_spawn(&app, account.as_deref()) } else { None };
     // CL-8 round 2: a card that continues from a build of Build with both
     // keeps that build's chosen model (same vendor) on a Start fresh.
     // 1.168.1 (E2): otherwise the card's own choice, else the workspace's
@@ -1707,6 +1742,7 @@ pub fn start(
         vendor,
         args,
         claude_session_id.clone(),
+        account.clone(),
     )?;
     let previous = card.builder.clone();
     let mut updated: Option<KanbanCard> = None;
@@ -1766,6 +1802,7 @@ pub fn start(
             // C2: a new session's Finish and check starts afresh.
             self_check_started_at: None,
             pr_draft: None,
+            account: account.clone(),
         });
         c.last_run_status = Some(LastRunStatus::Running);
         // 1.169.0 (A3): the session started, so the retry is recorded.
@@ -1844,7 +1881,15 @@ pub fn resume(
     if let Some(why) = shell_env::try_get().and_then(|env| vendor_missing_refusal(&env, &state.vendor, true)) {
         return Err(why);
     }
-    let theme = if state.vendor == "claude" { crate::claude_theme::theme_for_spawn(&app) } else { None };
+    // 1.179.0: Resume runs on the account the session was started on, where
+    // its conversation is kept, whatever new sessions start on now; an
+    // account removed since refuses it.
+    let account = if state.vendor == "claude" {
+        crate::ai_accounts::for_resume(&app, state.account.as_deref())?
+    } else {
+        None
+    };
+    let theme = if state.vendor == "claude" { crate::claude_theme::theme_for_spawn(&app, account.as_deref()) } else { None };
     // #74: the row is read again, so a model changed in Settings applies
     // to the new session in the same worktree — unless (CL-8 round 2) the
     // card continues from a build whose model was chosen at its start.
@@ -1896,6 +1941,7 @@ pub fn resume(
         &state.vendor,
         args,
         state.claude_session_id.clone(),
+        account,
     )?;
     let resumed_at = now_millis();
     registry.mark_resumed(card_id, &pty_id, resumed_at);
@@ -5118,6 +5164,7 @@ mod tests {
             intake: false,
             kind: SessionBlockKind::Trust,
             resets_at: None,
+            account: None,
         };
         assert_eq!(registry.session_blocks(), vec![trust("card-a", "claude"), trust("card-b#both-b", "codex")]);
         // Only the capture's tail is read: a question long scrolled away is not.
@@ -6285,9 +6332,11 @@ mod tests {
         assert!(parse_git_dirs("/p/.git/worktrees/c\n--path-format=absolute\n/p/.git\n").is_err());
         assert!(parse_git_dirs("/p/.git/worktrees/c\n.git\n").is_err());
         assert!(parse_git_dirs("/p/.git/worktrees/c\n").is_err());
+        // A bare "/p" has no drive letter, so it is not absolute on Windows.
+        let root = if cfg!(windows) { "C:/p" } else { "/p" };
         assert_eq!(
-            parse_git_dirs("/p/.git/worktrees/c\n/p/.git\n").unwrap(),
-            ("/p/.git/worktrees/c".to_string(), "/p/.git".to_string())
+            parse_git_dirs(&format!("{root}/.git/worktrees/c\n{root}/.git\n")).unwrap(),
+            (format!("{root}/.git/worktrees/c"), format!("{root}/.git"))
         );
     }
 
@@ -6702,6 +6751,7 @@ mod tests {
             last_activity_at: Arc::new(AtomicI64::new(0)),
             claude_session_id: None,
             transcript: Arc::default(),
+            account: None,
             });
         assert_eq!(r.get_pty("c1").as_deref(), Some("p1"));
         let replay = read_capture(&r, "c1").expect("a live session has a capture");
@@ -6728,6 +6778,7 @@ mod tests {
             last_activity_at: Arc::new(AtomicI64::new(0)),
             claude_session_id: None,
             transcript: Arc::default(),
+            account: None,
         });
         let replay = read_capture(&r, "c1").unwrap();
         assert_eq!(replay.data.len(), CAPTURE_REPLAY_MAX);
@@ -6760,6 +6811,7 @@ mod tests {
             last_activity_at: Arc::new(AtomicI64::new(7)),
             claude_session_id: None,
             transcript: Arc::default(),
+            account: None,
         };
         let (a, b) = (crate::build_both::lane_key("c1", "a"), crate::build_both::lane_key("c1", "b"));
         r.insert(session(&a, "pa"));
@@ -6892,6 +6944,7 @@ mod tests {
             lost_on_restart: false,
             self_check_started_at: None,
             pr_draft: None,
+            account: None,
         });
         card
     }

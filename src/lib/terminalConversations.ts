@@ -6,6 +6,7 @@
  */
 import type { TerminalHistorySession } from "../ipc.ts";
 import { shortDuration } from "./boardSemantics.ts";
+import { ACCOUNT_REMOVED } from "./claudeAccountNames.ts";
 
 export type ConversationKind = "claude" | "codex";
 
@@ -107,6 +108,9 @@ export interface SessionHistoryRow {
   cliSessionId: string | null;
   ptyId: string | null;
   titleSource: TerminalHistorySession["titleSource"] | null;
+  /** 1.179.0 (C2): the Claude account it ran on (null: Main); Resume runs
+   *  there. */
+  account: string | null;
 }
 
 /** Why a row can't be resumed. */
@@ -144,7 +148,10 @@ export function sessionHistoryRows(
         ? { kind: "none", reason: NO_CONVERSATION_YET }
         : s.resumable
           ? { kind: "resume" }
-          : { kind: "none", reason: s.gone === "folder" ? ROW_FOLDER_GONE : FILE_GONE };
+          : {
+              kind: "none",
+              reason: s.gone === "account" ? ACCOUNT_REMOVED : s.gone === "folder" ? ROW_FOLDER_GONE : FILE_GONE,
+            };
     rows.push({
       id: `${s.workspaceId}:${s.id}`,
       workspaceId: s.workspaceId,
@@ -162,6 +169,7 @@ export function sessionHistoryRows(
       cliSessionId: s.cliSessionId ?? null,
       ptyId: s.ptyId ?? null,
       titleSource: s.titleSource ?? null,
+      account: s.account ?? null,
     });
   }
   rows.sort((a, b) => b.lastUsedAt - a.lastUsedAt || b.startedAt - a.startedAt);
@@ -205,9 +213,13 @@ export function reopenPointerWords(n: number): string {
     : `${n} sessions were open when Plyloft quit · Reopen them in Terminals`;
 }
 
-/** The offer's tooltip: the sessions, by name. */
-export function reopenList(rows: ReadonlyArray<{ kind: ConversationKind; title?: string | null }>): string {
-  return rows.map((r) => `${KIND_WORD[r.kind]}: ${conversationTitle(r)}`).join("\n");
+/** The offer's tooltip: the sessions, by name. 1.179.0 (C2): `kindWord`
+ *  says the AI with its account, where accounts are named. */
+export function reopenList<R extends { kind: ConversationKind; title?: string | null }>(
+  rows: ReadonlyArray<R>,
+  kindWord: (r: R) => string = (r) => KIND_WORD[r.kind],
+): string {
+  return rows.map((r) => `${kindWord(r)}: ${conversationTitle(r)}`).join("\n");
 }
 
 /** What a reopen that didn't open them all says (null: they all opened). */

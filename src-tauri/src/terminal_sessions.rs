@@ -89,6 +89,12 @@ pub struct SessionRow {
     /// resumed. An older Plyloft keeps it as an unknown key.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub open_at_quit: Option<i64>,
+    /// 1.179.0: the Claude account the tile ran on (`ai_accounts`; `None`:
+    /// Main, every Codex row and every row before it). Its conversation is
+    /// in that account's folder: titles, Resume… and History look there,
+    /// and a resume runs on it. An older Plyloft keeps it as an unknown key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
     /// Keys a newer Plyloft wrote: kept as they are.
     #[serde(flatten)]
     pub extra: Map<String, Value>,
@@ -221,6 +227,43 @@ pub fn claude_args_with_session(mut args: Vec<String>) -> (Vec<String>, Option<S
     }
 }
 
+/// 1.179.0: the conversation a Claude tile's args resume (`--resume <id>`,
+/// `-r <id>`, `--resume=<id>`): it is kept on the account it ran on. `None`
+/// for a new conversation, `--session-id` and `--continue` included.
+pub fn claude_resumed_session(args: &[String]) -> Option<String> {
+    args.iter().enumerate().find_map(|(i, a)| {
+        if let Some(v) = a.strip_prefix("--resume=") {
+            return Some(v.to_string());
+        }
+        if a == "--resume" || a == "-r" {
+            return args.get(i + 1).filter(|v| !v.starts_with('-')).cloned();
+        }
+        None
+    })
+}
+
+/// 1.179.0: the Claude account conversation `id` is kept on, for a tile that
+/// resumes it: the account of its latest row in the workspace's record;
+/// for one the record doesn't have (a conversation of the member's own),
+/// the account whose folder holds its transcript from `cwd`, Main first.
+/// `None`: Main.
+pub fn account_of_conversation(config_dir: &Path, workspace_id: &str, homes: &CliHomes, cwd: &Path, id: &str) -> Option<String> {
+    let rows = load(&path_for(config_dir, workspace_id)).file.sessions;
+    let recorded = rows
+        .iter()
+        .filter(|r| r.kind == SessionKind::Claude && r.cli_session_id.as_deref() == Some(id))
+        .max_by_key(|r| r.started_at);
+    if let Some(row) = recorded {
+        return row.account.clone();
+    }
+    let name = format!("{id}.jsonl");
+    homes
+        .claude_all()
+        .into_iter()
+        .find(|(_, dir)| claude_project_dirs(dir, cwd).iter().any(|d| d.join(&name).is_file()))
+        .and_then(|(account, _)| account)
+}
+
 /// Codex's `resume <id>` (Resume…, P4): the conversation a Codex tile
 /// continues. `None` for a new one, whose id is looked up after its first
 /// turn.
@@ -292,6 +335,19 @@ pub fn record_start(
     cwd: &str,
     cli_session_id: Option<String>,
 ) -> Result<String, String> {
+    record_start_on(config_dir, workspace_id, pty_id, kind, cwd, cli_session_id, None)
+}
+
+/// [`record_start`] of a tile on Claude account `account` (`None`: Main).
+pub fn record_start_on(
+    config_dir: &Path,
+    workspace_id: &str,
+    pty_id: &str,
+    kind: SessionKind,
+    cwd: &str,
+    cli_session_id: Option<String>,
+    account: Option<String>,
+) -> Result<String, String> {
     let path = path_for(config_dir, workspace_id);
     let row = SessionRow {
         id: uuid::Uuid::new_v4().to_string(),
@@ -306,6 +362,7 @@ pub fn record_start(
         resumed_from: None,
         passed_name: None,
         open_at_quit: None,
+        account,
         extra: Map::new(),
     };
     let id = row.id.clone();
@@ -498,15 +555,15 @@ pub fn reopen_offer_resumable(config_dir: &Path, workspace_id: &str, homes: &Cli
             s.row
                 .cli_session_id
                 .as_deref()
-                .is_some_and(|id| has_conversation(homes, s.row.kind, Path::new(&s.row.cwd), id))
+                .is_some_and(|id| has_conversation(homes, s.row.kind, s.row.account.as_deref(), Path::new(&s.row.cwd), id))
         })
         .collect()
 }
 
 /// Whether conversation `id` from `cwd` has anything to resume: its
 /// transcript is there and holds a message the member typed or a name.
-fn has_conversation(homes: &CliHomes, kind: SessionKind, cwd: &Path, id: &str) -> bool {
-    let Some(path) = transcript_from(homes, kind, cwd, id) else { return false };
+fn has_conversation(homes: &CliHomes, kind: SessionKind, account: Option<&str>, cwd: &Path, id: &str) -> bool {
+    let Some(path) = transcript_from(homes, kind, account, cwd, id) else { return false };
     let found = match kind {
         SessionKind::Claude => crate::session_titles::read_claude(&path),
         SessionKind::Codex => {
@@ -578,6 +635,10 @@ pub struct TileTitle {
     /// title (a fresh one after `/clear` never has).
     #[serde(default)]
     pub conversation_named: bool,
+    /// 1.179.0: the Claude account the tile runs on (`None`: Main), for its
+    /// header ("Claude · Work").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
 }
 
 impl TileTitle {
@@ -589,6 +650,7 @@ impl TileTitle {
             cli_session_id: row.cli_session_id.clone(),
             followed: false,
             conversation_named: false,
+            account: row.account.clone(),
         }
     }
 }
@@ -596,7 +658,9 @@ impl TileTitle {
 /// Where the CLIs keep their files, so tests can point elsewhere.
 #[derive(Debug, Clone)]
 pub struct CliHomes {
-    /// Claude Code's config dir (`~/.claude`, or `CLAUDE_CONFIG_DIR`).
+    /// Main's Claude Code config dir (`~/.claude`, or `CLAUDE_CONFIG_DIR`).
+    /// 1.179.0: a row on another Claude account reads that account's own
+    /// folder instead ([`Self::claude_for`]).
     pub claude: Option<PathBuf>,
     /// Codex's home (`~/.codex`).
     pub codex: Option<PathBuf>,
@@ -604,26 +668,45 @@ pub struct CliHomes {
 
 impl CliHomes {
     pub fn real() -> Self {
-        CliHomes { claude: crate::claude_session::claude_config_dir(), codex: Some(crate::codex_home::real_codex_home()) }
+        CliHomes { claude: crate::ai_accounts::claude_dir(None), codex: Some(crate::codex_home::real_codex_home()) }
+    }
+
+    /// 1.179.0: the Claude folder of a row recorded on `account`: Main's
+    /// (`claude`), or the account's own while it is there — `None` once the
+    /// account was removed, so nothing of it is looked for elsewhere.
+    pub fn claude_for(&self, account: Option<&str>) -> Option<PathBuf> {
+        match account {
+            None => self.claude.clone(),
+            Some(_) => crate::ai_accounts::recorded_claude_dir(account),
+        }
+    }
+
+    /// 1.179.0: every Claude folder a list of all conversations covers:
+    /// Main's first, then each account's (`ai_accounts::account_dirs`).
+    pub fn claude_all(&self) -> Vec<(Option<String>, PathBuf)> {
+        let mut all: Vec<(Option<String>, PathBuf)> = self.claude.clone().map(|main| (None, main)).into_iter().collect();
+        all.extend(crate::ai_accounts::account_dirs());
+        all
     }
 }
 
 /// The Claude conversation a live Claude process is in now, from Claude
 /// Code's own per-process file (`sessions/<pid>.json`, undocumented: only a
-/// hint — absent or unreadable means "unchanged").
-fn claude_current_session(homes: &CliHomes, pid: Option<u32>) -> Option<String> {
-    let path = homes.claude.as_ref()?.join("sessions").join(format!("{}.json", pid?));
+/// hint — absent or unreadable means "unchanged"), in the folder of the
+/// account the tile runs on.
+fn claude_current_session(homes: &CliHomes, account: Option<&str>, pid: Option<u32>) -> Option<String> {
+    let path = homes.claude_for(account)?.join("sessions").join(format!("{}.json", pid?));
     let v: Value = serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
     v.get("sessionId").and_then(Value::as_str).map(str::to_string)
 }
 
-/// What the CLI's files say about a conversation.
-fn read_title(homes: &CliHomes, kind: SessionKind, id: &str) -> Option<crate::session_titles::Found> {
+/// What the CLI's files say about a conversation (a Claude one in the
+/// folder of the account it ran on).
+fn read_title(homes: &CliHomes, kind: SessionKind, account: Option<&str>, id: &str) -> Option<crate::session_titles::Found> {
     let found = match kind {
         SessionKind::Claude => homes
-            .claude
-            .as_ref()
-            .and_then(|dir| crate::claude_session::find_transcript(dir, id))
+            .claude_for(account)
+            .and_then(|dir| crate::claude_session::find_transcript(&dir, id))
             .map(|t| crate::session_titles::read_claude(&t)),
         SessionKind::Codex => homes.codex.as_ref().and_then(|home| {
             let rollout = crate::codex_sessions::rollout_for(&home.join("sessions"), id)?;
@@ -692,7 +775,7 @@ pub fn refresh_title(pty_id: &str, pid: Option<u32>, homes: &CliHomes) -> Option
     let mut follow: Option<String> = None;
     let mut adopt: Option<String> = None;
     if row.kind == SessionKind::Claude {
-        if let Some(now_in) = claude_current_session(homes, pid) {
+        if let Some(now_in) = claude_current_session(homes, row.account.as_deref(), pid) {
             match row.cli_session_id.as_deref() {
                 Some(id) if id != now_in => follow = Some(now_in),
                 // Started with `--continue`/`-r` and no id: the one it is in.
@@ -708,7 +791,7 @@ pub fn refresh_title(pty_id: &str, pid: Option<u32>, homes: &CliHomes) -> Option
     // the member's, not the conversation's own — it neither comes back after
     // "Use the automatic name" nor makes a fresh conversation "named".
     let passed: HashSet<&str> = rows.iter().filter_map(|r| r.passed_name.as_deref()).collect();
-    let mut found = session.as_deref().and_then(|id| read_title(homes, row.kind, id));
+    let mut found = session.as_deref().and_then(|id| read_title(homes, row.kind, row.account.as_deref(), id));
     if let Some(f) = found.as_mut() {
         if f.renamed.as_deref().is_some_and(|n| passed.contains(n)) {
             f.renamed = None;
@@ -860,6 +943,10 @@ pub struct Conversation {
     /// one of the project's copies; absent for the project folder's own.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
+    /// 1.179.0: the Claude account whose folder keeps it, which a resume
+    /// runs on (`None`: Main, and every Codex conversation).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account: Option<String>,
 }
 
 /// Claude Code's directory name for a folder: every character that is not
@@ -976,27 +1063,33 @@ pub fn conversations(config_dir: &Path, workspace_id: &str, cwd: &Path, homes: &
     let mut out: Vec<Conversation> = Vec::new();
     let mut read = 0usize;
 
-    if let Some(claude) = homes.claude.as_deref() {
+    // 1.179.0: Main's folder and every Claude account's, each conversation
+    // tagged with the account that keeps it.
+    let claude_homes = homes.claude_all();
+    if !claude_homes.is_empty() {
         let mut seen: HashSet<PathBuf> = HashSet::new();
-        let mut files: Vec<(i64, String, PathBuf, usize)> = Vec::new();
-        for (i, (folder, _)) in folders.iter().enumerate() {
-            for dir in claude_project_dirs(claude, folder) {
-                let Ok(entries) = std::fs::read_dir(&dir) else { continue };
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    let Some(id) = path.file_name().and_then(|n| n.to_str()).and_then(|n| n.strip_suffix(".jsonl")) else {
-                        continue;
-                    };
-                    let Some(at) = mtime_ms(&path) else { continue };
-                    if at >= since && path.is_file() && seen.insert(path.clone()) {
-                        files.push((at, id.to_string(), path, i));
+        let mut files: Vec<(i64, String, PathBuf, usize, Option<String>)> = Vec::new();
+        for (account, claude) in &claude_homes {
+            for (i, (folder, _)) in folders.iter().enumerate() {
+                for dir in claude_project_dirs(claude, folder) {
+                    let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        let Some(id) = path.file_name().and_then(|n| n.to_str()).and_then(|n| n.strip_suffix(".jsonl"))
+                        else {
+                            continue;
+                        };
+                        let Some(at) = mtime_ms(&path) else { continue };
+                        if at >= since && path.is_file() && seen.insert(path.clone()) {
+                            files.push((at, id.to_string(), path, i, account.clone()));
+                        }
                     }
                 }
             }
         }
         files.sort_by(|a, b| b.0.cmp(&a.0));
         let mut kept = 0usize;
-        for (at, id, path, i) in files {
+        for (at, id, path, i, account) in files {
             if kept >= CONVERSATIONS_MAX || read >= CONVERSATIONS_READ_MAX {
                 break;
             }
@@ -1026,6 +1119,7 @@ pub fn conversations(config_dir: &Path, workspace_id: &str, cwd: &Path, homes: &
                 live: false,
                 cwd: folders[at_folder].1.clone(),
                 opening: found.first_message.as_deref().and_then(crate::session_titles::from_first_message),
+                account,
             });
         }
     }
@@ -1060,6 +1154,7 @@ pub fn conversations(config_dir: &Path, workspace_id: &str, cwd: &Path, homes: &
                 live: false,
                 cwd: folders[i].1.clone(),
                 opening: found.first_message.as_deref().and_then(crate::session_titles::from_first_message),
+                account: None,
             });
         }
     }
@@ -1105,6 +1200,9 @@ pub enum ResumeCheck {
     FolderGone,
     /// Its transcript is no longer there.
     ConversationGone,
+    /// 1.179.0: the Claude account it was kept on was removed from Plyloft
+    /// (its folder with it): it is not resumed on another account.
+    AccountRemoved,
 }
 
 #[cfg(unix)]
@@ -1161,11 +1259,11 @@ fn claude_open_elsewhere(claude: &Path, id: &str, cwd: &Path) -> bool {
 }
 
 /// Its transcript where the CLI would look for it from `cwd`.
-fn transcript_from(homes: &CliHomes, kind: SessionKind, cwd: &Path, id: &str) -> Option<PathBuf> {
+fn transcript_from(homes: &CliHomes, kind: SessionKind, account: Option<&str>, cwd: &Path, id: &str) -> Option<PathBuf> {
     match kind {
         SessionKind::Claude => {
             let name = format!("{id}.jsonl");
-            claude_project_dirs(homes.claude.as_deref()?, cwd).into_iter().map(|d| d.join(&name)).find(|p| p.is_file())
+            claude_project_dirs(&homes.claude_for(account)?, cwd).into_iter().map(|d| d.join(&name)).find(|p| p.is_file())
         }
         SessionKind::Codex => crate::codex_sessions::rollout_for(&homes.codex.as_deref()?.join("sessions"), id),
     }
@@ -1175,7 +1273,11 @@ fn transcript_from(homes: &CliHomes, kind: SessionKind, cwd: &Path, id: &str) ->
 /// `cwd` — a tile of this Plyloft that runs it (any workspace), another
 /// Claude in it, a folder or transcript gone. Codex keeps no per-process
 /// file, so a Codex open outside Plyloft is not seen.
-pub fn resume_check(homes: &CliHomes, kind: SessionKind, id: &str, cwd: &Path) -> ResumeCheck {
+///
+/// 1.179.0: `account` is the Claude account the conversation is kept on
+/// (`None`: Main), where it is looked for; a removed one says so first.
+pub fn resume_check(homes: &CliHomes, kind: SessionKind, id: &str, cwd: &Path, account: Option<&str>) -> ResumeCheck {
+    let account = if kind == SessionKind::Claude { account } else { None };
     let live: Vec<(PathBuf, String, String)> = {
         let guard = store().lock();
         guard.live.iter().map(|(pty, (path, row))| (path.clone(), row.clone(), pty.clone())).collect()
@@ -1194,13 +1296,16 @@ pub fn resume_check(homes: &CliHomes, kind: SessionKind, id: &str, cwd: &Path) -
     }
     // Challenger round 3: what can't be opened at all first, so "Open it
     // anyway" never spawns in a missing folder.
+    if crate::ai_accounts::recorded_account_removed(account) {
+        return ResumeCheck::AccountRemoved;
+    }
     if !cwd.is_dir() {
         return ResumeCheck::FolderGone;
     }
-    if transcript_from(homes, kind, cwd, id).is_none() {
+    if transcript_from(homes, kind, account, cwd, id).is_none() {
         return ResumeCheck::ConversationGone;
     }
-    if kind == SessionKind::Claude && homes.claude.as_deref().is_some_and(|c| claude_open_elsewhere(c, id, cwd)) {
+    if kind == SessionKind::Claude && homes.claude_for(account).is_some_and(|c| claude_open_elsewhere(&c, id, cwd)) {
         return ResumeCheck::Elsewhere;
     }
     ResumeCheck::Ready
@@ -1214,6 +1319,9 @@ pub fn resume_check(homes: &CliHomes, kind: SessionKind, id: &str, cwd: &Path) -
 pub enum Gone {
     Folder,
     Conversation,
+    /// 1.179.0: its Claude account was removed from Plyloft ("Its account
+    /// was removed from Plyloft."): not resumed on another one.
+    Account,
 }
 
 /// A row as History › Sessions shows it: the record's row, its workspace,
@@ -1259,12 +1367,15 @@ pub fn history_all(config_dir: &Path, workspace_ids: &[String], homes: &CliHomes
             let mut last_write_at = None;
             let gone = match row.cli_session_id.as_deref() {
                 None => None,
+                Some(_) if row.kind == SessionKind::Claude && crate::ai_accounts::recorded_account_removed(row.account.as_deref()) => {
+                    Some(Gone::Account)
+                }
                 Some(_) if !Path::new(&row.cwd).is_dir() => Some(Gone::Folder),
                 Some(id) => {
                     let found: Option<PathBuf> = match row.kind {
-                        SessionKind::Claude => homes.claude.as_deref().and_then(|c| {
+                        SessionKind::Claude => homes.claude_for(row.account.as_deref()).and_then(|c| {
                             let name = format!("{id}.jsonl");
-                            claude_project_dirs(c, Path::new(&row.cwd))
+                            claude_project_dirs(&c, Path::new(&row.cwd))
                                 .iter()
                                 .map(|d| d.join(&name))
                                 .find(|p| p.is_file())
@@ -1296,7 +1407,9 @@ pub fn history_all(config_dir: &Path, workspace_ids: &[String], homes: &CliHomes
             // Resume… names it — from the CLI's files, at most one short line.
             if session.row.title.is_none() && gone.is_none() {
                 if let Some(id) = session.row.cli_session_id.clone() {
-                    if let Some((title, source)) = read_title(homes, session.row.kind, &id).as_ref().and_then(listable) {
+                    if let Some((title, source)) =
+                        read_title(homes, session.row.kind, session.row.account.as_deref(), &id).as_ref().and_then(listable)
+                    {
                         session.row.title = Some(title);
                         session.row.title_source = Some(source);
                     }
@@ -1348,9 +1461,14 @@ pub(crate) fn live_conversation(pty_id: &str, pid: Option<u32>, homes: &CliHomes
     let rows = load(&path).file.sessions;
     let row = rows.iter().find(|r| r.id == view.row_id)?.clone();
     let id = row.cli_session_id.clone();
-    let file = id.as_deref().and_then(|id| transcript_from(homes, row.kind, Path::new(&row.cwd), id));
+    // 1.179.0: a Claude tile's files are in the folder of the account it
+    // runs on (its row's).
+    let account = row.account.as_deref();
+    let file = id.as_deref().and_then(|id| transcript_from(homes, row.kind, account, Path::new(&row.cwd), id));
     let pid_names_it = match row.kind {
-        SessionKind::Claude => claude_current_session(homes, pid).map(|now_in| id.as_deref() == Some(now_in.as_str())),
+        SessionKind::Claude => {
+            claude_current_session(homes, account, pid).map(|now_in| id.as_deref() == Some(now_in.as_str()))
+        }
         SessionKind::Codex => None,
     };
     // Review round 1 (M2, S3): another conversation of the same CLI written
@@ -1369,12 +1487,12 @@ pub(crate) fn live_conversation(pty_id: &str, pid: Option<u32>, homes: &CliHomes
         // its start — the tile's first action may be `/resume` of an older one.
         (SessionKind::Codex, None, _) => homes.codex.as_deref().is_some_and(|home| codex_unclaimed_since(home, &row)),
         (SessionKind::Claude, Some(own), _) if pid_names_it.is_none() => {
-            homes.claude.as_deref().is_some_and(|claude| claude_written_elsewhere(claude, &row, own))
+            homes.claude_for(account).is_some_and(|claude| claude_written_elsewhere(&claude, &row, own))
         }
         _ => false,
     };
     let plans_dir = match row.kind {
-        SessionKind::Claude => homes.claude.as_ref().map(|c| c.join("plans")),
+        SessionKind::Claude => homes.claude_for(account).map(|c| c.join("plans")),
         SessionKind::Codex => None,
     };
     Some(LiveConversation { kind: row.kind, id, title: view.title, file, pid_names_it, newer_elsewhere, plans_dir })

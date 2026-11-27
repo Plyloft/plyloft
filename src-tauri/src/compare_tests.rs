@@ -399,6 +399,50 @@ fn a_live_claude_tile_is_read_from_the_conversation_it_is_in_now() {
     reset_for_tests();
 }
 
+/// 1.179.0 (C2): two Claude tiles on different accounts, in the same
+/// folder: each one's answer is read from its own account's folder, never
+/// the other's, even with the same conversation id in both.
+#[test]
+fn two_claude_tiles_on_different_accounts_are_each_read_from_their_own_folder() {
+    let _serial = serial_for_tests();
+    reset_for_tests();
+    let config = tempfile::tempdir().unwrap();
+    let main = tempfile::tempdir().unwrap();
+    let homes = CliHomes { claude: Some(main.path().to_path_buf()), codex: None };
+    crate::ai_accounts::test_root::set(Some(config.path().to_path_buf()));
+    let account = "a1b2c3d4";
+    let account_dir = config.path().join("ai-accounts").join("claude").join(account);
+    let folder = tempfile::tempdir().unwrap();
+    let cwd = folder.path().to_string_lossy().to_string();
+    let key = crate::terminal_sessions::claude_project_key(&cwd);
+    let write = |root: &std::path::Path, text: &str| {
+        let path = root.join(format!("projects/{key}/s-same.jsonl"));
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, lines(&[prompt("u1", None, json!("which one")), say("a1", "m1", text), turn_end("t1")]))
+            .unwrap();
+    };
+    write(main.path(), "Main's answer.");
+    write(&account_dir, "The account's answer.");
+    record_start(config.path(), "ws", "pty-main", SessionKind::Claude, &cwd, Some("s-same".into())).unwrap();
+    crate::terminal_sessions::record_start_on(
+        config.path(),
+        "ws",
+        "pty-work",
+        SessionKind::Claude,
+        &cwd,
+        Some("s-same".into()),
+        Some(account.into()),
+    )
+    .unwrap();
+    let read = |pty: &str| tile_answer(crate::terminal_sessions::live_conversation(pty, None, &homes)).answer;
+    assert_eq!(read("pty-main").as_deref(), Some("Main's answer."));
+    assert_eq!(read("pty-work").as_deref(), Some("The account's answer."));
+    let plans = crate::terminal_sessions::live_conversation("pty-work", None, &homes).unwrap().plans_dir;
+    assert_eq!(plans, Some(account_dir.join("plans")), "plan files too");
+    crate::ai_accounts::test_root::set(None);
+    reset_for_tests();
+}
+
 #[test]
 fn a_live_codex_tile_whose_session_is_not_claimed_reads_nothing() {
     let _serial = serial_for_tests();

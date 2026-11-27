@@ -1865,7 +1865,10 @@ fn run_claude_slash_step(
     let model = crate::settings::model_for_workspace(app, workspace_id, "claude", crate::settings::AgentRole::Builder);
     // 1.175.0 (A6): the member's own mode — never one the repository's
     // settings file, or the copy's, asks for.
-    let writer = crate::claude_session::writer_choice(repo_root);
+    // 1.179.0: the step runs on the account new sessions start on now,
+    // whose own settings are the member's.
+    let account = crate::ai_accounts::for_new_session(app, crate::coordination::Provider::Claude);
+    let writer = crate::claude_session::writer_choice(repo_root, account.as_deref());
     let argv = build_claude_slash_argv(name, args, writer.mode, &model);
     let cwd = repo_root.to_string_lossy().to_string();
     let knowledge_mcp = match crate::mcp_launch::KnowledgeMcpContext::new(
@@ -1902,6 +1905,7 @@ fn run_claude_slash_step(
         run_id: None,
         retention_class: crate::coordination::RetentionClass::Ephemeral,
         objective: Some(format!("/{name}")),
+        account,
     };
     let outcome = loop {
         let elapsed = started.elapsed();

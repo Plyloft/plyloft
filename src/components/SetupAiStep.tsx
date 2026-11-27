@@ -95,6 +95,7 @@ import {
   StatusLine,
 } from "./ux";
 import { pushErrorToast } from "../lib/errorToast";
+import { SETUP_SECOND_ACCOUNT_ASK, SETUP_SECOND_ACCOUNT_LINK } from "../lib/claudeAccountNames";
 
 export const AI_TITLE = "Your AI";
 export const AI_WHY =
@@ -558,6 +559,13 @@ export function AiToolsStep({
         </p>
       ))}
       <p className="ux-setup-note">{AI_SUBSCRIPTION_LINE}</p>
+      {/* 1.179.0 (C2): one quiet line to where a second Claude account is added. */}
+      <p className="ux-setup-note" data-ply-setup-second-account="">
+        {SETUP_SECOND_ACCOUNT_ASK}{" "}
+        <CBtn size="sm" tone="quiet" onClick={() => useUi.getState().openSettingsSection("claude-codex")}>
+          {SETUP_SECOND_ACCOUNT_LINK}
+        </CBtn>
+      </p>
 
       {asking && (
         <Section title="Which do you have?">
