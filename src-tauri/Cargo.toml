@@ -80,7 +80,7 @@ ignore = "0.4"
 # the tree, here with flate2's deflate only: reading, no other codec) and
 # `quick-xml` (already in the tree, same version).
 pdf-extract = "0.12"
-zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "9", default-features = false, features = ["deflate-flate2"] }
 quick-xml = "0.37"
 # A card chat reads Claude's screen as a terminal would show it: an emulated
 # grid (rows x columns) fed every PTY byte, so cursor moves, partial
@@ -104,11 +104,13 @@ semver = "1"
 # before any target table. The config-managed features (`protocol-asset`)
 # must stay on that main entry; this one may only add `tray-icon`, which
 # neither manages. Moving `tauri` out of `[dependencies]` would make this
-# entry the checked one and fail the build.
-tauri = { version = "2", features = ["tray-icon"] }
+# entry the checked one and fail the build. From tauri-cli 2.12 a build
+# also writes the configured features (`protocol-asset`) into this entry, so
+# it is listed here too: otherwise every build leaves the file changed.
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 # WebView2's settings behind `with_webview` (browser accelerator keys off).
 # Already in the tree via tauri/wry, same version.
-webview2-com = "0.38"
+webview2-com = "0.39"
 # canonicalize() without the `\\?\` verbatim prefix git and prefix checks
 # choke on (platform::canonicalize). Already in the tree via tauri-utils.
 dunce = "1"
@@ -157,7 +159,7 @@ socket2 = "0.6"
 # a progress sink that says where each item landed (trash.rs), and the
 # microphone consent store (microphone.rs). Both already in the tree via
 # tauri/webview2-com; windows-core names what `#[implement]` expands to.
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
   "Win32_Foundation",
   "Win32_System_Com",
   "Win32_Storage_FileSystem",
@@ -166,7 +168,7 @@ windows = { version = "0.61", features = [
   "Win32_UI_Shell_Common",
   "Win32_UI_WindowsAndMessaging",
 ] }
-windows-core = "0.61"
+windows-core = "0.62"
 
 [target.'cfg(unix)'.dependencies]
 # Signal a whole process group when abandoning a spawned updater: killing the

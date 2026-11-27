@@ -2804,7 +2804,7 @@ mod dropped_file_tests {
                     cmd: "fs_save_dropped_file".into(),
                     callback: CallbackFn(0),
                     error: CallbackFn(1),
-                    url: "http://tauri.localhost".parse().expect("invoke URL"),
+                    url: crate::test_env::local_invoke_url(),
                     body,
                     headers,
                     invoke_key: tauri::test::INVOKE_KEY.to_string(),

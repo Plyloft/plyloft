@@ -24,3 +24,11 @@ pub(crate) fn can_symlink() -> bool {
         Err(err) => panic!("probe symlink: {err}"),
     }
 }
+
+/// The address the app's own pages load from on this platform. An IPC request
+/// from any other origin is remote, and from tauri 2.11.1 a remote origin
+/// reaches no app command, so a test that invokes one must come from here.
+pub(crate) fn local_invoke_url() -> tauri::Url {
+    let url = if cfg!(any(windows, target_os = "android")) { "http://tauri.localhost" } else { "tauri://localhost" };
+    url.parse().expect("invoke URL")
+}

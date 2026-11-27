@@ -8782,8 +8782,12 @@ mod tests {
         let (bare, clone) = bare_remote_and_clone(tmp.path());
         let teammate = tmp.path().join("teammate");
         git(tmp.path(), &["clone", &bare.to_string_lossy(), &teammate.to_string_lossy()]);
-        // `[x]*` would match `x-mine.md` as a glob.
-        let file = "library/knowledge/[x]*";
+        // `[x]*` would match `x-mine.md` as a glob. Windows can't hold a `*` in a
+        // file name, so there `[x]` (a glob for `x`) stands in, with an `x` beside it.
+        let file = if cfg!(windows) { "library/knowledge/[x]" } else { "library/knowledge/[x]*" };
+        if cfg!(windows) {
+            write_entry(&teammate.join("library/knowledge/x"), "a bystander").unwrap();
+        }
         let folder = "library/knowledge/old";
         write_entry(&teammate.join(file), "a file").unwrap();
         write_entry(&teammate.join(folder).join("inner.md"), "a folder").unwrap();
