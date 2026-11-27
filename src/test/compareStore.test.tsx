@@ -79,8 +79,8 @@ describe("the Compare store", () => {
     s.setAnswer(W, "codex", a("codex", "the review", t0 + 10));
     expect(w().returnHeld).toMatchObject({ from: "codex", answer: { answer: "the review" } });
     expect(w().returnPending).toBeNull();
-    // A later, separate answer of Codex's doesn't replace it.
-    s.setAnswer(W, "codex", a("codex", "something else", t0 + 20));
+    // The same answer read again keeps it.
+    s.setAnswer(W, "codex", a("codex", "the review", t0 + 10));
     expect(w().returnHeld?.answer.answer).toBe("the review");
     // The return pass consumes it and waits for Claude's answer.
     s.addPass(W, { ...pass(2), from: "codex", to: "claude", at: t0 + 30 });
@@ -137,11 +137,12 @@ describe("the Compare store", () => {
     expect(w().returnHeld?.answer.answer).toBe("Plan v2");
     s.setAnswer(W, "claude", { vendor: "claude", conversation: "known", turn: "done", answer: "Done it.", answerKind: "text", finishedAtMs: t0 + 30, cut: false });
     expect(w().returnHeld?.answer.answer).toBe("Done it.");
+    // 1.179.0: a later, separate answer of that tile lapses the hold.
     s.setAnswer(W, "claude", { vendor: "claude", conversation: "known", turn: "done", answer: "Something else", answerKind: "text", finishedAtMs: t0 + 40, cut: false });
-    expect(w().returnHeld?.answer.answer).toBe("Done it.");
+    expect(w().returnHeld).toBeNull();
   });
 
-  it("round 5 (D): a Swap applies to the offer in view; a new finished answer from either tile is a new offer and drops the flip; a held answer stays", () => {
+  it("round 5 (D): a Swap applies to the offer in view; a new finished answer from either tile is a new offer and drops the flip; a held answer stays until its own tile answers again", () => {
     const s = useCompare.getState();
     s.setOn(W, false);
     s.setOn(W, true);
@@ -164,9 +165,55 @@ describe("the Compare store", () => {
     s.setAnswer(W, "codex", a("codex", "the reply", t0 + 40));
     expect(w().returnHeld?.answer.answer).toBe("the reply");
     s.setAnswer(W, "claude", a("claude", "c3", t0 + 50));
-    s.setAnswer(W, "codex", a("codex", "x later", t0 + 60));
     expect(w().returnHeld?.answer.answer).toBe("the reply");
     expect(w().returnHeld?.from).toBe("codex");
+    // 1.179.0: Codex finishes a newer answer of its own: the hold lapses.
+    s.setAnswer(W, "codex", a("codex", "x later", t0 + 60));
+    expect(w().returnHeld).toBeNull();
+  });
+
+  it("1.179.0 (measured): a held answer lapses when its tile finishes a newer answer that is not the answer to a pass", () => {
+    const s = useCompare.getState();
+    s.setOn(W, false);
+    s.setOn(W, true);
+    const w = () => useCompare.getState().byWorkspace[W];
+    const t0 = Date.now() - 3_600_000;
+    const a = (vendor: "claude" | "codex", text: string, at: number, turn: "open" | "done" = "done") => ({ vendor, conversation: "known" as const, turn, answer: text, answerKind: "text" as const, finishedAtMs: at, cut: false });
+    // Pass into Codex; Codex answers it: answer 1, held.
+    s.addPass(W, { ...pass(1), at: t0 });
+    s.setAnswer(W, "codex", a("codex", "answer 1", t0 + 10_000));
+    expect(w().returnHeld?.answer.answer).toBe("answer 1");
+    // Read again, and a newer answer in the Claude tile: still held.
+    s.setAnswer(W, "codex", a("codex", "answer 1", t0 + 10_000));
+    s.setAnswer(W, "claude", a("claude", "Claude moved on", t0 + 20_000));
+    expect(w().returnHeld?.answer.answer).toBe("answer 1");
+    // Hours later the member asks Codex something of their own; while its
+    // turn is open, the read still gives answer 1 beside it: still held.
+    s.setAnswer(W, "codex", a("codex", "answer 1", t0 + 10_000, "open"));
+    expect(w().returnHeld?.answer.answer).toBe("answer 1");
+    // Codex finishes answer 2, no pass into it waited for: the hold lapses
+    // and answer 2 is the answer on offer.
+    s.setAnswer(W, "codex", a("codex", "answer 2", t0 + 3_000_000));
+    expect(w().returnHeld).toBeNull();
+    expect(w().returnPending).toBeNull();
+    expect(w().answers.codex?.answer).toBe("answer 2");
+  });
+
+  it("1.179.0: with a pass into that tile waited for, its newer answer becomes the held one, as before", () => {
+    const s = useCompare.getState();
+    s.setOn(W, false);
+    s.setOn(W, true);
+    const w = () => useCompare.getState().byWorkspace[W];
+    const t0 = Date.now() - 600_000;
+    const a = (text: string, at: number) => ({ vendor: "codex" as const, conversation: "known" as const, turn: "done" as const, answer: text, answerKind: "text" as const, finishedAtMs: at, cut: false });
+    s.addPass(W, { ...pass(1), at: t0 });
+    s.setAnswer(W, "codex", a("answer 1", t0 + 10));
+    expect(w().returnHeld?.answer.answer).toBe("answer 1");
+    // Another pass into Codex (it consumes the hold), then Codex answers it.
+    s.addPass(W, { ...pass(2), at: t0 + 100 });
+    s.setAnswer(W, "codex", a("answer 2", t0 + 200));
+    expect(w().returnHeld?.answer.answer).toBe("answer 2");
+    expect(w().returnPending).toBeNull();
   });
 
   it("writes nothing to storage", () => {

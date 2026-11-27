@@ -70,7 +70,7 @@ export const CODEX_UNKNOWN_WORDS =
 export const PLAN_WAITING_WORDS =
   "Claude is waiting for your answer to its plan. To send it this instead, press Esc in its tile, then pass.";
 /** 1.179.0: Claude's newest plan can't be read back from its transcript. */
-export const PLAN_UNREAD_WORDS = "Can't read Claude's newest plan. Ask Claude to show it again, then pass.";
+export const PLAN_UNREAD_WORDS = "Can't read Claude's latest plan. Ask Claude to show it again, then try passing it again.";
 export function ambiguousQuietWords(v: CompareVendor): string {
   if (v === "codex") return CODEX_UNKNOWN_WORDS;
   return `Can't tell which conversation ${compareVendorName(v)}'s tile is in.`;

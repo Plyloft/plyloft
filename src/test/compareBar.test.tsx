@@ -747,12 +747,6 @@ describe("pairing and history (S3, S9)", () => {
     expect(useCompare.getState().byWorkspace[WS].returnHeld?.answer.answer).toBe("Codex's review of it");
     const back = await screen.findByRole("button", { name: /Pass to Claude/ });
     expect((back as HTMLButtonElement).disabled).toBe(false);
-    // Codex answers yet another, separate question: still the answer to the pass.
-    codexAns = { ...codexAns, answer: "Codex on another topic", finishedAtMs: passAt + 3 };
-    await act(async () => {
-      const { refreshAnswers } = await import("../store/compareActions");
-      await refreshAnswers(WS);
-    });
     await t.user.click(screen.getByRole("button", { name: /Pass to Claude/ }));
     expect(await screen.findByText("Codex's answer to Claude")).toBeTruthy();
     expect(screen.getByRole("radio", { name: "Answer this review" }).getAttribute("aria-checked")).toBe("false");
@@ -761,6 +755,58 @@ describe("pairing and history (S3, S9)", () => {
     expect((t.tauri.callsOf("compare_prepare_paste")[1].args.parts as { answer: string }).answer).toBe("Codex's review of it");
     // The return went through: the hold is consumed.
     await waitFor(() => expect(useCompare.getState().byWorkspace[WS].returnHeld).toBeNull());
+  });
+
+  it("1.179.0 (measured): a held answer lapses once its tile finishes a newer answer of the member's own; the newest is passed", async () => {
+    const before = Date.now() - 7_200_000;
+    let claudeAns: CompareAnswer = { vendor: "claude", conversation: "known", turn: "done", answer: "Claude's plan text", answerKind: "text", finishedAtMs: before, chars: 18, cut: false };
+    let codexAns: CompareAnswer = none;
+    const t = setup({ compare_tile_answer: ({ ptyId }: { ptyId: string }) => (ptyId === "pty-claude" ? claudeAns : codexAns) });
+    const { refreshAnswers } = await import("../store/compareActions");
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    await t.user.click(await screen.findByRole("button", { name: /Send to Codex/ }));
+    await waitFor(() => expect(written(t)).toHaveLength(1));
+    const passAt = useCompare.getState().byWorkspace[WS].history[0].at;
+    // Codex answers the pass (answer 1, held); the member doesn't pass it back.
+    codexAns = { vendor: "codex", conversation: "known", turn: "done", answer: "Answer 1", answerKind: "text", finishedAtMs: passAt + 1, chars: 8, cut: false };
+    await act(async () => void (await refreshAnswers(WS)));
+    expect(useCompare.getState().byWorkspace[WS].returnHeld?.answer.answer).toBe("Answer 1");
+    // Later the member types their own message into Codex: while that turn
+    // is open, answer 1 stays held.
+    codexAns = { ...codexAns, turn: "open" };
+    await act(async () => void (await refreshAnswers(WS)));
+    expect(useCompare.getState().byWorkspace[WS].returnHeld?.answer.answer).toBe("Answer 1");
+    // Codex finishes answer 2: the hold lapses, and answer 2 is what goes.
+    codexAns = { ...codexAns, turn: "done", answer: "Answer 2", finishedAtMs: passAt + 5_000, chars: 8 };
+    await act(async () => void (await refreshAnswers(WS)));
+    expect(useCompare.getState().byWorkspace[WS].returnHeld).toBeNull();
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Claude/ }));
+    expect(useCompare.getState().byWorkspace[WS].composer?.answer).toBe("Answer 2");
+    expect(useCompare.getState().byWorkspace[WS].composer?.held).toBeUndefined();
+    await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
+    await waitFor(() => expect(t.tauri.callsOf("compare_prepare_paste")).toHaveLength(2));
+    expect((t.tauri.callsOf("compare_prepare_paste")[1].args.parts as { answer: string }).answer).toBe("Answer 2");
+  });
+
+  it("1.179.0: a composer open on a held answer that lapses before the press stops and shows the newer answer", async () => {
+    const claudeAns: CompareAnswer = { vendor: "claude", conversation: "known", turn: "done", answer: "Claude's plan text", answerKind: "text", finishedAtMs: Date.now() - 7_200_000, chars: 18, cut: false };
+    let codexAns: CompareAnswer = none;
+    const t = setup({ compare_tile_answer: ({ ptyId }: { ptyId: string }) => (ptyId === "pty-claude" ? claudeAns : codexAns) });
+    const { refreshAnswers } = await import("../store/compareActions");
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Codex/ }));
+    await t.user.click(await screen.findByRole("button", { name: /Send to Codex/ }));
+    await waitFor(() => expect(written(t)).toHaveLength(1));
+    const passAt = useCompare.getState().byWorkspace[WS].history[0].at;
+    codexAns = { vendor: "codex", conversation: "known", turn: "done", answer: "Answer 1", answerKind: "text", finishedAtMs: passAt + 1, chars: 8, cut: false };
+    await act(async () => void (await refreshAnswers(WS)));
+    await t.user.click(await screen.findByRole("button", { name: /Pass to Claude/ }));
+    expect(useCompare.getState().byWorkspace[WS].composer?.held).toBe(true);
+    // Codex finishes answer 2 before the press.
+    codexAns = { ...codexAns, answer: "Answer 2", finishedAtMs: passAt + 5_000 };
+    await t.user.click(screen.getByRole("button", { name: /Put it in its box/ }));
+    expect(await screen.findByText("Codex answered again. Read it, then send.")).toBeTruthy();
+    expect(written(t)).toHaveLength(1);
+    expect(useCompare.getState().byWorkspace[WS].composer).toMatchObject({ answer: "Answer 2", held: false });
   });
 
   it("round 1 (H2): a held plan replaced by plan v2 before the press stops the press and shows v2", async () => {
