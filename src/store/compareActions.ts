@@ -4,7 +4,7 @@
 // backend commands and the PTY. Every hand-over is the member's press. An
 // answer's text is never logged or put in a toast or an error.
 import { ptyWrite, tileScreenBlock } from "../ipc";
-import { compareTileAnswer, comparePreparePaste, type CompareAnswer } from "../lib/compareIpc";
+import { compareTileAnswer, comparePreparePaste, type CompareAnswer, type ComparePreparedPaste } from "../lib/compareIpc";
 import {
   answerSeen,
   defaultAsk,
@@ -13,7 +13,9 @@ import {
   lastAskInto,
   plannedSincePass,
   pasteParts,
+  questionFor,
   resolvePair,
+  type QuestionState,
   type TileFacts,
 } from "../lib/compareView";
 import {
@@ -34,7 +36,7 @@ import { tileHeaderStatusFor } from "../lib/tileHeaderStatus";
 import { PASTE_SETTLE_MS_PER_CHAR, PASTE_SETTLE_QUIET_MS } from "../lib/builderInject";
 import { pasteIntoTile } from "../lib/pasteIntoTile";
 import { screenProvesTurnOver, tileLastOutputAt, tileScreenNow, type TileScreenNow } from "../lib/tileScreen";
-import { useCompare, type Composer } from "./compareStore";
+import { useCompare, type Composer, type WsCompare } from "./compareStore";
 import { useTiles, type Tile } from "./tileStore";
 import { focusTile } from "./tileActions";
 
@@ -305,8 +307,40 @@ export async function openComposer(workspaceId: string, from: CompareVendor): Pr
     fromHistory: false,
     ...(heldHere ? { held: true } : {}),
     returnTileId,
+    ...questionOpening(questionOf(w, from, a)),
   };
   useCompare.getState().openComposer(workspaceId, composer);
+}
+
+/** 1.179.0: the member's question in `a`'s turn, against the passes into
+ *  its tile held in memory. */
+function questionOf(w: WsCompare, from: CompareVendor, a: CompareAnswer): QuestionState {
+  return questionFor(
+    a.turnAsks,
+    w.history.filter((p) => p.to === from),
+    a.finishedAtMs,
+  );
+}
+
+/** The switch at a composer's open: on whenever there is a question. */
+function questionOpening(question: QuestionState | null): Pick<Composer, "question" | "includeQuestion" | "preview"> {
+  return { question, includeQuestion: question?.state === "ok", preview: null };
+}
+
+/** The question for an answer read again in an open composer: the member's
+ *  "off" stays off for this composer; otherwise on when there is one. */
+function questionAgain(workspaceId: string, c: Composer, a: CompareAnswer): Pick<Composer, "question" | "includeQuestion" | "preview"> {
+  const w = useCompare.getState().byWorkspace[workspaceId];
+  const question: QuestionState = w ? questionOf(w, c.from, a) : { state: "unknown", why: "not-read" };
+  const turnedOff = c.question?.state === "ok" && c.includeQuestion === false;
+  return { question, includeQuestion: question.state === "ok" && !turnedOff, preview: null };
+}
+
+/** What the composer passes as the member's question: only with the switch
+ *  on and a question to include. */
+export function questionParts(c: Composer | null | undefined): { text: string; cut: boolean } | null {
+  if (!c || c.includeQuestion !== true || c.question?.state !== "ok") return null;
+  return { text: c.question.text, cut: c.question.cut };
 }
 
 /** Pass a past pass's answer again, in the same direction. */
@@ -328,6 +362,8 @@ export function reopenFromPass(workspaceId: string, passN: number): void {
     error: null,
     fromHistory: true,
     returnTileId: tileWithKeyboard(workspaceId),
+    // 1.179.0: it carries the question it went with, or none.
+    ...questionOpening(p.question !== undefined ? { state: "ok", text: p.question, cut: p.questionCut === true } : null),
   });
   void refreshAnswers(workspaceId);
 }
@@ -413,6 +449,7 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
         finishedAtMs: src.finishedAtMs,
         cutKnown: false,
         held: false,
+        ...questionAgain(workspaceId, c, src),
       });
       return;
     }
@@ -426,6 +463,7 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
         cut: h.answer.cut,
         finishedAtMs: h.answer.finishedAtMs,
         cutKnown: false,
+        ...questionAgain(workspaceId, c, h.answer),
       });
       return;
     }
@@ -442,6 +480,7 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
         cut: src.cut,
         finishedAtMs: src.finishedAtMs,
         cutKnown: false,
+        ...questionAgain(workspaceId, c, src),
       });
       return;
     }
@@ -463,23 +502,27 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
   }
   if (!wanted()) return drop();
 
-  let prepared: string;
+  // 1.179.0: the question goes only with the switch on (the parts are the
+  // preview's: the same backend function gives what is shown and written).
+  const question = questionParts(c);
+  let prepared: ComparePreparedPaste;
   try {
-    prepared = await comparePreparePaste(pasteParts(c.from, c.ask, c.answer, c.note));
+    prepared = await comparePreparePaste(pasteParts(c.from, c.ask, c.answer, c.note, question));
   } catch {
     return fail(notReachedWords(c.to));
   }
   if (!wanted()) return drop();
-  if (prepared === "") return fail(notReachedWords(c.to));
+  if (prepared.text === "") return fail(notReachedWords(c.to));
   // The note can make the backend cut the answer further to fit its cap: the
-  // composer says so and waits for another press.
-  if (c.note.trim() !== "" && !c.cut && !c.cutKnown && [...prepared].length >= NOTE_CUT_AT) {
+  // composer says so and waits for another press. The backend says so itself
+  // (`answerCut`): a long question is cut or left out, never the answer.
+  if (c.note.trim() !== "" && !c.cut && !c.cutKnown && prepared.answerCut) {
     store.patchComposer(workspaceId, { busy: false, error: noteCutsWords(), cut: true, cutKnown: true });
     return;
   }
 
   const result = await pasteIntoTile(
-    prepared,
+    prepared.text,
     {
       vendor: c.to,
       windows: isWindows(),
@@ -526,10 +569,14 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
     withNote: c.note.trim() !== "",
     at: Date.now(),
     mode,
-    sent: prepared,
+    sent: prepared.text,
     answer: c.answer,
     answerKind: c.answerKind,
     cut: c.cut,
+    // What was given, before the backend's cut, so Pass it again sends the
+    // same question; whether the text held it. Memory only.
+    ...(question ? { question: question.text, questionCut: question.cut } : {}),
+    withQuestion: prepared.question !== undefined,
   });
   // Only this press's own composer closes (another may be open by now).
   if (useCompare.getState().byWorkspace[workspaceId]?.composer === mine) closeComposer(workspaceId, byKey, toTile.id);
@@ -537,10 +584,56 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
   void refreshAnswers(workspaceId);
 }
 
-/** The backend caps what it prepares at 16,000 characters: at or near it,
- *  with a note, the note has cut the answer. */
-const NOTE_CUT_AT = 15_900;
-
 /** The guard's own marker for "this press is no longer wanted": nothing is
  *  written and nothing is said. */
 const CANCELLED = "\u0000compare-cancelled";
+
+/** 1.179.0: how long the composer waits after a change before it asks the
+ *  backend for the preview again. */
+export const PREVIEW_DEBOUNCE_MS = 250;
+const previewTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const previewSeq = new Map<string, number>();
+
+const sameParts = (a: Composer, b: Composer) => {
+  const qa = questionParts(a);
+  const qb = questionParts(b);
+  return a.answer === b.answer && a.ask === b.ask && a.note === b.note && a.from === b.from && qa?.text === qb?.text && qa?.cut === qb?.cut;
+};
+
+/** 1.179.0: the composer's preview of the question as it will go, from
+ *  `compare_prepare_paste` with the same parts a press sends (debounced),
+ *  only while the switch is on. The write prepares again; nothing here is
+ *  written, logged or kept beyond the open composer. */
+export function refreshPreview(workspaceId: string): void {
+  const pending = previewTimers.get(workspaceId);
+  if (pending !== undefined) clearTimeout(pending);
+  previewTimers.delete(workspaceId);
+  // A newer request makes any answer still in flight stale.
+  const seq = (previewSeq.get(workspaceId) ?? 0) + 1;
+  previewSeq.set(workspaceId, seq);
+  const c0 = useCompare.getState().byWorkspace[workspaceId]?.composer;
+  if (!c0) return;
+  if (!questionParts(c0)) {
+    if (c0.preview) useCompare.getState().patchComposer(workspaceId, { preview: null });
+    return;
+  }
+  previewTimers.set(
+    workspaceId,
+    setTimeout(() => {
+      previewTimers.delete(workspaceId);
+      const c = useCompare.getState().byWorkspace[workspaceId]?.composer;
+      const question = questionParts(c);
+      if (!c || !question) return;
+      comparePreparePaste(pasteParts(c.from, c.ask, c.answer, c.note, question)).then(
+        (preview) => {
+          if (previewSeq.get(workspaceId) !== seq) return;
+          const now = useCompare.getState().byWorkspace[workspaceId]?.composer;
+          if (now && sameParts(now, c)) useCompare.getState().patchComposer(workspaceId, { preview });
+        },
+        // No preview: the composer shows the question without it; a press
+        // prepares again and says if that fails.
+        () => undefined,
+      );
+    }, PREVIEW_DEBOUNCE_MS),
+  );
+}

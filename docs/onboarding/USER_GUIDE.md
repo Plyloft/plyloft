@@ -2059,7 +2059,9 @@ follow the project you're in, not your first card's.
   to ask the other one (**Review this plan**, **Carry it out**, **Check this
   work**, **Answer this review** or **Just pass it**), add a note of your
   own if you want, then **Send** it, or **Put it in its box** and press
-  Enter there yourself. A plan Claude wrote in plan mode can be passed while
+  Enter there yourself. **Include my question** adds what you asked in that
+  turn before the answer; it is left out when the turn holds only text you
+  passed, or when Plyloft can't tell which words are yours. A plan Claude wrote in plan mode can be passed while
   Claude still waits for your answer; to send something to Claude while it
   waits there, press Esc in its session first. Nothing goes by itself: every
   pass is your press. While the other session is working, asks you something or

@@ -3,10 +3,10 @@
 // the pairing, the last answers and the history die with the app, like tiles.
 // An answer's text is held here and nowhere else.
 import { create } from "zustand";
-import type { CompareAnswer } from "../lib/compareIpc";
-import type { Pass, ReturnHeld, ReturnPending } from "../lib/compareView";
+import type { CompareAnswer, ComparePreparedPaste } from "../lib/compareIpc";
+import type { Pass, QuestionState, ReturnHeld, ReturnPending } from "../lib/compareView";
 import type { CompareAsk, CompareVendor } from "../lib/compareWords";
-import { answerToPass, nextHeld } from "../lib/compareView";
+import { answerToPass, nextHeld, stampOf } from "../lib/compareView";
 
 /** The open composer: the answer being passed, as it was read. */
 export interface Composer {
@@ -32,6 +32,16 @@ export interface Composer {
   held?: boolean;
   /** The tile that had the keyboard when it opened: it gets it back. */
   returnTileId: string | null;
+  /** 1.179.0 "Include my question": the member's question in the answer's
+   *  turn (`questionFor`), or null when the switch isn't offered (a pass
+   *  from the history that went without one). Memory only. */
+  question?: QuestionState | null;
+  /** The switch: on at each open when there is a question; the member's
+   *  "off" lasts for this composer only. */
+  includeQuestion?: boolean;
+  /** What the backend prepares with the question on, for the preview; the
+   *  write prepares again (`deliver`), from the same parts. */
+  preview?: ComparePreparedPaste | null;
 }
 
 export interface WsCompare {
@@ -187,6 +197,13 @@ export const useCompare = create<CompareState>((set, get) => ({
         // member was looking at. A new finished answer from either tile is a
         // new offer: the flip goes (an answer held for a pass ignores it).
         const before = w.answers[vendor];
+        // 1.179.0: a Put into this tile learns the first answer finished after
+        // it: the turn that took it (`questionFor`, rule 12).
+        const at = answer?.answer ? stampOf(answer, Date.now()) : undefined;
+        const history =
+          at !== undefined && w.history.some((p) => p.to === vendor && p.mode === "put" && p.answeredAt === undefined && at > p.at)
+            ? w.history.map((p) => (p.to === vendor && p.mode === "put" && p.answeredAt === undefined && at > p.at ? { ...p, answeredAt: at } : p))
+            : w.history;
         const fresh =
           !!answer?.answer &&
           answer.finishedAtMs != null &&
@@ -197,13 +214,13 @@ export const useCompare = create<CompareState>((set, get) => ({
         // 1.177.1: the first answer the pass's tile finished after the pass
         // is the answer to it, and is held.
         const returnHeld = answerToPass(w.returnPending, vendor, answer, Date.now());
-        if (returnHeld) return { answers, planSeenAt, flipped, returnHeld, returnPending: null };
+        if (returnHeld) return { answers, planSeenAt, flipped, history, returnHeld, returnPending: null };
         // Review round 1 (H2): a held plan of a turn still open follows that
         // turn (plan v2, then its final answer). 1.179.0: a final one lapses
         // once its tile finishes a newer answer with no pass into it waited
         // for (`heldLapsed`): the bar offers the newest again.
         const held = nextHeld(w.returnHeld, vendor, answer, Date.now(), w.returnPending);
-        return held !== w.returnHeld ? { answers, planSeenAt, flipped, returnHeld: held } : { answers, planSeenAt, flipped };
+        return held !== w.returnHeld ? { answers, planSeenAt, flipped, history, returnHeld: held } : { answers, planSeenAt, flipped, history };
       }),
     ),
   flip: (workspaceId, to) =>

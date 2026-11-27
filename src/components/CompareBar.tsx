@@ -31,6 +31,7 @@ import {
   COMPARE_SWAP,
   COMPARE_SWAP_TITLE,
   COMPARE_WITH_NOTE,
+  COMPARE_WITH_QUESTION,
   conversationUnknownWords,
   historyDirection,
   targetDraftWords,
@@ -385,7 +386,7 @@ export function CompareBar({ workspaceId }: { workspaceId: string }) {
       <span>
         {historyDirection(p.from, p.to)}
         <span className="ux-relay-muted">
-          {` · ${COMPARE_ASK_LABEL[p.ask]}${p.withNote ? ` · ${COMPARE_WITH_NOTE}` : ""}`}
+          {` · ${COMPARE_ASK_LABEL[p.ask]}${p.withQuestion ? ` · ${COMPARE_WITH_QUESTION}` : ""}${p.withNote ? ` · ${COMPARE_WITH_NOTE}` : ""}`}
         </span>
       </span>
       <span className="ux-relay-pass-time">{clockWords(p.at)}</span>

@@ -8,8 +8,9 @@
 // the button and why it is off. Every guard before a write is here
 // (`deliveryGate`): Plyloft never writes into a tile unless each one is
 // positively known; unknown is a refusal with its reason, never a retry.
-import type { CompareAnswer, ComparePasteParts } from "./compareIpc.ts";
+import type { CompareAnswer, CompareAsksUnknown, ComparePasteParts, CompareTurnAsks } from "./compareIpc.ts";
 import { agoWords } from "./copyWords.ts";
+import { plainForKeys } from "./builderInject.ts";
 import {
   COMPARE_ASK_LEAD,
   COMPARE_CODEX_SEARCH_OPEN,
@@ -29,6 +30,12 @@ import {
   passCountWords,
   passedToWords,
   putInBoxWords,
+  QUESTION_EDITED_WORDS,
+  QUESTION_PLAN_FEEDBACK_WORDS,
+  questionLabelWords,
+  questionNotYoursWords,
+  questionPassedOnlyWords,
+  questionStartUnknownWords,
   sourceWorkingWords,
   targetAsksWords,
   targetDraftWords,
@@ -162,6 +169,16 @@ export interface Pass {
   answer: string;
   answerKind?: "text" | "plan";
   cut: boolean;
+  /** 1.179.0: the member's question given with it, before any cut (memory
+   *  only), so *Pass it again* carries the same question. */
+  question?: string;
+  /** That question was already cut when it was read (`turnAsks.cut`). */
+  questionCut?: boolean;
+  /** The pasted text held the question (it wasn't left out for room). */
+  withQuestion?: boolean;
+  /** A Put: when its tile first finished an answer after it, so the turn
+   *  that took it is known (`questionFor`, an edited Put). */
+  answeredAt?: number;
 }
 
 export type GateAction = "send" | "put";
@@ -720,15 +737,135 @@ export function lastAskInto(history: readonly Pass[], vendor: CompareVendor): Co
 
 /** What goes to `comparePreparePaste`. The backend cleans and caps the
  *  text; the frontend never assembles what is pasted. */
-export function pasteParts(from: CompareVendor, ask: CompareAsk, answer: string, note: string): ComparePasteParts {
+export function pasteParts(
+  from: CompareVendor,
+  ask: CompareAsk,
+  answer: string,
+  note: string,
+  /** 1.179.0: the member's question, passed text already taken out; absent
+   *  (or blank) leaves the parts exactly as before. */
+  question?: { text: string; cut: boolean } | null,
+): ComparePasteParts {
   const trimmed = note.slice(0, COMPARE_NOTE_MAX).trim();
-  return {
+  const parts: ComparePasteParts = {
     lead: COMPARE_ASK_LEAD[ask],
     fromLabel: fromLabelWords(from),
     answer,
     note: trimmed === "" ? undefined : trimmed,
     noteLabel: COMPARE_NOTE_LABEL,
   };
+  if (question && question.text.trim() !== "") {
+    parts.question = question.text;
+    parts.questionLabel = questionLabelWords(from);
+    if (question.cut) parts.questionCut = true;
+  }
+  return parts;
+}
+
+/** 1.179.0 "Include my question": what the member asked in the answer's
+ *  turn. `ok`: the words to include; `nothing`: the turn holds no words of
+ *  theirs (`passed-only`: only text Compare passed; `no-words`: no message in
+ *  words at all); `unknown`: the question is left out, for `why` (the
+ *  backend's, `edited` for a pass that can't be told apart from the member's
+ *  words, `not-read` when the answer came without its turn's messages). */
+export type QuestionState =
+  | { state: "ok"; text: string; cut: boolean }
+  | { state: "nothing"; why: "passed-only" | "no-words" }
+  | { state: "unknown"; why: CompareAsksUnknown | "edited" | "not-read" };
+
+/** Lines only Compare writes: a pass's labels and its ask leads. Left in a
+ *  message once the passes are taken out, they are a pass edited by hand or
+ *  one made before the history was lost. */
+const COMPARE_LABEL_LINES: ReadonlySet<string> = new Set(
+  [
+    fromLabelWords("claude"),
+    fromLabelWords("codex"),
+    questionLabelWords("claude"),
+    questionLabelWords("codex"),
+    ...Object.values(COMPARE_ASK_LEAD),
+  ]
+    .filter((l): l is string => typeof l === "string")
+    .map((l) => plainForKeys(l).trim()),
+);
+
+/** Text as a turn's message and a pass are compared: the paste's own key
+ *  normalisation (Windows replays a paste to Codex as plain keys), trimmed,
+ *  so the pass's leading space (which Codex doesn't keep) doesn't count. */
+const askNorm = (s: string): string => plainForKeys(s).trim();
+
+/** Whether the turn whose answer finished at `finishedAtMs` is the one that
+ *  took the Put `p`: made before that answer, and its tile finished no
+ *  answer between the Put and this one. */
+function turnTookPut(p: Pass, finishedAtMs: number | undefined): boolean {
+  if (finishedAtMs === undefined) return p.answeredAt === undefined;
+  return p.at < finishedAtMs && (p.answeredAt === undefined || p.answeredAt >= finishedAtMs);
+}
+
+/**
+ * 1.179.0: the member's own question in `asks` (the answer's turn, as the
+ * CLI's file has it), from the passes into that tile held in memory
+ * (`passesInto`, newest first). A message equal to a pass is not theirs;
+ * one that holds a pass and words of their own keeps only those words.
+ * Uncertain is left out, never a part that looks whole: Compare's labels
+ * left once the passes are out, or a Put the turn took that no message holds
+ * verbatim (edited by hand), make it `unknown`.
+ */
+export function questionFor(
+  asks: CompareTurnAsks | undefined,
+  passesInto: readonly Pass[],
+  finishedAtMs: number | undefined,
+): QuestionState {
+  if (!asks) return { state: "unknown", why: "not-read" };
+  if (asks.status === "unknown") return { state: "unknown", why: asks.why };
+  const norm = asks.messages.map((m) => askNorm(m.text));
+  // Rule 12: a Put this turn took must be in one of its messages as it went.
+  const put = passesInto.find((p) => p.mode === "put" && turnTookPut(p, finishedAtMs));
+  if (put) {
+    const text = askNorm(put.sent);
+    if (text !== "" && !norm.some((m) => m.includes(text))) return { state: "unknown", why: "edited" };
+  }
+  // Longest first, so a pass that holds a shorter one is taken out whole.
+  const passed = [...new Set(passesInto.map((p) => askNorm(p.sent)).filter((s) => s !== ""))].sort((a, b) => b.length - a.length);
+  const kept: string[] = [];
+  let words = false;
+  for (let i = 0; i < norm.length; i++) {
+    const n = norm[i];
+    if (n === "") continue;
+    words = true;
+    let pieces = [n];
+    for (const p of passed) pieces = pieces.flatMap((s) => s.split(p));
+    const rest = pieces.map((s) => s.trim()).filter((s) => s !== "");
+    // Rule 11: Compare's labels with no pass that holds them.
+    if (rest.some((r) => r.split("\n").some((line) => COMPARE_LABEL_LINES.has(line.trim())))) {
+      return { state: "unknown", why: "edited" };
+    }
+    if (rest.length === 0) continue;
+    // A message with nothing taken out goes as the member wrote it.
+    kept.push(rest.length === 1 && rest[0] === n ? asks.messages[i].text.trim() : rest.join("\n\n"));
+  }
+  if (kept.length > 0) return { state: "ok", text: kept.join("\n\n"), cut: asks.cut };
+  return { state: "nothing", why: words ? "passed-only" : "no-words" };
+}
+
+/** Why the switch is off and disabled, or null when there is a question. */
+export function questionReasonWords(from: CompareVendor, q: QuestionState): string | null {
+  if (q.state === "ok") return null;
+  if (q.state === "nothing") return q.why === "passed-only" ? questionPassedOnlyWords(from) : questionNotYoursWords(from);
+  switch (q.why) {
+    case "start-not-read":
+    case "queued-start":
+    case "compacted":
+    case "not-read":
+      return questionStartUnknownWords(from);
+    case "command":
+    case "not-typed":
+      return questionNotYoursWords(from);
+    case "feedback-unread":
+      return QUESTION_PLAN_FEEDBACK_WORDS;
+    case "unknown-message":
+    case "edited":
+      return QUESTION_EDITED_WORDS;
+  }
 }
 
 /** "21:04" — the app's 24-hour clock, as the command blocks show it. */

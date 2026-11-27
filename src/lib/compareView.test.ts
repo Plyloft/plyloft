@@ -22,6 +22,8 @@ import * as W from "./compareWords.ts";
 import { readinessProbe } from "./tileHeaderStatus.ts";
 import { choiceMenuInView, matchesClaudePromptIdle, promptInputEmpty, settledTail } from "./attention.ts";
 import { liveWorking } from "./tileScreen.ts";
+import { questionFor, questionReasonWords, type QuestionState } from "./compareView.ts";
+import type { CompareTurnAsks } from "./compareIpc.ts";
 import { STALE_OPEN_QUIET_MS, answerToPass, heldIsProvisional, heldLapsed, heldOffered, nextHeld, openTurnStale, passDropped, type ReturnHeld } from "./compareView.ts";
 
 const NOW = 10_000_000;
@@ -796,3 +798,107 @@ console.log("compareView held answer lapses: ok");
   );
 }
 console.log("compareView cleared Put: ok");
+
+// 1.179.0 "Include my question": the member's own words of the answer's
+// turn, the passes into that tile taken out (rules 11 and 12), compared
+// through the paste's key normalisation.
+{
+  const asks = (...texts: string[]): CompareTurnAsks => ({
+    status: "known",
+    messages: texts.map((text, i) => ({ text, kind: i === 0 ? ("prompt" as const) : ("plan-feedback" as const) })),
+    cut: false,
+  });
+  const FINISHED = NOW - 1_000;
+  const into = (sent: string, over: Partial<Pass> = {}): Pass => ({
+    n: 1,
+    from: "codex",
+    to: "claude",
+    ask: "just-pass",
+    withNote: false,
+    at: NOW - 60_000,
+    mode: "send",
+    sent,
+    answer: "a",
+    cut: false,
+    ...over,
+  });
+  const PASS = " Review this plan. Say what is missing or wrong before any code is written.\n\nFrom Codex:\nAdd a test.";
+  const STORED = PASS.trim(); // the CLI keeps it without the leading space
+
+  // A plain typed question goes as it was written; several messages, a blank line apart.
+  assert.deepEqual(questionFor(asks("Plan the login page"), [], FINISHED), { state: "ok", text: "Plan the login page", cut: false });
+  assert.deepEqual(questionFor(asks("Plan it", "Use the old schema"), [], FINISHED), { state: "ok", text: "Plan it\n\nUse the old schema", cut: false });
+  // The backend's cut goes with it.
+  assert.deepEqual(questionFor({ ...asks("Long words"), cut: true } as CompareTurnAsks, [], FINISHED), { state: "ok", text: "Long words", cut: true });
+  // Only text Compare passed: nothing to include.
+  assert.deepEqual(questionFor(asks(STORED), [into(PASS)], FINISHED), { state: "nothing", why: "passed-only" });
+  // The member typed after a pass: only the typed part.
+  assert.deepEqual(questionFor(asks(`${STORED}\n\nAlso check the logout`), [into(PASS)], FINISHED), { state: "ok", text: "Also check the logout", cut: false });
+  // Typed before, and a pass followed: the typed part.
+  assert.deepEqual(questionFor(asks(`Look at this first\n\n${STORED}`), [into(PASS)], FINISHED), { state: "ok", text: "Look at this first", cut: false });
+  // A message that is the pass, then one of the member's own (plan feedback).
+  assert.deepEqual(questionFor(asks(STORED, "Keep it short"), [into(PASS)], FINISHED), { state: "ok", text: "Keep it short", cut: false });
+  // Compare's labels with no pass in memory (made before a restart, or edited): unknown.
+  assert.deepEqual(questionFor(asks(STORED), [], FINISHED), { state: "unknown", why: "edited" });
+  assert.deepEqual(questionFor(asks("From Claude Code:\nsome plan"), [], FINISHED), { state: "unknown", why: "edited" });
+  assert.deepEqual(questionFor(asks("Carry out this plan.\n\nmore"), [], FINISHED), { state: "unknown", why: "edited" });
+  // A pass edited by hand inside: its labels are left, so unknown.
+  assert.deepEqual(questionFor(asks(STORED.replace("Add a test.", "Add two tests.")), [into(PASS)], FINISHED), { state: "unknown", why: "edited" });
+  // A Put this turn took that no message holds verbatim: edited by hand.
+  const put = into(" Just some text\nthat went", { mode: "put", at: NOW - 30_000 });
+  assert.deepEqual(questionFor(asks("Just some words\nthat went"), [put], FINISHED), { state: "unknown", why: "edited" });
+  assert.deepEqual(questionFor(asks("Just some text\nthat went\n\nmine"), [put], FINISHED), { state: "ok", text: "mine", cut: false });
+  // …a Put an earlier turn took (its tile answered since) is not this turn's.
+  assert.deepEqual(questionFor(asks("A new question"), [{ ...put, answeredAt: FINISHED - 10_000 }], FINISHED), { state: "ok", text: "A new question", cut: false });
+  // …nor one made after this answer finished.
+  assert.deepEqual(questionFor(asks("A new question"), [{ ...put, at: FINISHED + 1 }], FINISHED), { state: "ok", text: "A new question", cut: false });
+  // Normalised as the paste is (Windows replays keys): arrows, curly quotes, CR LF, blank-line runs.
+  const typographic = " From Codex:\nUse \u201cA\u201d \u2192 B\r\n\n\n\nDone\u2026";
+  const replayed = "From Codex:\nUse \"A\" -> B\n\nDone...";
+  assert.deepEqual(questionFor(asks(replayed), [into(typographic)], FINISHED), { state: "nothing", why: "passed-only" });
+  assert.deepEqual(questionFor(asks(`${replayed}\n\nmy words`), [into(typographic)], FINISHED), { state: "ok", text: "my words", cut: false });
+  // A message with no words at all (an image only), or none.
+  assert.deepEqual(questionFor({ status: "known", messages: [], cut: false }, [], FINISHED), { state: "nothing", why: "no-words" });
+  assert.deepEqual(questionFor(asks("   "), [], FINISHED), { state: "nothing", why: "no-words" });
+  // The backend's unknowns pass through; no turn read is unknown too.
+  for (const why of ["start-not-read", "command", "not-typed", "queued-start", "feedback-unread", "compacted", "unknown-message"] as const) {
+    assert.deepEqual(questionFor({ status: "unknown", why }, [into(PASS)], FINISHED), { state: "unknown", why });
+  }
+  assert.deepEqual(questionFor(undefined, [], FINISHED), { state: "unknown", why: "not-read" });
+
+  // The reason line for each.
+  const r = (from: "claude" | "codex", q: QuestionState) => questionReasonWords(from, q);
+  assert.equal(r("claude", { state: "ok", text: "x", cut: false }), null);
+  assert.equal(r("claude", { state: "nothing", why: "passed-only" }), "That turn holds only what you passed to Claude. There's no question of yours to add.");
+  assert.equal(r("codex", { state: "nothing", why: "passed-only" }), "That turn holds only what you passed to Codex. There's no question of yours to add.");
+  for (const why of ["start-not-read", "queued-start", "compacted", "not-read"] as const) {
+    assert.equal(r("claude", { state: "unknown", why }), "Can't tell where Claude's turn started, so your question is left out.", why);
+    assert.equal(r("codex", { state: "unknown", why }), "Can't tell where Codex's turn started, so your question is left out.", why);
+  }
+  for (const why of ["command", "not-typed"] as const) {
+    assert.equal(r("claude", { state: "unknown", why }), "Claude's turn didn't start with a message of yours, so there's no question to add.", why);
+    assert.equal(r("codex", { state: "unknown", why }), "Codex's turn didn't start with a message of yours, so there's no question to add.", why);
+  }
+  assert.equal(r("claude", { state: "nothing", why: "no-words" }), "Claude's turn didn't start with a message of yours, so there's no question to add.");
+  assert.equal(r("claude", { state: "unknown", why: "feedback-unread" }), "Can't read your answer to Claude's plan menu, so your question is left out.");
+  for (const why of ["unknown-message", "edited"] as const) {
+    assert.equal(r("codex", { state: "unknown", why }), "Can't tell your words from the text you passed, so your question is left out.", why);
+  }
+
+  // What goes to the backend: the question and its label only when given.
+  assert.deepEqual(pasteParts("claude", "just-pass", "A", "", { text: "Q?", cut: false }), {
+    lead: undefined,
+    fromLabel: "From Claude Code:",
+    answer: "A",
+    note: undefined,
+    noteLabel: "My note:",
+    question: "Q?",
+    questionLabel: "My question to Claude:",
+  });
+  assert.equal(pasteParts("codex", "just-pass", "A", "", { text: "Q?", cut: true }).questionLabel, "My question to Codex:");
+  assert.equal(pasteParts("codex", "just-pass", "A", "", { text: "Q?", cut: true }).questionCut, true);
+  assert.equal("question" in pasteParts("claude", "just-pass", "A", "", { text: "  ", cut: false }), false);
+  assert.equal("question" in pasteParts("claude", "just-pass", "A", "", null), false);
+  assert.equal("questionLabel" in pasteParts("claude", "just-pass", "A", ""), false);
+}
+console.log("compareView include my question: ok");
