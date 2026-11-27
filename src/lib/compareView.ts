@@ -18,6 +18,7 @@ import {
   COMPARE_NOTE_MAX,
   COMPARE_NOTHING_YET,
   ambiguousQuietWords,
+  PLAN_UNREAD_WORDS,
   PLAN_WAITING_WORDS,
   conversationUnknownWords,
   earlierTurnWords,
@@ -349,20 +350,48 @@ export function sentOver(
   now: number,
   /** The target is still printing (ConPTY replaying a long paste as keys). */
   outputActive = false,
+  /** 1.179.0: the OTHER tile's answer (the one the pass came from). */
+  otherAnswer?: CompareAnswer,
 ): boolean {
   if (hasAnswer(targetAnswer) && (stampOf(targetAnswer, now) ?? 0) > sent.at) return true;
   if (!target || target.ended) return true;
   if (outputActive) return false;
+  // 1.179.0 (walk: a Put cleared with Ctrl+U, never sent): a Put whose
+  // target's box is not known to hold text any more, and that isn't working,
+  // is over once the other tile has finished a newer answer than the pass —
+  // the member moved on, and that answer is offered again. Text still seen in
+  // the box keeps the line (it is there to send).
+  if (
+    sent.mode === "put" &&
+    hasAnswer(otherAnswer) &&
+    (stampOf(otherAnswer, now) ?? 0) > sent.at &&
+    target.working !== true &&
+    target.draft !== true &&
+    target.draftNow !== true
+  ) {
+    return true;
+  }
   const after = now - sent.at >= (sent.mode === "send" ? SENT_SEND_MS : SENT_PUT_MS);
   if (!after) return false;
   // The target stopped: it asks something (a refused command leaves it
   // waiting), or its box is idle and empty — either way it isn't working on it.
   if (target.question === true && target.working !== true) return true;
+  // 1.179.0: Claude's "not working" as the guard reads it (`deliveryGate`'s
+  // `workingKnown`): its live read gives `working: null` when the prompt that
+  // started its last turn scrolled off the page (`liveWorking`, a long
+  // answer above), and the store's settled "not working" can't outvote that
+  // unknown (`factsOfTile`'s `orOf`). The screen's proof that the last turn
+  // ended, or the transcript's word that no turn is open, says it is not.
+  const notWorking =
+    target.working === false ||
+    (target.working === null &&
+      target.vendor === "claude" &&
+      (target.turnOverOnScreen === true || (targetAnswer?.conversation === "known" && targetAnswer.turn !== "open")));
   // Round 5 (final walk, step 9): a Send whose text sits in the box unsent
   // (Esc landed before its Enter, or the CLI put it back) is a Put now: the
   // line says it is in the box (`bar`) for as long as it is, as a Put's does.
   return (
-    target.working === false &&
+    notWorking &&
     target.draft === false &&
     target.promptIdle === true &&
     target.question === false
@@ -380,7 +409,8 @@ export interface ReturnPending {
 
 /** 1.177.1: the answer to a pass, held: the tile that answered (`from`) and
  *  that answer, as it was read. Offered back (`from` → the other) until a
- *  pass succeeds, the member swaps, the pair changes or Compare goes off.
+ *  pass succeeds, the member swaps, the pair changes, Compare goes off or
+ *  (1.179.0) its tile finishes a newer answer of its own (`heldLapsed`).
  *  Memory only, never logged. */
 export interface ReturnHeld {
   from: CompareVendor;
@@ -415,17 +445,52 @@ export function heldIsProvisional(held: ReturnHeld): boolean {
   return held.from === "claude" && held.answer.turn === "open" && held.answer.answerKind === "plan";
 }
 
+/**
+ * 1.179.0 (owner, 2026-11-27): a final held answer lapses when its tile
+ * finishes a newer answer that is not the answer to a pass — the member moved
+ * on in that tile (asked it something of their own), and offering the old
+ * answer back would pass what they no longer mean. Newer: a read of THAT tile
+ * whose answer finished strictly after the held one (`finishedAtMs`), or,
+ * where either time is missing or not believed, a different text. Only once
+ * that answer is finished: a read with its turn still open, ambiguous, or
+ * without an answer never lapses it; nor does a read while a pass into that
+ * tile is waited for (`pending`), whose answer `answerToPass` holds instead.
+ * The backend reads only a tile's newest finished answer, so while the held
+ * answer is still its tile's newest, every read gives back that same answer
+ * (the same time, the same text): never later than itself.
+ */
+export function heldLapsed(
+  held: ReturnHeld | null,
+  vendor: CompareVendor,
+  answer: CompareAnswer | null | undefined,
+  now: number,
+  pending: ReturnPending | null = null,
+): boolean {
+  if (!held || held.from !== vendor || heldIsProvisional(held)) return false;
+  if (pending?.into === vendor) return false;
+  if (!answer || !hasAnswer(answer) || answer.conversation === "ambiguous") return false;
+  if (answer.turn === "open") return false;
+  const at = stampOf(answer, now);
+  const heldAt = held.answer.finishedAtMs;
+  if (at !== undefined && heldAt !== undefined) return at > heldAt;
+  return answer.answer !== held.answer.answer;
+}
+
 /** Review round 1 (H2): the held answer after a read of `vendor`'s tile: a
  *  provisional one is replaced by a newer read from the same tile (plan v2,
- *  or the turn's final answer, which then stays); a final one never is — a
- *  later, separate answer of that tile is not the answer to the pass. */
+ *  or the turn's final answer, which then stays); a final one is never
+ *  replaced — a later, separate answer of that tile is not the answer to the
+ *  pass — and 1.179.0: it lapses then (`heldLapsed`), so the bar offers what
+ *  it would with nothing held. */
 export function nextHeld(
   held: ReturnHeld | null,
   vendor: CompareVendor,
   answer: CompareAnswer | null | undefined,
   now: number,
+  pending: ReturnPending | null = null,
 ): ReturnHeld | null {
-  if (!held || held.from !== vendor || !heldIsProvisional(held)) return held;
+  if (!held || held.from !== vendor) return held;
+  if (!heldIsProvisional(held)) return heldLapsed(held, vendor, answer, now, pending) ? null : held;
   if (!answer || !hasAnswer(answer) || answer.conversation === "ambiguous") return held;
   const at = stampOf(answer, now);
   if (at === undefined || at < (held.answer.finishedAtMs ?? 0)) return held;
@@ -538,7 +603,11 @@ export function bar(input: BarInput): BarView {
   // After a pass, until its target answers (or its box is seen empty and
   // idle again): the line says whose turn it is.
   const sentTo = input.sent?.to ?? null;
-  if (input.sent && sentTo && !sentOver(input.sent, factsOf(sentTo), answers[sentTo], input.now, input.sentOutputActive === true)) {
+  if (
+    input.sent &&
+    sentTo &&
+    !sentOver(input.sent, factsOf(sentTo), answers[sentTo], input.now, input.sentOutputActive === true, answers[compareOtherVendor(sentTo)])
+  ) {
     const back = compareOtherVendor(sentTo);
     // A Put whose target is now working was sent by the member (Enter there).
     // …and its box reads empty: the text was sent, not only a draft being typed over.
@@ -574,6 +643,9 @@ export function bar(input: BarInput): BarView {
     // A tile Plyloft can't place in a conversation: say so (a fresh one is
     // "unstarted", and has nothing to pass yet).
     const ambiguous = (["claude", "codex"] as const).find((v) => answers[v]?.conversation === "ambiguous");
+    // 1.179.0: Claude's newest plan can't be read, so nothing of it is
+    // offered; say why rather than "nothing yet".
+    if (answers.claude?.planUnread === true) return { ...base, kind: "nothing", line: PLAN_UNREAD_WORDS };
     return { ...base, kind: "nothing", line: ambiguous ? conversationUnknownWords(ambiguous) : COMPARE_NOTHING_YET };
   }
   const { from, to } = dir;

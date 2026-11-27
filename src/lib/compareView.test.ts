@@ -22,7 +22,7 @@ import * as W from "./compareWords.ts";
 import { readinessProbe } from "./tileHeaderStatus.ts";
 import { choiceMenuInView, matchesClaudePromptIdle, promptInputEmpty, settledTail } from "./attention.ts";
 import { liveWorking } from "./tileScreen.ts";
-import { STALE_OPEN_QUIET_MS, answerToPass, heldIsProvisional, heldOffered, nextHeld, openTurnStale, passDropped, type ReturnHeld } from "./compareView.ts";
+import { STALE_OPEN_QUIET_MS, answerToPass, heldIsProvisional, heldLapsed, heldOffered, nextHeld, openTurnStale, passDropped, type ReturnHeld } from "./compareView.ts";
 
 const NOW = 10_000_000;
 const tile = (id: string, vendor: "claude" | "codex", over: Partial<TileFacts> = {}): TileFacts => ({
@@ -206,6 +206,11 @@ v = bar(input({ answers: { claude: ans("claude", { conversation: "ambiguous", tu
 assert.equal(v.line, "Can't tell which conversation this Claude tile is in. Send it one message first.");
 v = bar(input({ answers: { codex: ans("codex", { conversation: "unstarted", turn: "none", answer: undefined }) } }));
 assert.equal(v.line, W.COMPARE_NOTHING_YET);
+// 1.179.0: Claude's newest plan can't be read back: nothing offered, and why.
+v = bar(input({ answers: { claude: ans("claude", { answer: undefined, answerKind: undefined, planUnread: true }), codex: fresh("codex") } }));
+assert.equal(v.kind, "nothing");
+assert.equal(v.line, "Can't read Claude's latest plan. Ask Claude to show it again, then try passing it again.");
+assert.equal(W.PLAN_UNREAD_WORDS, v.line);
 // A blank answer is no answer.
 v = bar(input({ answers: { claude: ans("claude", { answer: "  \n " }), codex: fresh("codex") } }));
 assert.equal(v.kind, "nothing");
@@ -625,14 +630,18 @@ console.log("compareView return offer: ok");
   const final = nextHeld(held2, "claude", done, NOW)!;
   assert.equal(final.answer.answer, "Built it.", "the turn's final answer replaces the plan");
   assert.equal(heldIsProvisional(final), false);
-  assert.equal(nextHeld(final, "claude", later, NOW), final, "a separate later question does not replace it");
-  // A finished answer held first stays, even while a new turn is open.
+  // 1.179.0: a separate later answer of that tile, no pass waited for, lapses it.
+  assert.equal(nextHeld(final, "claude", later, NOW), null, "a separate later answer lapses the hold");
+  assert.equal(nextHeld(final, "claude", later, NOW, { into: "claude", at: PASS_AT + 150_000, sawWork: false }), final, "a pass into it is waited for: not this");
+  // A finished answer held first stays while a new turn is open, and lapses
+  // once a newer one is finished (1.179.0).
   const t1 = answerToPass({ into: "claude", at: PASS_AT, sawWork: true }, "claude", ans("claude", { answer: "First", turn: "open", finishedAtMs: PASS_AT + 5 }), NOW)!;
-  assert.equal(nextHeld(t1, "claude", later, NOW), t1);
+  assert.equal(nextHeld(t1, "claude", ans("claude", { answer: "First", turn: "open", finishedAtMs: PASS_AT + 5 }), NOW), t1);
+  assert.equal(nextHeld(t1, "claude", later, NOW), null);
   // Codex's answers are final.
   const cx = answerToPass({ into: "codex", at: PASS_AT, sawWork: true }, "codex", ans("codex", { turn: "open", finishedAtMs: PASS_AT + 5 }), NOW)!;
   assert.equal(heldIsProvisional(cx), false);
-  assert.equal(nextHeld(cx, "codex", ans("codex", { answer: "next", finishedAtMs: NOW - 1 }), NOW), cx);
+  assert.equal(nextHeld(cx, "codex", ans("codex", { answer: "next", finishedAtMs: NOW - 1 }), NOW), null, "final, and lapses on a newer finished answer");
   // The bar offers v2, with v2's age.
   const v = bar(input({ answers: { claude: v2, codex: ans("codex") }, held: held2 }));
   assert.equal(v.from, "claude");
@@ -699,3 +708,91 @@ console.log("compareView unsent Send: ok");
   }
 }
 console.log("compareView typed-just-now: ok");
+
+// 1.179.0 (owner, 2026-11-27, measured): a held answer lapses when its tile
+// finishes a newer answer that is not the answer to a pass. Pass into Codex,
+// Codex answers (answer 1, held); the member asks Codex something of their
+// own later, Codex answers (answer 2): the bar offers answer 2, never 1.
+{
+  const PASS_AT = NOW - 600_000;
+  const pending = { into: "codex" as const, at: PASS_AT, sawWork: true };
+  const one = ans("codex", { answer: "Answer 1", finishedAtMs: PASS_AT + 30_000 });
+  const two = ans("codex", { answer: "Answer 2", finishedAtMs: NOW - 10_000 });
+  const claudeOld = ans("claude", { answer: "Claude's text", finishedAtMs: PASS_AT - 60_000 });
+  const held = answerToPass(pending, "codex", one, NOW)!;
+  assert.equal(held.answer.answer, "Answer 1");
+  // The measured sequence: answer 2 finished, no pass waited for: dropped.
+  assert.equal(heldLapsed(held, "codex", two, NOW), true);
+  assert.equal(nextHeld(held, "codex", two, NOW, null), null);
+  const v = bar(input({ answers: { claude: claudeOld, codex: two }, held: nextHeld(held, "codex", two, NOW, null) }));
+  assert.equal(v.from, "codex");
+  assert.equal(v.line, "Codex answered just now", "the newest answer, offered as with nothing held");
+  // The new turn still open (the read gives answer 1 beside it): still held.
+  assert.equal(nextHeld(held, "codex", { ...one, turn: "open" }, NOW, null), held, "a new turn still open");
+  assert.equal(nextHeld(held, "codex", { ...two, turn: "open" }, NOW, null), held, "lapses only once that turn is finished");
+  // A re-read of answer 1: still held.
+  assert.equal(nextHeld(held, "codex", one, NOW, null), held, "the same answer read again");
+  assert.equal(nextHeld(held, "codex", { ...one }, NOW, null), held, "an equal copy");
+  // An older read never lapses it.
+  assert.equal(nextHeld(held, "codex", ans("codex", { answer: "Older", finishedAtMs: PASS_AT + 1 }), NOW, null), held);
+  // A newer answer in the OTHER tile: still held.
+  assert.equal(nextHeld(held, "claude", ans("claude", { answer: "Claude moved on", finishedAtMs: NOW - 1_000 }), NOW, null), held);
+  // Ambiguous, answer-less or unreadable reads: still held.
+  assert.equal(nextHeld(held, "codex", { ...two, conversation: "ambiguous" }, NOW, null), held);
+  assert.equal(nextHeld(held, "codex", null, NOW, null), held);
+  assert.equal(nextHeld(held, "codex", { vendor: "codex", conversation: "known", turn: "done", cut: false }, NOW, null), held);
+  // Times missing: a different finished text lapses it, the same one doesn't.
+  const noTime = { ...two, finishedAtMs: undefined };
+  assert.equal(nextHeld(held, "codex", noTime, NOW, null), null);
+  assert.equal(nextHeld(held, "codex", { ...one, finishedAtMs: undefined }, NOW, null), held);
+  // A pass into Codex waited for: the new answer is that pass's, held as today.
+  const pending2 = { into: "codex" as const, at: NOW - 20_000, sawWork: true };
+  assert.equal(nextHeld(held, "codex", two, NOW, pending2), held, "no lapse while a pass into it is waited for");
+  assert.equal(answerToPass(pending2, "codex", two, NOW)?.answer.answer, "Answer 2", "the new answer becomes the held one");
+  // The provisional case is unchanged: a plan of an open turn follows that turn.
+  const plan = ans("claude", { answer: "Plan v1", answerKind: "plan", turn: "open", planPending: true, finishedAtMs: PASS_AT + 10 });
+  const heldPlan: ReturnHeld = { from: "claude", answer: { ...plan, answer: "Plan v1" } };
+  assert.equal(heldLapsed(heldPlan, "claude", ans("claude", { answer: "Built it.", finishedAtMs: NOW - 5 }), NOW), false);
+  assert.equal(nextHeld(heldPlan, "claude", ans("claude", { answer: "Built it.", finishedAtMs: NOW - 5 }), NOW)?.answer.answer, "Built it.");
+}
+console.log("compareView held answer lapses: ok");
+
+// 1.179.0 (walk: Put into Claude, then Ctrl+U, never sent). The bar left
+// "It's in Claude's box" only on a strict live `working: false`; Claude's
+// live read is `working: null` when its last turn's prompt scrolled off the
+// page, and the guard already reads that as not working on the screen's
+// proof or the transcript's word. The sent state now ends the same way, and
+// a Put whose box is not known to hold text ends once the other tile has
+// finished a newer answer.
+{
+  const PUT_AT = NOW - 120_000;
+  const sent = { to: "claude" as const, at: PUT_AT, mode: "put" as const };
+  const cleared = tile("c1", "claude", { working: null, draft: false, draftNow: false, turnOverOnScreen: false });
+  const claudeDone = ans("claude", { finishedAtMs: PUT_AT - 60_000 });
+  // The transcript says no turn is open in Claude: over.
+  assert.equal(sentOver(sent, cleared, claudeDone, NOW), true, "cleared box, working unknown, transcript done");
+  assert.equal(sentOver(sent, { ...cleared }, { ...claudeDone, turn: "open" }, NOW), false, "a turn open in the transcript: not proven over");
+  assert.equal(sentOver(sent, { ...cleared, turnOverOnScreen: true }, { ...claudeDone, turn: "open" }, NOW), true, "the screen proves the turn over");
+  assert.equal(sentOver(sent, { ...cleared, vendor: "codex" }, claudeDone, NOW), false, "Codex: never on an unknown");
+  assert.equal(sentOver(sent, { ...cleared, draft: true, draftNow: true }, claudeDone, NOW), false, "text still in the box");
+  // The other tile finished newer answers: a Put no longer in the box is over.
+  const codexNewer = ans("codex", { answer: "Codex again", finishedAtMs: NOW - 5_000 });
+  const stuck = tile("c1", "claude", { working: null, draft: false, draftNow: false, promptIdle: null });
+  assert.equal(sentOver(sent, stuck, { ...claudeDone, turn: "open" }, NOW), false, "nothing proves it over by itself");
+  assert.equal(sentOver(sent, stuck, { ...claudeDone, turn: "open" }, NOW, false, codexNewer), true, "Codex answered since the Put");
+  assert.equal(sentOver(sent, { ...stuck, draft: null }, claudeDone, NOW, false, codexNewer), true, "the box not known to hold it");
+  assert.equal(sentOver(sent, { ...stuck, draftNow: true }, claudeDone, NOW, false, codexNewer), false, "the text seen in the box");
+  assert.equal(sentOver(sent, { ...stuck, working: true }, claudeDone, NOW, false, codexNewer), false, "sent and working on it");
+  assert.equal(sentOver(sent, stuck, claudeDone, NOW, false, ans("codex", { finishedAtMs: PUT_AT - 1 })), false, "an answer from before the Put");
+  assert.equal(sentOver({ ...sent, mode: "send" }, { ...stuck, draftNow: true }, { ...claudeDone, turn: "open" }, NOW, false, codexNewer), false, "a Send is not a Put");
+  // The bar: Codex's newer answer is offered again.
+  const v = bar(input({ tiles: [stuck, tile("x1", "codex")], answers: { claude: { ...claudeDone, turn: "open" }, codex: codexNewer }, sent }));
+  assert.notEqual(v.kind, "sent");
+  assert.equal(v.from, "codex");
+  assert.equal(
+    bar(input({ tiles: [{ ...stuck, draft: true, draftNow: true }, tile("x1", "codex")], answers: { claude: claudeDone, codex: codexNewer }, sent })).line,
+    "It's in Claude's box. Press Enter there to send it.",
+    "still in the box: the line stays",
+  );
+}
+console.log("compareView cleared Put: ok");

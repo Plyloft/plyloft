@@ -1,7 +1,6 @@
 //! Compare (1.177.0): the last finished answer of a Claude or Codex tile,
 //! read from the CLI's own file, and the one cleaned text the window pastes
-//! into the other tile on the member's press. Spike:
-//! `~/ply-build/next-1177/SPIKE-backend.md`.
+//! into the other tile on the member's press.
 //!
 //! - **Which conversation.** The tile's record is looked at again first
 //!   (`terminal_sessions::live_conversation`, through `refresh_title`: a
@@ -115,6 +114,12 @@ pub struct CompareAnswer {
     /// finished answer of a turn that goes on. Sent only when true.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub plan_pending: bool,
+    /// Claude: the newest turn ended on a plan its transcript can't give
+    /// back (the plan file was written after the plan was shown, and that
+    /// write can't be read), so nothing is offered rather than an older
+    /// plan. Sent only when true.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub plan_unread: bool,
     /// The answer is Claude's plan file, read while the approval menu is up
     /// (the log's fact; not sent to the window).
     #[serde(skip)]
@@ -134,13 +139,14 @@ impl std::fmt::Debug for CompareAnswer {
             .field("cut", &self.cut)
             .field("from_earlier_turn", &self.from_earlier_turn)
             .field("plan_pending", &self.plan_pending)
+            .field("plan_unread", &self.plan_unread)
             .finish_non_exhaustive()
     }
 }
 
 impl CompareAnswer {
     fn without_answer(vendor: Option<Vendor>, conversation: ConversationLink, title: Option<String>, turn: TurnState) -> Self {
-        CompareAnswer { vendor, conversation, title, turn, answer: None, answer_kind: None, finished_at_ms: None, chars: None, cut: false, from_earlier_turn: false, plan_pending: false, from_plan_file: false }
+        CompareAnswer { vendor, conversation, title, turn, answer: None, answer_kind: None, finished_at_ms: None, chars: None, cut: false, from_earlier_turn: false, plan_pending: false, plan_unread: false, from_plan_file: false }
     }
 }
 
@@ -180,6 +186,14 @@ pub(crate) struct Parsed {
     /// Claude, an open turn whose ExitPlanMode has its result: the approval
     /// menu was answered (review R2-M1).
     pub plan_answered: bool,
+    /// Claude, an open turn whose last ExitPlanMode on disk was refused with
+    /// the member's feedback: the time stamped on that refusal. Claude then
+    /// writes the next plan to the plan file and shows its menu before any
+    /// of it is flushed (measured, 2.1.332).
+    pub plan_refused_ms: Option<i64>,
+    /// Claude: the turn the answer would come from ended on a plan that
+    /// can't be read back (see [`turn_plan`]).
+    pub plan_unread: bool,
 }
 
 // ── The command ──────────────────────────────────────────────────────────
@@ -198,7 +212,7 @@ pub fn compare_tile_answer(registry: State<'_, PtyRegistry>, pty_id: String) -> 
     });
     let out = tile_answer(live);
     log::info!(
-        "compare: tile read pid={:?} seen(id, pid_names_it, newer_elsewhere, file_bytes)={:?} -> conversation={:?} turn={:?} kind={:?} chars={:?} earlier={} cut={} plan_file={} plan_pending={}",
+        "compare: tile read pid={:?} seen(id, pid_names_it, newer_elsewhere, file_bytes)={:?} -> conversation={:?} turn={:?} kind={:?} chars={:?} earlier={} cut={} plan_file={} plan_pending={} plan_unread={}",
         pid,
         seen,
         out.conversation,
@@ -208,7 +222,8 @@ pub fn compare_tile_answer(registry: State<'_, PtyRegistry>, pty_id: String) -> 
         out.from_earlier_turn,
         out.cut,
         out.from_plan_file,
-        out.plan_pending
+        out.plan_pending,
+        out.plan_unread
     );
     out
 }
@@ -266,6 +281,9 @@ pub(crate) fn tile_answer(live: Option<LiveConversation>) -> CompareAnswer {
             }
         }
     }
+    // B1: a plan that can't be read back is said so, never replaced by an
+    // older one (an open turn's plan file above may still stand in).
+    out.plan_unread = parsed.plan_unread && found.is_none();
     if let Some(found) = found {
         out.from_earlier_turn = earlier;
         out.chars = Some(found.text.chars().count());
@@ -279,7 +297,12 @@ pub(crate) fn tile_answer(live: Option<LiveConversation>) -> CompareAnswer {
         // measured, how far varies), so newer entries can't say the menu was
         // answered; the result can, and it is on disk before any step after
         // it. A write to the plan file during the work never makes it pending.
-        let file_waits = out.from_plan_file && !parsed.plan_answered;
+        // B1: the same holds after a plan refused with feedback (the turn's
+        // last ExitPlanMode on disk): the next plan's menu is up while the
+        // plan file is newer than that refusal, and none of it is flushed.
+        let refused_then_rewritten =
+            matches!((parsed.plan_refused_ms, found.at_ms), (Some(refused), Some(written)) if written > refused);
+        let file_waits = out.from_plan_file && (!parsed.plan_answered || refused_then_rewritten);
         out.plan_pending = parsed.turn == TurnState::Open
             && found.kind == AnswerKind::Plan
             && (file_waits || parsed.plan_waits);
@@ -388,10 +411,12 @@ pub(crate) fn read_tail(
     let mut n = first.min(max).max(1);
     loop {
         let Some((bytes, whole)) = fetch(n) else {
-            return Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false };
+            return Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false };
         };
         let parsed = parse(from_line_start(&bytes, whole), whole);
-        if parsed.found.is_some() || whole || n >= max {
+        // A plan that can't be read back stops the search too: what lies
+        // further back is older than it.
+        if parsed.found.is_some() || parsed.plan_unread || whole || n >= max {
             return parsed;
         }
         n = n.saturating_mul(4).min(max);
@@ -447,14 +472,126 @@ struct ClaudeSide {
     plan_prompts: std::collections::HashSet<String>,
     /// Each user entry's time, by `uuid`.
     prompt_times: std::collections::HashMap<String, i64>,
+    /// The line each tool call was written on, by its id.
+    tool_lines: std::collections::HashMap<String, usize>,
+    /// The line each tool call's result was written on, by the call's id.
+    result_lines: std::collections::HashMap<String, usize>,
+    /// Each `Write` or `Edit` call: whether it is an Edit, its file, its input.
+    writes: std::collections::HashMap<String, (bool, String, Value)>,
+    /// A `Write` or `Edit` whose result is on disk: the file's content after
+    /// it, `None` when that can't be read (an error, an Edit that can't be
+    /// applied to the file it reports).
+    written: std::collections::HashMap<String, Option<String>>,
+    /// Each ExitPlanMode's `planFilePath`, by its id.
+    plan_paths: std::collections::HashMap<String, String>,
+    /// The ExitPlanModes refused with the member's feedback: the refusal's time.
+    refused_with_feedback: std::collections::HashMap<String, Option<i64>>,
+    /// The `sessionId` the transcript's entries carry (the last one seen).
+    session_id: Option<String>,
+}
+
+/// Two spellings of one file path (Windows separators, letter case).
+fn same_path(a: &str, b: &str) -> bool {
+    let norm = |p: &str| p.replace('\\', "/").to_lowercase();
+    norm(a) == norm(b)
+}
+
+/// Whether `path` is this session's plan file, for an ExitPlanMode that
+/// doesn't name it (measured, 2.1.332: a session's first ExitPlanMode can come
+/// with an empty input; every later one names the same file). Tied to the
+/// session, never guessed from a folder: the file another ExitPlanMode in
+/// the tail names, or `plans/<slug>-of-<session id>.md` (the name Claude gives
+/// it, in its config folder). A project's own `docs/plans/*.md` is neither.
+fn is_session_plan_file(path: &str, side: &ClaudeSide) -> bool {
+    if side.plan_paths.values().any(|named| same_path(path, named)) {
+        return true;
+    }
+    let Some(session) = side.session_id.as_deref().filter(|s| !s.is_empty()) else { return false };
+    let path = path.replace('\\', "/").to_lowercase();
+    let mut parts = path.rsplit('/');
+    let name = parts.next().unwrap_or("");
+    name.ends_with(&format!("-of-{}.md", session.to_lowercase())) && parts.next() == Some("plans")
+}
+
+/// The file's content after a successful `Write` or `Edit`, from its result
+/// (`toolUseResult`, when it is that call's own) and its input. An Edit
+/// needs the file as it was (`originalFile`) and its old text in it.
+fn content_after_write(edit: bool, input: &Value, result: Option<&Value>) -> Option<String> {
+    fn text<'a>(v: Option<&'a Value>, key: &str) -> Option<&'a str> {
+        v.and_then(|v| v.get(key)).and_then(Value::as_str)
+    }
+    if !edit {
+        return text(result, "content").or_else(|| text(Some(input), "content")).map(str::to_string);
+    }
+    let original = text(result, "originalFile")?;
+    let old = text(result, "oldString").or_else(|| text(Some(input), "old_string"))?;
+    let new = text(result, "newString").or_else(|| text(Some(input), "new_string"))?;
+    let all = result.and_then(|r| r.get("replaceAll")).or_else(|| input.get("replace_all")).and_then(Value::as_bool)
+        == Some(true);
+    if old.is_empty() {
+        // An Edit with no old text creates the file: only an empty one.
+        return original.is_empty().then(|| new.to_string());
+    }
+    if !original.contains(old) {
+        return None;
+    }
+    Some(if all { original.replace(old, new) } else { original.replacen(old, new, 1) })
+}
+
+/// A tool result's text, whether Claude wrote it as a string or as blocks.
+fn result_text(block: &Value) -> String {
+    match &block["content"] {
+        Value::String(s) => s.clone(),
+        Value::Array(parts) => {
+            parts.iter().filter_map(|p| p.get("text").and_then(Value::as_str)).collect::<Vec<_>>().join("\n")
+        }
+        _ => String::new(),
+    }
 }
 
 fn claude_side(text: &str) -> ClaudeSide {
     let mut side = ClaudeSide::default();
-    for line in text.lines() {
+    for (index, line) in text.lines().enumerate() {
         let Ok(entry) = serde_json::from_str::<Value>(line.trim()) else { continue };
         if let Some(at) = line_ms(&entry) {
             side.last_at = Some(at);
+        }
+        if let Some(session) = entry.get("sessionId").and_then(Value::as_str).filter(|s| !s.is_empty()) {
+            side.session_id = Some(session.to_string());
+        }
+        let sidechain = entry.get("isSidechain").and_then(Value::as_bool) == Some(true);
+        if entry.get("type").and_then(Value::as_str) == Some("user") && !sidechain {
+            // Tool results (only `user` entries: request copies such as
+            // `api-request-blob` repeat tool calls with other inputs).
+            let results: Vec<&Value> = entry["message"]["content"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|b| b.get("type").and_then(Value::as_str) == Some("tool_result"))
+                .collect();
+            for block in &results {
+                let Some(id) = block.get("tool_use_id").and_then(Value::as_str) else { continue };
+                side.result_lines.entry(id.to_string()).or_insert(index);
+                let is_error = block.get("is_error").and_then(Value::as_bool) == Some(true);
+                if let Some((edit, path, input)) = side.writes.get(id) {
+                    // `toolUseResult` is the entry's, so only an entry with one
+                    // result, and only when it names the same file.
+                    let own = entry.get("toolUseResult").filter(|_| results.len() == 1).filter(|r| {
+                        r.get("filePath").and_then(Value::as_str).map_or(true, |p| same_path(p, path))
+                    });
+                    let content = if is_error { None } else { content_after_write(*edit, input, own) };
+                    side.written.entry(id.to_string()).or_insert(content);
+                }
+                // Measured (2.1.332): "Tell Claude what to change" is a
+                // `user-rejected` refusal whose text carries the member's words
+                // after "the user said"; the turn goes on.
+                if is_error
+                    && entry.get("toolDenialKind").and_then(Value::as_str) == Some("user-rejected")
+                    && result_text(block).contains("the user said")
+                {
+                    side.refused_with_feedback.entry(id.to_string()).or_insert(line_ms(&entry));
+                }
+            }
         }
         if let (Some("user"), Some(uuid), Some(at)) =
             (entry.get("type").and_then(Value::as_str), entry.get("uuid").and_then(Value::as_str), line_ms(&entry))
@@ -486,10 +623,23 @@ fn claude_side(text: &str) -> ClaudeSide {
             if let Some(at) = at {
                 side.times.insert(id.to_string(), at);
             }
-            if block.get("name").and_then(Value::as_str) == Some(EXIT_PLAN_MODE) {
-                if let Some(plan) = exit_plan_mode_plan(&block["input"]) {
-                    side.plans.insert(id.to_string(), plan);
+            side.tool_lines.entry(id.to_string()).or_insert(index);
+            let input = &block["input"];
+            match block.get("name").and_then(Value::as_str) {
+                Some(EXIT_PLAN_MODE) => {
+                    if let Some(plan) = exit_plan_mode_plan(input) {
+                        side.plans.insert(id.to_string(), plan);
+                    }
+                    if let Some(path) = input.get("planFilePath").and_then(Value::as_str) {
+                        side.plan_paths.insert(id.to_string(), path.to_string());
+                    }
                 }
+                Some(name @ ("Write" | "Edit")) => {
+                    if let Some(path) = input.get("file_path").and_then(Value::as_str) {
+                        side.writes.entry(id.to_string()).or_insert((name == "Edit", path.to_string(), input.clone()));
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -521,7 +671,7 @@ pub(crate) fn claude_tail(bytes: &[u8], whole: bool) -> Parsed {
     // writes no `turn_duration` after it, so the fold would stay Working.
     let real: Vec<bool> = (0..count).map(|n| !segment(n).is_empty() && !segment(n).iter().all(local_command)).collect();
     let Some(newest) = real.iter().rposition(|r| *r) else {
-        return Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: side.last_at, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false };
+        return Parsed { turn: TurnState::None, found: None, earlier: false, last_entry_ms: side.last_at, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false };
     };
     let turn = if newest + 1 < count || state == ChatState::Ready { TurnState::Done } else { TurnState::Open };
     // Walk 6: whether the open turn is a planning one — its prompt sent in
@@ -560,16 +710,39 @@ pub(crate) fn claude_tail(bytes: &[u8], whole: bool) -> Parsed {
         && segment(newest)
             .iter()
             .any(|it| matches!(it, ChatItem::Tool { name, outcome, .. } if name == EXIT_PLAN_MODE && *outcome != ToolOutcome::Running));
+    // B1 (measured, 2.1.332): the open turn's last ExitPlanMode on disk was
+    // refused with feedback; the next plan's menu can be up with none of it
+    // flushed.
+    let plan_refused_ms = if turn == TurnState::Open {
+        segment(newest)
+            .iter()
+            .rev()
+            .find_map(|it| match it {
+                ChatItem::Tool { id, name, .. } if name == EXIT_PLAN_MODE => Some(id),
+                _ => None,
+            })
+            .and_then(|id| side.refused_with_feedback.get(id).copied().flatten())
+    } else {
+        None
+    };
     for n in (0..=newest).rev().filter(|n| real[*n]) {
         let ended = n != newest || turn == TurnState::Done;
         let cut_head = n == 0 && headless && !whole;
-        if let Some(found) = claude_turn_answer(segment(n), n == 0 && headless, ended, cut_head, &side) {
-            // S1: the newest turn ended without an answer of its own.
-            let earlier = n != newest && turn == TurnState::Done;
-            return Parsed { turn, found: Some(found), earlier, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered };
+        match claude_turn_answer(segment(n), n == 0 && headless, ended, cut_head, &side) {
+            TurnAnswer::Found(found) => {
+                // S1: the newest turn ended without an answer of its own.
+                let earlier = n != newest && turn == TurnState::Done;
+                return Parsed { turn, found: Some(found), earlier, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered, plan_refused_ms, plan_unread: false };
+            }
+            // B1: never an older turn's answer instead of a plan that can't
+            // be read. An open turn's plan file may still stand in.
+            TurnAnswer::PlanUnread => {
+                return Parsed { turn, found: None, earlier: false, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered, plan_refused_ms, plan_unread: ended };
+            }
+            TurnAnswer::Nothing => {}
         }
     }
-    Parsed { turn, found: None, earlier: false, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered }
+    Parsed { turn, found: None, earlier: false, last_entry_ms: side.last_at, planning, prompt_ms, plan_waits, plan_answered, plan_refused_ms, plan_unread: false }
 }
 
 /// A local command's line (`<command-name>…`, `<command-message>…`) or a `!`
@@ -588,7 +761,7 @@ fn local_command(item: &ChatItem) -> bool {
 /// One turn's answer. `headless`: the turn's prompt is not among `items`;
 /// `cut_head`: and it may lie before the tail, so only text after a tool
 /// call in view is surely whole.
-fn claude_turn_answer(items: &[ChatItem], headless: bool, ended: bool, cut_head: bool, side: &ClaudeSide) -> Option<Found> {
+fn claude_turn_answer(items: &[ChatItem], headless: bool, ended: bool, cut_head: bool, side: &ClaudeSide) -> TurnAnswer {
     let speaks = |it: &ChatItem| match it {
         ChatItem::Assistant { text, is_error, .. } => !is_error && !text.trim().is_empty(),
         ChatItem::Tool { .. } | ChatItem::Shell { .. } => true,
@@ -599,15 +772,14 @@ fn claude_turn_answer(items: &[ChatItem], headless: bool, ended: bool, cut_head:
     // plan while its menu is up (the narration just before it is not the
     // answer). After it (unmeasured: Approve, "keep planning", Esc) a turn
     // that ended with text answers with that text; otherwise the plan stays.
-    let plan = body.iter().rev().find_map(|it| match it {
-        ChatItem::Tool { id, name, .. } if name == EXIT_PLAN_MODE => side.plans.get(id).map(|plan| (id, plan)),
-        _ => None,
-    });
-    let plan_found = || {
-        plan.map(|(id, plan)| {
+    let plan = turn_plan(body, side);
+    let plan_found = || match &plan {
+        TurnPlan::Known(id, plan) => {
             let text = cap_relay(plan);
-            Found { cut: relay_was_cut(&text), text, kind: AnswerKind::Plan, at_ms: side.times.get(id).copied() }
-        })
+            TurnAnswer::Found(Found { cut: relay_was_cut(&text), text, kind: AnswerKind::Plan, at_ms: side.times.get(*id).copied() })
+        }
+        TurnPlan::None => TurnAnswer::Nothing,
+        TurnPlan::Unread => TurnAnswer::PlanUnread,
     };
     if matches!(body.iter().rev().find(|it| speaks(it)), Some(ChatItem::Tool { name, .. }) if name == EXIT_PLAN_MODE) {
         return plan_found();
@@ -640,7 +812,89 @@ fn claude_turn_answer(items: &[ChatItem], headless: bool, ended: bool, cut_head:
         conversation.messages.push(message);
     }
     let Some((text, last_id)) = final_answer(&conversation, HEAD) else { return plan_found() };
-    Some(Found { cut: relay_was_cut(&text), at_ms: side.times.get(&last_id).copied(), text, kind: AnswerKind::Text })
+    TurnAnswer::Found(Found { cut: relay_was_cut(&text), at_ms: side.times.get(&last_id).copied(), text, kind: AnswerKind::Text })
+}
+
+/// What one turn gives Compare.
+enum TurnAnswer {
+    Found(Found),
+    /// Nothing of its own: an earlier turn's answer may stand.
+    Nothing,
+    /// It ended on a plan that can't be read back: nothing at all.
+    PlanUnread,
+}
+
+/// A turn's plan: that of its last ExitPlanMode, readable or not.
+enum TurnPlan<'a> {
+    /// The ExitPlanMode's id, and its plan.
+    Known(&'a str, String),
+    None,
+    Unread,
+}
+
+/// B1 (measured, Claude Code 2.1.332): when Claude writes the plan file and
+/// calls ExitPlanMode in one message and the write's result lands after the
+/// ExitPlanMode, its `input.plan` is the file as it was before that write
+/// (the previous plan, or none). So the plan is the content after the last
+/// write of the plan file since the turn's previous ExitPlanMode (or its
+/// start), made before this one's result, when that write's result lands
+/// after it; a write whose result came first left `input.plan` right, and so
+/// does no write at all. A write whose content can't be read (no result yet,
+/// an error, an Edit that can't be applied) makes the plan unknown: never
+/// `input.plan`, never an older ExitPlanMode's. The plan file is the one the
+/// ExitPlanMode names, else one tied to this session
+/// ([`is_session_plan_file`]); any other file is no write of the plan.
+fn turn_plan<'a>(body: &'a [ChatItem], side: &ClaudeSide) -> TurnPlan<'a> {
+    let tools: Vec<(&str, &str)> = body
+        .iter()
+        .filter_map(|it| match it {
+            ChatItem::Tool { id, name, .. } => Some((id.as_str(), name.as_str())),
+            _ => None,
+        })
+        .collect();
+    let Some(last) = tools.iter().rposition(|(_, name)| *name == EXIT_PLAN_MODE) else { return TurnPlan::None };
+    let exit = tools[last].0;
+    let since = tools[..last].iter().rposition(|(_, name)| *name == EXIT_PLAN_MODE).map_or(0, |p| p + 1);
+    let plan_file = side.plan_paths.get(exit);
+    let is_plan_file = |path: &str| match plan_file {
+        Some(file) => same_path(path, file),
+        None => is_session_plan_file(path, side),
+    };
+    let until = side.result_lines.get(exit).copied().unwrap_or(usize::MAX);
+    let write = tools[since..]
+        .iter()
+        .map(|(id, _)| *id)
+        .filter(|id| side.writes.get(*id).is_some_and(|(_, path, _)| is_plan_file(path.as_str())))
+        .filter(|id| side.tool_lines.get(*id).is_some_and(|line| *line < until))
+        .last();
+    let from_input = side.plans.get(exit).cloned();
+    let plan = match write {
+        None => from_input,
+        Some(id) => {
+            let came_first = matches!(
+                (side.result_lines.get(id), side.tool_lines.get(exit)),
+                (Some(result), Some(call)) if result < call
+            );
+            if came_first {
+                // The write landed first, so `input.plan` is that write's
+                // content; an ExitPlanMode that carries none still has it
+                // in the write.
+                from_input.or_else(|| match side.written.get(id) {
+                    Some(Some(content)) => Some(content.trim().to_string()).filter(|c| !c.is_empty()),
+                    _ => None,
+                })
+            } else {
+                match side.written.get(id) {
+                    Some(Some(content)) => Some(content.trim().to_string()).filter(|c| !c.is_empty()),
+                    _ => return TurnPlan::Unread,
+                }
+            }
+        }
+    };
+    match plan {
+        Some(plan) => TurnPlan::Known(exit, plan),
+        None => TurnPlan::None,
+    }
 }
 
 // ── Codex ────────────────────────────────────────────────────────────────
@@ -735,7 +989,7 @@ pub(crate) fn codex_tail(bytes: &[u8], whole: bool) -> Parsed {
         Found { cut: relay_was_cut(&text), text, kind: AnswerKind::Text, at_ms }
     });
     let earlier = turn == TurnState::Done && found.is_some() && !last_end_answered;
-    Parsed { turn, found, earlier, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false }
+    Parsed { turn, found, earlier, last_entry_ms: None, planning: None, prompt_ms: None, plan_waits: false, plan_answered: false, plan_refused_ms: None, plan_unread: false }
 }
 
 // ── The text to paste ────────────────────────────────────────────────────

@@ -399,6 +399,23 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
   if (c.held) {
     if (src) store.setAnswer(workspaceId, c.from, src);
     const h = useCompare.getState().byWorkspace[workspaceId]?.returnHeld;
+    // 1.179.0: the hold lapsed with this read (its tile finished a newer
+    // answer of the member's own, `heldLapsed`): the held text no longer goes;
+    // the press stops and shows that newer answer, as an ordinary composer.
+    if ((!h || h.from !== c.from) && src?.answer && src.answer.trim() !== "" && (src.answer !== c.answer || src.finishedAtMs !== c.finishedAtMs)) {
+      store.patchComposer(workspaceId, {
+        busy: false,
+        error: newerAnswerWords(c.from),
+        answer: src.answer,
+        answerKind: src.answerKind,
+        chars: src.chars ?? src.answer.length,
+        cut: src.cut,
+        finishedAtMs: src.finishedAtMs,
+        cutKnown: false,
+        held: false,
+      });
+      return;
+    }
     if (h && h.from === c.from && (h.answer.answer !== c.answer || h.answer.finishedAtMs !== c.finishedAtMs)) {
       store.patchComposer(workspaceId, {
         busy: false,

@@ -30,6 +30,10 @@ export type CompareAnswer = {
   /** Claude: the answer is the open turn's own plan, still waiting for its
    *  approval menu. Absent when not. */
   planPending?: boolean;
+  /** 1.179.0, Claude: its newest turn ended on a plan the transcript can't
+   *  give back, so no answer is offered (never an older plan). Absent when
+   *  not. */
+  planUnread?: boolean;
 };
 
 /** The pieces in the frontend's own words (Rust `compare::PasteParts`). */
