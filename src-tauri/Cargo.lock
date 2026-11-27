@@ -264,7 +264,7 @@ dependencies = [
  "ply-collab",
  "ply-memory",
  "portable-pty",
- "quick-xml 0.37.5",
+ "quick-xml 0.39.2",
  "reqwest",
  "rustls",
  "same-file",
