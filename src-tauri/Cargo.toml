@@ -108,7 +108,7 @@ semver = "1"
 tauri = { version = "2", features = ["tray-icon"] }
 # WebView2's settings behind `with_webview` (browser accelerator keys off).
 # Already in the tree via tauri/wry, same version.
-webview2-com = "0.38"
+webview2-com = "0.39"
 # canonicalize() without the `\\?\` verbatim prefix git and prefix checks
 # choke on (platform::canonicalize). Already in the tree via tauri-utils.
 dunce = "1"
@@ -157,7 +157,7 @@ socket2 = "0.6"
 # a progress sink that says where each item landed (trash.rs), and the
 # microphone consent store (microphone.rs). Both already in the tree via
 # tauri/webview2-com; windows-core names what `#[implement]` expands to.
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
   "Win32_Foundation",
   "Win32_System_Com",
   "Win32_Storage_FileSystem",
@@ -166,7 +166,7 @@ windows = { version = "0.61", features = [
   "Win32_UI_Shell_Common",
   "Win32_UI_WindowsAndMessaging",
 ] }
-windows-core = "0.61"
+windows-core = "0.62"
 
 [target.'cfg(unix)'.dependencies]
 # Signal a whole process group when abandoning a spawned updater: killing the
