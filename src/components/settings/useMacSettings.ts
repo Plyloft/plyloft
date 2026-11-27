@@ -201,6 +201,8 @@ function offerUndo(undo: {
   // own focus has settled (a checked field puts it back on its input).
   let field: HTMLElement | null = null;
   const note = () => {
+    // The second look runs on a timer: the page may be gone by then.
+    if (typeof document === "undefined") return;
     const el = document.activeElement;
     if (el instanceof HTMLElement && el !== document.body && el.matches("input, select, textarea, button")) field = el;
   };
