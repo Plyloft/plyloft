@@ -1,0 +1,5 @@
+Ply: this repository's Verify scripts read Cargo build output through
+CARGO_TARGET_DIR (scripts/build-sidecar.sh, scripts/verify-build.sh), so a
+card's Verify may build into the workspace's shared Cargo target
+(.atelier-worktrees/.cargo-target). Remove this file if a script Verify runs
+starts reading a fixed target/ path. See docs/STATUS.md (#53).

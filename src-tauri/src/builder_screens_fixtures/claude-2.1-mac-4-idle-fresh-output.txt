@@ -1,0 +1,48 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: idle
+# truth: nothing: idle; the card page had just opened (11:20:52) and its redraw printed 0.5 s before, nothing above the box changed for 85 s; counted working on the safe side while it printed in the last 10 s
+# vendor: claude
+# cli: Claude Code 2.1.330
+# platform: macos
+# source: real capture, Mac walk C, 2026-11-23 (Start build 11:19:19 Claude, 11:22:10 Codex, 11:25:17 Codex trust; Board read every ~5 s); capture mac-112057, frame 1 of 3; home path replaced
+# captured-at: 2026-11-23T10:20:58.403Z
+# key: card-mwt45p4e-0
+# size: 31 rows x 89 cols
+# cursor: row 26, col 2, shown
+# alternate-screen: false
+# exited: false
+# last-output-ago-ms: 533
+# content-changed-ago-ms: 84826
+# ----
+  Read 1 file (ctrl+o to expand)
+
+⏺ f1.txt ha 3 righe.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ f2.txt ha 6 righe.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ f3.txt ha 9 righe.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ f4.txt ha 12 righe.
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ f5.txt ha 15 righe.
+
+  Finito: ho letto tutti e cinque i file (3, 6, 9, 12 e 15 righe) senza creare,
+  modificare o eliminare nulla.
+
+✻ Churned for 9s · done 11:19 AM
+
+─────────────────────────────────────────────────────────────────────────────────────────
+❯
+─────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)
+
+

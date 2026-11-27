@@ -1,0 +1,48 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: idle
+# truth: nothing: turn over (Sauteed for 22s, done; Board Your turn by 13:55:44); counted working on the safe side until 10 s after the last change above the box
+# vendor: claude
+# cli: Claude Code 2.1.330
+# platform: windows
+# source: real capture, Windows walk C2, 2026-11-23 (ConPTY; Start build ~13:55:10 Claude, ~13:58:46 Codex; Board read every ~5 s); capture win-135534, frame 3 of 3; home path replaced
+# captured-at: 2026-11-23T12:55:35.790Z
+# key: card-mwt9patf-0
+# size: 31 rows x 92 cols
+# cursor: row 28, col 2, shown
+# alternate-screen: true
+# exited: false
+# last-output-ago-ms: 26
+# content-changed-ago-ms: 0
+# ----
+
+
+  Searched for 1 pattern, read 1 file
+
+● f1.txt has 3 lines.
+
+  Read 1 file
+
+● f2.txt has 6 lines.
+
+  Read 1 file
+
+● f3.txt has 9 lines.
+
+  Read 1 file
+
+● f4.txt has 12 lines.
+
+  Read 1 file
+
+● f5.txt has 15 lines.
+
+  Finished: all five files read (3, 6, 9, 12 and 15 lines), nothing created, changed or
+  deleted.
+
+✻ Sautéed for 22s · done 1:55 PM
+                                         Your login expires in 1 day · run /login to renew
+────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

@@ -1,0 +1,514 @@
+/* UX-8.5 (Code, basic): the file tree's rows, the editor's tabs, the
+   CODEOWNERS ribbon and the page a file Code cannot open shows in its tab.
+   One scale; every colour is a token. */
+
+/* ── The file tree ─────────────────────────────────────────────────── */
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 24px;
+  padding: 0 var(--space-xs);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+.tree-row:hover {
+  background: var(--hover);
+}
+.tree-row:focus-visible {
+  background: var(--selected);
+}
+.tree-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.tree-row.is-dir .tree-name {
+  font-weight: 500;
+}
+.tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tree-loading {
+  color: var(--muted);
+}
+.tree-error {
+  color: var(--warn);
+  font-size: var(--type-caption);
+  padding: var(--space-2xs) var(--space-xs);
+}
+/* QoL 6.1: a hidden file or folder, when Show hidden files is on. */
+.tree-row.is-hidden .tree-name {
+  color: var(--muted);
+}
+/* QoL 6.3: the inline name of a new file or folder, or a rename. */
+.tree-naming {
+  padding-right: var(--space-xs);
+}
+.tree-name-input {
+  width: 100%;
+  min-height: 22px;
+  margin: 1px 0;
+  padding: 0 var(--space-xs);
+  font: inherit;
+  font-size: var(--type-small);
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--claude-accent);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+/* QoL 6.3: the tree's context menu, at the pointer; it opens rightwards and
+   down from there and turns when that would be cut off (menuPlacement). */
+.tree-menu-anchor {
+  position: fixed;
+  z-index: var(--z-modal);
+  width: 0;
+  height: 0;
+}
+.tree-menu-anchor > .ux-menu {
+  top: 0;
+  left: 0;
+  right: auto;
+}
+.tree-menu-anchor > .ux-menu.ux-menu--end {
+  left: auto;
+  right: 0;
+}
+.tree-menu-anchor > .ux-menu.ux-menu--up {
+  top: auto;
+  bottom: 0;
+}
+
+/* ── The editor's tabs ─────────────────────────────────────────────── */
+
+.editor-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: 32px;
+  padding: 0 var(--space-xs) 0 var(--space-md);
+  font-size: var(--type-small);
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+  user-select: none;
+}
+.editor-tab:hover {
+  background: var(--hover);
+}
+.editor-tab.active {
+  background: var(--bg);
+  box-shadow: inset 0 -2px 0 var(--claude-accent);
+}
+.editor-tab .tab-name {
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+}
+.editor-tab.removed .tab-name {
+  text-decoration: line-through;
+  color: var(--warn);
+}
+/* GH #142: a reading view; UX-8.5: a file Code cannot open. */
+.editor-tab.read-only .tab-name,
+.editor-tab.refused .tab-name {
+  color: var(--muted);
+}
+.editor-tab .tab-readonly {
+  font-size: var(--type-caption);
+  color: var(--muted);
+}
+/* GH #308: a ⌘S that failed says so on the tab, as well as under the tabs. */
+.editor-tab .tab-not-saved {
+  font-size: var(--type-caption);
+  color: var(--warn);
+}
+/* Challenger L5: a tab reloaded from disk in silence says so for a moment. */
+.editor-tab .tab-updated {
+  font-size: var(--type-caption);
+  color: var(--muted);
+}
+.editor-tab.not-saved .dirty-dot {
+  background: var(--warn);
+}
+.editor-save-error {
+  flex-shrink: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border);
+}
+.editor-tab .dirty-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  /* QoL 1.168 (block 10, A6): neutral — green means "good" elsewhere. */
+  background: var(--signal-unsaved-fg);
+}
+/* A real button with the close icon; appears on hover, focus and the
+   active tab. */
+.editor-tab .tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+}
+.editor-tab:hover .tab-close,
+.editor-tab.active .tab-close,
+.editor-tab .tab-close:focus-visible {
+  opacity: 1;
+}
+.editor-tab .tab-close:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+/* ── CODEOWNERS ribbon ─────────────────────────────────────────────── */
+
+/* ── The page for a file Code cannot open ──────────────────────────── */
+
+.editor-refused {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-lift-over);
+  display: flex;
+  justify-content: center;
+  overflow-y: auto;
+  padding: var(--space-3xl) var(--space-xl);
+  background: var(--bg);
+}
+.editor-refused-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  max-width: 560px;
+  width: 100%;
+}
+.editor-refused-title {
+  margin: 0;
+  font-size: var(--type-heading);
+  line-height: var(--type-heading-lh);
+  font-weight: var(--type-heading-weight);
+}
+.editor-refused-reason {
+  margin: 0;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+}
+.editor-refused-path {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+  color: var(--muted);
+  word-break: break-all;
+}
+.editor-refused-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+/* GH #308: a Reveal that failed, under the page's actions. */
+.editor-refused-inner > .ux-error {
+  margin-top: var(--space-md);
+  text-align: left;
+}
+
+/* ── The opener (GH #266): Code with no file open ──────────────────── */
+.code-opener {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: var(--space-2xl);
+  box-sizing: border-box;
+}
+.code-opener-inner {
+  width: 560px;
+  max-width: 100%;
+}
+.code-opener-icon {
+  display: inline-flex;
+  margin-bottom: var(--space-sm);
+  color: var(--muted);
+}
+.code-opener-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--type-heading);
+  line-height: var(--type-heading-lh);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.code-opener-sub {
+  margin: 0 0 var(--space-lg);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--muted);
+}
+/* A field that opens the finder: the control edge at rest, the ring only
+   on keyboard focus. */
+.code-opener-jump {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  height: var(--control-md);
+  padding: 0 var(--space-md);
+  box-sizing: border-box;
+  background: var(--raised);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--type-ui);
+  cursor: pointer;
+}
+.code-opener-jump:hover {
+  background: var(--hover);
+}
+.code-opener-jump-label {
+  flex: 1;
+  text-align: left;
+}
+.code-opener-jump kbd {
+  font-family: inherit;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  color: var(--muted);
+}
+
+/* ── The status bar (GH #267): one line, only what is useful ──────── */
+.editor-statusbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 var(--space-md);
+  border-top: 1px solid var(--border);
+  background: var(--panel-bg);
+  color: var(--muted);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+}
+.editor-statusbar-state {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.editor-statusbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+/* A quiet toggle: no edge, the selected fill while on — not an accent chip. */
+.editor-statusbar-btn {
+  height: 22px;
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.editor-statusbar-btn:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.editor-statusbar-btn[aria-pressed="true"] {
+  background: var(--selected);
+  color: var(--fg);
+}
+
+/* ── The localhost preview (GH #268) ───────────────────────────────── */
+.browser-pane {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel-bg);
+}
+.browser-tabs {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+}
+.browser-body,
+.browser-localhost {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.browser-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-shrink: 0;
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
+}
+.browser-bar .ux-field {
+  flex: 1;
+  min-width: 0;
+}
+/* A page with no background of its own is drawn on the web's default
+   white, whatever Ply's theme — its text assumes it. */
+.browser-iframe {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: white;
+}
+.browser-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl);
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.browser-empty p {
+  margin: 0;
+  max-width: 320px;
+}
+
+/* Try it TI-5 (TRY_IT_SPEC §3.2): the project's own Try session, said at
+   the top of Code's localhost preview; the preview fills what is left. */
+.code-mode-preview > .browser-pane {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.code-try-strip {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
+}
+.code-try-strip-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+/* QoL 6.4: the read-only line over a dropped file from outside the project,
+   with Copy into the project at its end. */
+.editor-readonly-banner:has(> button) {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.editor-readonly-banner > button {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Challenger L3: a row's ⋯, shown on hover and while the row has focus. */
+.tree-row-more {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 var(--space-2xs);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  visibility: hidden;
+}
+.tree-row:hover .tree-row-more,
+.tree-row:focus-visible .tree-row-more {
+  visibility: visible;
+}
+.tree-row-more:hover {
+  background: var(--selected);
+  color: var(--fg);
+}
+/* Challenger L4: the last move to the bin, with its Undo, above the tree. */
+.tree-trashed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-2xs);
+  padding: var(--space-2xs) var(--space-xs);
+  font-size: var(--type-caption);
+  color: var(--muted);
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.tree-trashed-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-trashed-undo,
+.tree-trashed-close {
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  padding: 0 var(--space-2xs);
+  border-radius: var(--radius-sm);
+}
+.tree-trashed-undo {
+  margin-left: auto;
+  font-weight: 500;
+}
+.tree-trashed-undo:hover,
+.tree-trashed-close:hover {
+  background: var(--hover);
+}
+
+/* Windows re-check of block 6: the file on disk stopped being text. */
+.editor-disk-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--type-small);
+  color: var(--warn);
+  border-bottom: 1px solid var(--border);
+}
+.editor-disk-notice > span {
+  flex: 1;
+}

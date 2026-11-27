@@ -1,0 +1,38 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 13, cap 13-I; rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: ready
+# cells: dim
+# ----
+  8
+  9
+  10
+  11
+  12
+  13
+  14
+  15
+  16
+  17
+  18
+  19
+  20
+  21
+  22
+  23
+  24
+  25
+  26
+  27
+  28
+  29
+  30
+
+✻ Sautéed for 1s · done 9:40 AM
+
+────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

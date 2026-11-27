@@ -1,0 +1,48 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: running
+# truth: working: mid-turn (Board Working at 13:59:04); Working line with its timer
+# vendor: codex
+# cli: Codex 0.171.0
+# platform: windows
+# source: real capture, Windows walk C2, 2026-11-23 (ConPTY; Start build ~13:55:10 Claude, ~13:58:46 Codex; Board read every ~5 s); capture win-135849, frame 1 of 3; home path replaced
+# captured-at: 2026-11-23T12:58:50.005Z
+# key: card-mwt9uilf-1
+# size: 31 rows x 92 cols
+# cursor: row 27, col 2, shown
+# alternate-screen: true
+# exited: false
+# last-output-ago-ms: 4
+# content-changed-ago-ms: 0
+# ----
+    back to you here.
+
+  • Your sandbox may block sockets, so the project's full gate can fail locally on socket
+    or port errors. That is expected, not a blocker: report what you ran and what passed;
+    Plyloft runs the full gate outside the sandbox at Finish and check.
+
+  • A skill in this repository can live in two copies: .claude/skills/<name> (Claude's)
+    and .agents/skills/<name> (Codex's). Edit one copy only. At Finish and check Plyloft
+    brings the other copy in line in a commit of its own (skill: align <name>); that commit
+    is Plyloft's, so do not undo it.
+
+  • git may print 'Unable to create …packed-refs.lock'; that's expected — the commit
+    succeeded if git log -1 shows it.
+
+  Task:
+  Read each file in this folder, one at a time. After reading each one, say in one short
+  sentence how many lines it has, before you read the next. Do not create, change or delete
+  any file, and do not run any command that changes anything.
+
+  Read each file in this folder, one at a time. After reading each one, say in one short
+  sentence how many lines it has, before you read the next. Do not create, change or delete
+  any file, and do not run any command that changes anything.
+
+
+• Working (0s • esc to interrupt)
+
+
+› Ask Codex to do anything
+
+  GPT-6.2-Sol default · C:\work\sandboxes\n1763\s1\.plyloft-worktrees\card-mwt9uilf-1
+  ← for agents · ? for shortcuts

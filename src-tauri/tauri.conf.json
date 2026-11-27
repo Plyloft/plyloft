@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "security": {
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$APPCONFIG/attachments/**",
+          "$APPCONFIG/icons/**"
+        ]
+      },
+      "csp": null
+    },
+    "windows": [
+      {
+        "decorations": true,
+        "dragDropEnabled": false,
+        "height": 820,
+        "label": "main",
+        "minHeight": 600,
+        "minWidth": 900,
+        "title": "Plyloft",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 20 },
+        "width": 1280
+      }
+    ]
+  },
+  "build": {
+    "beforeBuildCommand": "node scripts/build-sidecar.mjs --release && npm run build",
+    "beforeDevCommand": "node scripts/build-sidecar.mjs && npm run dev",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../dist"
+  },
+  "bundle": {
+    "active": true,
+    "category": "DeveloperTool",
+    "copyright": "© 2026 MB Adv",
+    "createUpdaterArtifacts": false,
+    "externalBin": [
+      "binaries/ply-mcp"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "resources": {
+      "resources/ply-skills": "ply-skills",
+      "resources/ply-skills-history": "ply-skills-history"
+    },
+    "targets": "all",
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/installer-hooks.nsh"
+      }
+    }
+  },
+  "identifier": "com.mbadv.ply",
+  "plugins": {
+    "updater": {
+      "active": false,
+      "endpoints": [
+        "https://github.com/MatteoB-adv/ply-releases/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU3MjJBNTI1NDkyOTM2ODgKUldTSU5pbEpKYVVpNXcxTEkvNXdTTDJCQm5RYWljYmJxOC92eFJEa1lKK1M4ZVFhSUN4MUlGeC8K",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
+  "productName": "Plyloft",
+  "version": "1.178.0"
+}

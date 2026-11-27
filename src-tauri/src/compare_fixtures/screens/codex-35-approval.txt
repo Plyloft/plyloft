@@ -1,0 +1,27 @@
+# plyloft compare screen v1
+# vendor: codex
+# cli: Codex 0.172.0
+# platform: macos
+# source: real capture, narrow-tile Mac walk 2026-11-26 (app-walks/2026-11-26-122139, Plyloft Test 1.177.1 build 35bb0818, layout Six (2x3), Claude's rule 35 columns, read with ui_terminal), step 7, command approval; rows verbatim
+# verdict: asking
+# cells: plain
+# turn: open
+# ----
+ 
+  Would you like to run the
+  following command?
+ 
+  Environment: local
+ 
+  Reason: Vuoi consentire l’avvio
+  del server locale per
+  verificare il titolo nel
+  browser?
+ 
+  $ python3 -m http.server 8765
+  --bind 127.0.0.1
+› 1. Yes, proceed (y)              
+  2. Yes, and don't ask again for
+     commands that start with
+  Press enter to confirm or esc to 
+  cancel                           

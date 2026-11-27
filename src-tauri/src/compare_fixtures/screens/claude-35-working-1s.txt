@@ -1,0 +1,29 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, narrow-tile Mac walk 2026-11-26 (app-walks/2026-11-26-122139, Plyloft Test 1.177.1 build 35bb0818, layout Six (2x3), Claude's rule 35 columns, read with ui_terminal), step 4, working, about 1 s after Enter (a command in the foreground); rows verbatim
+# verdict: working
+# cells: dim
+# turn: open
+# ----
+ ▝▝   ▝▝   ~/…/compare-1177/app
+
+
+❯ Say GREEN in one word.           
+
+⏺ VERDE
+
+✻ Cogitated for 1s · done 12:22 PM
+
+❯ Run the shell command: sleep 20  
+
+· Caramelizing… (1s · thinking)
+  ⎿  Tip: Use /config to change 
+     your default permission mode
+     (including Plan Mode)
+
+───────────────────────────────────
+❯ 
+───────────────────────────────────
+  ⏵⏵ auto mode on · esc to inter…

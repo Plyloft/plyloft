@@ -1,0 +1,48 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: running
+# truth: working: mid-turn (Board Working at 13:55:29); spinner with its timer
+# vendor: claude
+# cli: Claude Code 2.1.330
+# platform: windows
+# source: real capture, Windows walk C2, 2026-11-23 (ConPTY; Start build ~13:55:10 Claude, ~13:58:46 Codex; Board read every ~5 s); capture win-135514, frame 1 of 3; home path replaced
+# captured-at: 2026-11-23T12:55:15.181Z
+# key: card-mwt9patf-0
+# size: 31 rows x 92 cols
+# cursor: row 28, col 2, shown
+# alternate-screen: true
+# exited: false
+# last-output-ago-ms: 63
+# content-changed-ago-ms: 0
+# ----
+  - Do the task below completely: code, tests, and the project's own checks.
+  - Commit as you go if you like, but do NOT push and do NOT open pull requests. Plyloft
+  ships this card when the human presses Ship.
+  - Stay inside this worktree. Do not edit the main checkout or other worktrees.
+  - Ask the human when a decision is genuinely theirs; otherwise decide and continue.
+  - When you are finished, say so in one line and stop: the human presses "Finish and
+  check" in Plyloft, which snapshots the worktree, runs verification and sends the result
+  back to you here.
+  - Your sandbox may block sockets, so the project's full gate can fail locally on socket
+  or port errors. That is expected, not a blocker: report what you ran and what passed;
+  Plyloft runs the full gate outside the sandbox at Finish and check.
+  - A skill in this repository can live in two copies: .claude/skills/<name> (Claude's) and
+  .agents/skills/<name> (Codex's). Edit one copy only. At Finish and check Plyloft brings
+  the other copy in line in a commit of its own (skill: align <name>); that commit is
+  Plyloft's, so do not undo it.
+
+  Task:
+  Read each file in this folder, one at a time. After reading each one, say in one short
+  sentence how many lines it has, before you read the next. Do not create, change or delete
+  any file, and do not run any command that changes anything.
+
+  Read each file in this folder, one at a time. After reading each one, say in one short
+  sentence how many lines it has, before you read the next. Do not create, change or delete
+  any file, and do not run any command that changes anything.
+
+✢ Zesting…
+                                                                        ◐ medium · /effort
+────────────────────────────────────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt · ← for agents

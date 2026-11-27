@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# v1.4.0: Atelier CLI shim. Resolves the user-supplied path to an absolute
+# directory and routes it to /Applications/Atelier.app via macOS `open`.
+# Tauri's single-instance plugin picks up the argv on the warm path
+# (already-running instance); cold-start parses argv from std::env::args().
+#
+# Install: `cp scripts/cli/atelier /usr/local/bin/atelier && chmod +x ...`
+# Usage:   `atelier .`        (current dir)
+#          `atelier path/to`  (relative)
+#          `atelier ~/code/x` (absolute)
+#          `atelier`          (no path; just open the app)
+set -euo pipefail
+
+APP="${ATELIER_APP_PATH:-/Applications/Atelier.app}"
+if [[ ! -d "$APP" ]]; then
+  echo "atelier: app not found at $APP" >&2
+  echo "atelier: set ATELIER_APP_PATH to override" >&2
+  exit 1
+fi
+
+if [[ $# -eq 0 ]]; then
+  open "$APP"
+  exit 0
+fi
+
+target="$1"
+if [[ ! -d "$target" ]]; then
+  echo "atelier: not a directory: $target" >&2
+  exit 1
+fi
+
+abs="$(cd "$target" && pwd -P)"
+# `open -na` always launches a new instance; the single-instance plugin
+# detects the existing one (if any) and forwards argv via local IPC.
+open -na "$APP" --args "$abs"

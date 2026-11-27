@@ -1,0 +1,28 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, narrow-tile Mac walk 2026-11-26 (app-walks/2026-11-26-122139, Plyloft Test 1.177.1 build 35bb0818, layout Six (2x3), Claude's rule 35 columns, read with ui_terminal), step 6, after Esc on the plan menu, plan mode, the plan's box above the input box; rows verbatim
+# verdict: ready
+# cells: dim
+# ----
+ fuori da #app: in quel caso il
+ titolo va aggiunto nel render di
+     │ Servire la cartella (es.   │
+     │ python3 -m http.server,    │
+     │ necessario per             │
+     │ type="module") e           │
+     │ controllare visivamente la │
+     │ pagina. Se il titolo non   │
+     │ compare o sparisce,        │
+     │ significa che notes.js     │
+     │ scrive fuori da #app: in   │
+     │ quel caso il titolo va     │
+     │ aggiunto nel render di     │
+     │ notes.js.                  │
+     ╰────────────────────────────╯
+
+───────────────────────────────────
+❯ 
+───────────────────────────────────
+  ⏸ plan mode on

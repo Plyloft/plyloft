@@ -1,0 +1,22 @@
+# Vendored vt100 0.16.2 (MIT, https://github.com/doy/vt100-rust, commit
+# eb66ffaf7d771c13303ef73b29f6f2a56fdacecf) with one change: grapheme-aware
+# cell widths. See VENDORED.md. Used through [patch.crates-io] in
+# src-tauri/Cargo.toml. Upstream's dev-dependencies are dropped (its own test
+# suite is not vendored).
+[package]
+name = "vt100"
+version = "0.16.2"
+authors = ["Jesse Luehrs <doy@tozt.net>"]
+edition = "2021"
+rust-version = "1.70"
+description = "Library for parsing terminal data (vendored by Plyloft: grapheme-aware widths)"
+homepage = "https://github.com/doy/vt100-rust"
+repository = "https://github.com/doy/vt100-rust"
+readme = "README.md"
+license = "MIT"
+publish = false
+
+[dependencies]
+itoa = "1.0.15"
+unicode-width = "0.2.1"
+vte = "0.15.0"

@@ -1,0 +1,473 @@
+{
+  "note": "CH-4 (1.174.0): when \"Retry on…\" is offered for a role's round. `offered` is retryOn.ts::retryOffered; retry_on.rs::retryable agrees, given that the card's copy has changes when it has a worktreePath. The one known difference — the TS side can't see the copy's changes — is `rust` (copyHasChanges, retryable). Held by retryOn.test.ts and retry_on.rs.",
+  "cases": [
+    {
+      "name": "no Builder record",
+      "card": {},
+      "role": "builder",
+      "offered": false
+    },
+    {
+      "name": "closed after work",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ]
+        }
+      },
+      "role": "builder",
+      "offered": true
+    },
+    {
+      "name": "still working",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "ptyId": "p1",
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ]
+        }
+      },
+      "role": "builder",
+      "offered": false
+    },
+    {
+      "name": "ended on its own while the app ran",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "sessionLost": true,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ]
+        }
+      },
+      "role": "builder",
+      "offered": true
+    },
+    {
+      "name": "lost when Plyloft restarted: Resume's",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "sessionLost": true,
+          "lostOnRestart": true,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ]
+        }
+      },
+      "role": "builder",
+      "offered": false
+    },
+    {
+      "name": "no session ever ran",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 0,
+          "snapshots": []
+        },
+        "worktreePath": "/w"
+      },
+      "role": "builder",
+      "offered": false
+    },
+    {
+      "name": "no work and no copy",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": []
+        }
+      },
+      "role": "builder",
+      "offered": false
+    },
+    {
+      "name": "no snapshot, a copy: offered; Rust retries only when the copy has changes",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": []
+        },
+        "worktreePath": "/w"
+      },
+      "role": "builder",
+      "offered": true,
+      "rust": {
+        "copyHasChanges": false,
+        "retryable": false
+      }
+    },
+    {
+      "name": "archived",
+      "card": {
+        "archived": true,
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ]
+        }
+      },
+      "role": "builder",
+      "offered": false
+    },
+    {
+      "name": "a pull request's card (owner c)",
+      "card": {
+        "prReview": {
+          "number": 7
+        },
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ]
+        }
+      },
+      "role": "builder",
+      "offered": false
+    },
+    {
+      "name": "built by both, undecided",
+      "card": {
+        "buildBoth": {
+          "startedAt": 1,
+          "lanes": []
+        },
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ]
+        }
+      },
+      "role": "builder",
+      "offered": false
+    },
+    {
+      "name": "the Reviewer hasn't reviewed yet",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ]
+        }
+      },
+      "role": "challenger",
+      "offered": false
+    },
+    {
+      "name": "the Reviewer is still reviewing",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ],
+          "review": {
+            "status": "running",
+            "snapshotN": 1,
+            "provider": "claude",
+            "at": 13
+          }
+        }
+      },
+      "role": "challenger",
+      "offered": false
+    },
+    {
+      "name": "a review queued",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ],
+          "review": {
+            "status": "queued",
+            "snapshotN": 1,
+            "provider": "claude",
+            "at": 13
+          }
+        }
+      },
+      "role": "challenger",
+      "offered": false
+    },
+    {
+      "name": "a review done on the latest work",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ],
+          "review": {
+            "status": "done",
+            "snapshotN": 1,
+            "provider": "claude",
+            "at": 13
+          }
+        }
+      },
+      "role": "challenger",
+      "offered": true
+    },
+    {
+      "name": "a review that failed",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ],
+          "review": {
+            "status": "failed",
+            "snapshotN": 1,
+            "provider": "claude",
+            "at": 13
+          }
+        }
+      },
+      "role": "challenger",
+      "offered": true
+    },
+    {
+      "name": "newer work than the one reviewed",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            },
+            {
+              "n": 2,
+              "sha": "b",
+              "at": 12
+            }
+          ],
+          "review": {
+            "status": "done",
+            "snapshotN": 1,
+            "provider": "claude",
+            "at": 13
+          }
+        }
+      },
+      "role": "challenger",
+      "offered": false
+    },
+    {
+      "name": "an archived card's review",
+      "card": {
+        "archived": true,
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ],
+          "review": {
+            "status": "done",
+            "snapshotN": 1,
+            "provider": "claude",
+            "at": 13
+          }
+        }
+      },
+      "role": "challenger",
+      "offered": false
+    },
+    {
+      "name": "a pull request's card's review",
+      "card": {
+        "prReview": {
+          "number": 7
+        },
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ],
+          "review": {
+            "status": "done",
+            "snapshotN": 1,
+            "provider": "claude",
+            "at": 13
+          }
+        }
+      },
+      "role": "challenger",
+      "offered": false
+    },
+    {
+      "name": "built by both, the pick made",
+      "card": {
+        "buildBoth": {
+          "startedAt": 1,
+          "lanes": [],
+          "outcome": {
+            "kind": "picked",
+            "lane": "a",
+            "vendor": "claude"
+          }
+        },
+        "builder": {
+          "vendor": "claude",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ]
+        }
+      },
+      "role": "builder",
+      "offered": true
+    },
+    {
+      "name": "no snapshot, the copy has changes: offered and retried",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "sessionLost": true,
+          "snapshots": []
+        },
+        "worktreePath": "/w"
+      },
+      "role": "builder",
+      "offered": true,
+      "rust": {
+        "copyHasChanges": true,
+        "retryable": true
+      }
+    },
+    {
+      "name": "a review skipped",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [
+            {
+              "n": 1,
+              "sha": "a",
+              "at": 11
+            }
+          ],
+          "review": {
+            "status": "skipped",
+            "snapshotN": 1,
+            "provider": "claude",
+            "at": 13
+          }
+        }
+      },
+      "role": "challenger",
+      "offered": true
+    },
+    {
+      "name": "a review with no snapshots",
+      "card": {
+        "builder": {
+          "vendor": "codex",
+          "startedAt": 10,
+          "snapshots": [],
+          "review": {
+            "status": "done",
+            "snapshotN": 0,
+            "provider": "claude",
+            "at": 13
+          }
+        }
+      },
+      "role": "challenger",
+      "offered": true
+    }
+  ]
+}

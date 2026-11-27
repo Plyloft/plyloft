@@ -1,0 +1,66 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# TypeScript build artifacts (emitted from vite.config.ts / tsc --build)
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# v1.55.0 (Team Mode): ignore .atelier/ CONTENTS (swarm run artifacts,
+# etc.) but NOT the dir itself — git can only re-include a path if its
+# parent dir is traversable. The team-shared library (prompts / swarm
+# templates / user templates, committed via the Share action) is the one
+# subtree that must reach teammates through the repo.
+.atelier/*
+!.atelier/workspace.json
+!.atelier/library/
+# v1.61.0 (Phase 5 — onboarding): the committed per-repo workspace default
+# read by scripts/onboard.sh to pre-register a workspace on a fresh clone.
+!.atelier/workspace_default.json
+# Card Verify may use the workspace's shared Cargo target: this repository's
+# Verify scripts read Cargo output through CARGO_TARGET_DIR.
+!.atelier/shared-cargo-target
+# Claude Code's local state stays ignored, but not project skills: Claude
+# loads them from .claude/skills, and an ignored root means a card can never
+# carry them (found on the rung 4 walk). Same carve-out shape as .atelier/.
+.claude/*
+!.claude/skills/
+# SL-0 app tester: project agents travel with the repo too.
+!.claude/agents/
+.atelier-worktrees/
+# Codex Phase 2 deferred-backlog scratch captures (Phase 1 §10 — safe to delete)
+.codex-test.txt
+.codex-schema.json
+scripts/__pycache__/
+
+# UX audit harness output (scripts/ux-audit): screenshots, results, the harness build
+ux-audit-out/
+
+# 1.169.0 (B2): the ConPTY package cache and the bundle dir build.rs lays
+# out from it (scripts/fetch-conpty.mjs); the pin is windows/conpty.lock.json.
+src-tauri/windows/conpty/
+
+# The walk tooling's own accounts and dev OAuth client id (scripts/app-tester/
+# walk-config.sh); the committed template is walk.env.example.
+scripts/app-tester/walk.env

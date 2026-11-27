@@ -1,0 +1,21 @@
+{
+  "note": "1.169.0 (owner D2): the menus offer only the newest version of each model family. Family = the model id's words without its version numbers; the newest = the highest version. Held by modelCatalog.test.ts and model_catalog.rs.",
+  "cases": [
+    {
+      "ids": ["gpt-6.1-sol", "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
+      "latest": ["gpt-6.1-sol", "gpt-6-astra", "gpt-6-luna", "gpt-5.6-terra"]
+    },
+    {
+      "ids": ["claude-opus-5", "claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
+      "latest": ["claude-opus-5-5", "claude-fable-5-1", "claude-sonnet-5-5", "claude-haiku-5-5"]
+    },
+    {
+      "ids": ["codex-auto-review", "gpt-7-sol", "gpt-10-sol", "gpt-9.10-sol", "gpt-9.9-sol", "opus", "sonnet"],
+      "latest": ["codex-auto-review", "gpt-10-sol", "opus", "sonnet"]
+    },
+    {
+      "ids": ["gpt-6-astra", "gpt-6-astra", "gpt-6.0-astra"],
+      "latest": ["gpt-6-astra"]
+    }
+  ]
+}

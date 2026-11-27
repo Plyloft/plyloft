@@ -1,0 +1,60 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "severity": "P1",
+      "preExisting": false,
+      "sweepSaw": false,
+      "path": "docs/STATUS.md",
+      "line": 12,
+      "title": "Complete the required Tier 4 walkthrough",
+      "body": "The change explicitly leaves Tier 4 pending, although the brief and project rules require this feature's UI walkthrough. The helper tests cannot establish that Compact makes every card one line, the demo Backlog fits the mini window, Comfortable restores two lines, or the selection survives quitting and relaunching. Accepting the feature now would bypass a required project gate.",
+      "fix": "Perform the specified walkthrough on the mini, fix any failures, and replace the pending entry with the actual results, including quit/relaunch persistence."
+    }
+  ],
+  "nonBlocking": [],
+  "checklist": [
+    {
+      "class": "A",
+      "result": "Checked readDensity, densityClass, both tests, and STATUS. Both helper contracts and the unknown-value test are implemented correctly. Required Tier 4 remains pending; application integration cannot be inspected in the supplied tree."
+    },
+    {
+      "class": "B",
+      "result": "Checked — nothing in the changed helpers: both are synchronous, pure functions with no shared mutable state or asynchronous ordering."
+    },
+    {
+      "class": "C",
+      "result": "Checked — nothing in the changed storage-value normalization: compact is preserved; comfortable, null, and unknown strings default to comfortable. No persisted fields or writes are introduced. Storage integration and relaunch behavior are unavailable for inspection."
+    },
+    {
+      "class": "D",
+      "result": "Checked — nothing in the helpers: missing and unknown stored values have a safe fallback, including empty strings by inspection. No I/O, retries, or error-producing operations are added."
+    },
+    {
+      "class": "E",
+      "result": "Not applicable: the diff creates no processes, timers, handles, temporary files, or other resources."
+    },
+    {
+      "class": "F",
+      "result": "Checked — nothing in the visible TypeScript contracts: readDensity accepts string or null and returns Density; densityClass maps both Density values to the specified class strings. No IPC changes. The consuming component and CSS are absent."
+    },
+    {
+      "class": "G",
+      "result": "Not applicable: the changed code performs no deletion, overwrite, push, publication, or other mutation."
+    },
+    {
+      "class": "H",
+      "result": "Checked both test bodies: compact, comfortable, null, and an unknown stored value are covered, as are both class outputs. Assertions distinguish the previous broken readDensity implementation. Tests are deterministic. Required UI verification remains pending as reported."
+    },
+    {
+      "class": "I",
+      "result": "Checked STATUS and helper comments: the helper descriptions match the implementation, and Tier 4 is honestly labeled pending. Settings text, rendered cards, and interactive states are absent from the supplied tree."
+    }
+  ],
+  "earlierFindings": [],
+  "verificationGaps": [
+    "The tracked tree contains only AGENTS.md, CLAUDE.md, STATUS.md, and the two density files. Board and Settings components, styles, and storage code are unavailable, so class application and persistence integration could not be verified.",
+    "The referenced PPVP documentation, runtime invariants, package configuration, and PPVP script are absent. The documented PPVP 9/9 result could not be independently corroborated.",
+    "No builds or tests were run, as instructed. The mini UI walkthrough and relaunch behavior were not observed."
+  ]
+}

@@ -1,0 +1,1159 @@
+/* UX revamp C3 (ADR 0007): the shell — overlay title bar, sidebar, stage
+   header, the one ⌘K, the shortcuts sheet and the sidebar's status rows.
+   One-scale tokens only; no colour literal belongs here. */
+
+/* ── UX-3.2: the overlay title bar ─────────────────────────────────── */
+/* The window's title bar is transparent (titleBarStyle Overlay); the traffic
+   lights sit over the top of the sidebar. This strip is where they live and
+   where the window is dragged from; a double-click zooms it (Tauri's drag
+   script, the native title-bar behaviour). */
+.shell-titlebar {
+  flex: none;
+  height: 28px;
+}
+
+/* ── UX-3.3: the sidebar ───────────────────────────────────────────── */
+.shell-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  padding: 0 var(--space-sm) var(--space-sm);
+  box-sizing: border-box;
+  background: var(--panel-bg);
+  border-right: 1px solid var(--border);
+  color: var(--fg);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+.shell-nav {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin-top: var(--space-sm);
+  overflow-y: auto;
+  /* A scroll cue: a hairline shadow at an edge with more beyond it (the
+     stack of other workspaces can run past a short window). The two
+     sidebar-coloured covers scroll with the content and hide the shadows
+     at the ends. */
+  background:
+    linear-gradient(var(--panel-bg) 30%, transparent) center top / 100% var(--space-xl) no-repeat local,
+    linear-gradient(transparent, var(--panel-bg) 70%) center bottom / 100% var(--space-xl) no-repeat local,
+    radial-gradient(farthest-side at 50% 0, var(--border), transparent) center top / 100% var(--space-sm) no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, var(--border), transparent) center bottom / 100% var(--space-sm) no-repeat scroll;
+}
+.shell-foot {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+
+/* 1.169.0 (C9): Help, a row like Board or Settings, at the bottom of the
+   navigation and above the foot's line. Its menu opens from the row's left
+   edge (above it, measured, when there is no room below). */
+.shell-help-row {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-2xs);
+}
+.shell-help-row .shell-nav-item {
+  min-width: 0;
+}
+
+/* A row: 32 px, a 16 px icon, the word, a count on the right. */
+.shell-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: none;
+  height: var(--row-compact);
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.shell-nav-item .ux-icon {
+  color: var(--muted);
+}
+.shell-nav-item:hover:not(:disabled) {
+  background: var(--hover);
+}
+.shell-nav-item.is-selected {
+  background: var(--selected);
+}
+.shell-nav-item.is-selected .ux-icon {
+  color: var(--fg);
+}
+.shell-nav-item:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+.shell-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-count {
+  flex: none;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.shell-count--attention {
+  color: var(--claude-accent);
+}
+/* GH #246: on a washed row (selected, hovered, the current workspace) some
+   accents fall below 4.5:1 at 12 px, so the count takes the ink there; the
+   row already carries the state. lib/accentContrast.test.ts holds both. */
+.shell-nav-item.is-selected .shell-count--attention,
+.shell-nav-item:hover:not(:disabled) .shell-count--attention,
+.shell-switcher-row:hover .shell-count--attention,
+.shell-switcher-item[aria-current] .shell-count--attention {
+  color: var(--fg);
+}
+.shell-caption {
+  flex: none;
+  padding: var(--space-md) var(--space-sm) var(--space-xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Live sessions, indented under Terminals with their run dot. */
+.shell-sessions {
+  display: flex;
+  flex-direction: column;
+}
+.shell-session {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: 28px;
+  padding: 0 var(--space-sm) 0 var(--space-xl);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--type-small);
+  text-align: left;
+  cursor: pointer;
+}
+.shell-session:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+/* E4: the session(s) of the card open in the centre (both builds of a card
+   built by both), or the tile expanded on Terminals, are the only rows with
+   a highlight, the sidebar's neutral selected wash as a mode's row has. */
+.shell-session.is-selected {
+  background: var(--selected);
+  color: var(--fg);
+}
+.shell-session-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-session-name.is-shell {
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+}
+/* CL-7: a Builder row is two lines — the card, then who is working on it
+   in words, caption-sized and muted (dot + word; no accent). */
+.shell-session--builder {
+  height: auto;
+  min-height: 28px;
+  padding-top: var(--space-2xs);
+  padding-bottom: var(--space-2xs);
+}
+.shell-session-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.shell-session-text .shell-session-name {
+  flex: none;
+}
+.shell-session-state {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-session--more {
+  padding-left: calc(var(--space-xl) + var(--space-md));
+}
+
+/* The stack of other workspaces (WorkspaceStack): a compact row — the name
+   and its state in words on one line where they fit, the state under the
+   name when the sidebar is narrow — then the chevron that lists what is
+   going on there. */
+.shell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+.shell-stack-list,
+.shell-stack-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.shell-stack-row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-md);
+}
+.shell-stack-row:hover {
+  background: var(--hover);
+}
+.shell-stack-open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+  min-height: var(--row-compact);
+  padding: var(--space-2xs) var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.shell-stack-open .ws-icon-chip {
+  border-radius: var(--radius-sm);
+}
+.shell-stack-text {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-sm);
+  min-width: 0;
+}
+/* The name keeps its width; when name and state do not fit side by side,
+   the state wraps under it (and only a name too long alone is cut). */
+.shell-stack-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* QoL 1.168 (block 10, A8): at most two chips and "+N" (WorkspaceStack);
+   a chip is never cut — one that does not fit wraps whole to the next line. */
+.shell-stack-summary {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  column-gap: var(--space-sm);
+  color: var(--muted);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  white-space: nowrap;
+}
+.shell-stack-summary .ux-state {
+  flex: none;
+  gap: var(--space-xs);
+}
+.shell-stack-more-chips {
+  flex: none;
+}
+.shell-stack-toggle {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--row-compact);
+  height: var(--row-compact);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.shell-stack-toggle:hover {
+  color: var(--fg);
+}
+.shell-stack-toggle[aria-expanded="false"] .ux-icon {
+  transform: rotate(-90deg);
+}
+.shell-stack-item {
+  width: 100%;
+  /* UX P-A Windows walk 2: an item is two lines (its name, then the Inbox
+     row's words), so it grows past the one-line row's 28px instead of
+     overlapping the next item. */
+  height: auto;
+  min-height: 28px;
+  padding-top: var(--space-2xs);
+  padding-bottom: var(--space-2xs);
+}
+.shell-stack-item > .ux-state {
+  flex: 1;
+  min-width: 0;
+}
+.shell-stack-word {
+  flex: none;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+}
+.shell-stack-more {
+  padding-left: var(--space-sm);
+}
+
+/* The run-state dot (8 px); never colour alone — a word is beside it. */
+.shell-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+}
+.shell-dot--running {
+  background: var(--signal-running-fg);
+  animation: ux-pulse var(--dur-pulse) ease-in-out infinite;
+}
+.shell-dot--done {
+  background: var(--signal-done-fg);
+}
+.shell-dot--warn {
+  background: var(--signal-asks-fg);
+}
+/* GH #293: a silent session (or one held) also differs in shape — a ring —
+   so the row reads without colour; its words are in the row's name. */
+.shell-dot--error {
+  background: transparent;
+  border: 2px solid var(--signal-stalled-fg);
+}
+/* QoL 1.168 (block 10, A6): a crashed tile is the tile's red, filled. */
+.shell-dot--crashed {
+  background: var(--signal-crashed-fg);
+}
+/* …and one waiting for you says so: the amber dot and its second line
+   ("Claude · asks you something") in the asks ink. No edge and no box on the
+   row (owner, 2026-10-28, E4) — the tile keeps its amber border, the row
+   only its dot and words. */
+.shell-session--asks .shell-session-state {
+  color: var(--signal-asks-fg);
+  font-weight: 500;
+}
+.shell-dot--empty {
+  background: var(--signal-empty-fg);
+}
+.shell-dot--info {
+  background: var(--claude-accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-dot--running {
+    animation: none;
+  }
+}
+
+/* The workspace switcher: the trigger, then its popover. */
+.shell-switcher {
+  flex: none;
+}
+.shell-switcher .ux-popover-anchor {
+  display: flex;
+  flex-direction: column;
+}
+.shell-switcher-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: var(--row-compact);
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.shell-switcher-trigger:hover,
+.shell-switcher-trigger[aria-expanded="true"] {
+  background: var(--hover);
+}
+.shell-switcher-trigger > .ux-icon {
+  color: var(--muted);
+}
+/* GH #286: another workspace needs you — a dot beside the chevron, never a
+   number next to this workspace's name (it read as this one's count). */
+.shell-switcher-elsewhere {
+  margin-right: calc(-1 * var(--space-xs));
+}
+.shell-switcher-trigger .ws-icon-chip,
+.shell-switcher-item .ws-icon-chip {
+  border-radius: var(--radius-sm);
+}
+.shell-switcher-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 1.174.0 (TX2, T9): a name two workspaces share — its folder in a quiet
+   line under it. */
+.shell-switcher-names {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.shell-switcher-item:has(.shell-switcher-names) {
+  height: auto;
+  min-height: var(--row-compact);
+  padding-block: var(--space-xs);
+}
+.shell-switcher-folder {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+
+/* 1.173.0 (B2): "Area: Site ⌄" under the workspace's name — a quiet row,
+   only with two areas or more. */
+.shell-area-row {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+}
+.shell-area-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: var(--row-compact);
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.shell-area-trigger:hover,
+.shell-area-trigger[aria-expanded="true"] {
+  background: var(--hover);
+  color: var(--fg);
+}
+.shell-area-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-switcher [role="dialog"] {
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  font-weight: 400;
+}
+.shell-switcher-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: var(--control-md);
+  margin-bottom: var(--space-xs);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  color: var(--muted);
+}
+.shell-switcher-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
+.shell-switcher-search:focus-within {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+}
+.shell-switcher .shell-caption {
+  padding: var(--space-xs) var(--space-sm);
+}
+.shell-switcher-list {
+  display: flex;
+  flex-direction: column;
+}
+.shell-switcher-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  border-radius: var(--radius-md);
+}
+.shell-switcher-row:hover {
+  background: var(--hover);
+}
+.shell-switcher-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: var(--row-compact);
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.shell-switcher-item[aria-current] {
+  background: var(--selected);
+}
+.shell-switcher-item[aria-current] > .ux-icon {
+  color: var(--claude-accent);
+}
+.shell-switcher-new {
+  flex: none;
+  width: 100%;
+}
+.shell-switcher-new:hover {
+  background: var(--hover);
+}
+.shell-switcher-new > .ux-icon {
+  color: var(--muted);
+}
+/* The ⋯ appears on hover or focus, and stays while its menu is open. */
+.shell-switcher-row > .ux-more {
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.shell-switcher-row:hover > .ux-more,
+.shell-switcher-row:focus-within > .ux-more {
+  opacity: 1;
+}
+.shell-switcher-row > .ux-more .cicon {
+  width: var(--control-sm);
+  height: var(--control-sm);
+  border-color: transparent;
+}
+/* GH #287: the rename field and, below it, why a rename failed. */
+.shell-switcher-rename-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+.shell-switcher-rename-error {
+  font-size: var(--type-small);
+  line-height: var(--type-body-lh);
+  color: var(--warn);
+  overflow-wrap: anywhere;
+}
+.shell-switcher-rename {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-md);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+}
+.shell-switcher-empty {
+  margin: 0;
+  padding: var(--space-sm);
+  color: var(--muted);
+  font-size: var(--type-small);
+}
+.shell-switcher-divider {
+  height: 1px;
+  margin: var(--space-xs) 0;
+  background: var(--border);
+}
+
+/* The foot's status rows: a dot, a sentence, one action word. */
+.shell-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 28px;
+  padding: var(--space-2xs) var(--space-sm);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* QoL 1.168 (block 10, A8): the sentence wraps to a second line before it
+   is cut, so the action word never follows half a sentence ("Finishing
+   runs befor… · Cancel"); past two lines it gives way (the whole of it in
+   the tooltip). */
+.shell-status-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
+.shell-status--stack .shell-status-text {
+  display: block;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* GH #324: the action word keeps its place on the line. */
+.shell-status-act {
+  flex: none;
+  white-space: nowrap;
+}
+.shell-status-action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.shell-status-action:hover {
+  text-decoration: underline;
+}
+/* TU-4 Mac walk: Getting started's row on two lines — its name, then the
+   count and Resume — so the count is never cut off at the sidebar's width. */
+.shell-status--stack {
+  align-items: flex-start;
+  padding-top: var(--space-2xs);
+  padding-bottom: var(--space-2xs);
+}
+.shell-status--stack .shell-dot { margin-top: 5px; }
+/* 1.176.1 walk: the needs-you row's words wrap whole (two lines at the
+   sidebar's 200 px), never an ellipsis on the meaning; the detail and the
+   action keep the line under them. */
+.shell-status--wrap .shell-status-text {
+  display: block;
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: break-word;
+}
+.shell-status--wrap .shell-status-lines { flex: 1 1 auto; }
+/* "and 3 more · Open the setting" is wider than 200 px allows: the action
+   moves under it whole rather than being pushed out. */
+.shell-status--wrap .shell-status-sub { flex-wrap: wrap; }
+.shell-status-lines {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.shell-status-sub {
+  display: flex;
+  align-items: baseline;
+  /* TU-4 re-walk: the act's leading space is dropped at a flex item's edge
+     ("2 of 10· Resume"); the gap puts it back. */
+  gap: 0.3em;
+  white-space: nowrap;
+}
+/* 1.172.0 (owner, 2026-10-28): a count in plain type, not code. */
+.shell-status-count { color: var(--muted); }
+/* 1.176.1 walk 2: "and 1 more" is a press, read as the count it is. */
+.shell-status-more { color: var(--muted); font-weight: 400; }
+
+/* ── UX-3.4: resizable, collapsible sidebar ────────────────────────── */
+.shell-sidebar-slot {
+  position: relative;
+  flex: none;
+  height: 100%;
+  min-height: 0;
+}
+.shell-sidebar-grip {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  width: 6px;
+  cursor: col-resize;
+}
+.shell-sidebar-grip:hover,
+.shell-sidebar-slot.is-resizing .shell-sidebar-grip {
+  background: linear-gradient(to right, transparent 2px, var(--border-strong) 2px, var(--border-strong) 4px, transparent 4px);
+}
+.shell-sidebar-slot.is-resizing {
+  user-select: none;
+}
+/* Below 1000 px the sidebar floats over the stage on a scrim. */
+.shell-sidebar-slot--overlay {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: var(--z-modal);
+  box-shadow: var(--shadow-popover);
+}
+.shell-sidebar-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-scrim);
+  background: var(--scrim);
+}
+.ws-shell-body {
+  position: relative;
+}
+.shell-stage {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── UX-3.5: the screen header on every mode ───────────────────────── */
+.shell-stage-header {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl) var(--space-lg) var(--space-lg);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+.shell-stage-header-main {
+  flex: 1;
+  min-width: 0;
+}
+/* With the sidebar hidden, the traffic lights sit over the header's left
+   end; the header makes room for them. */
+.ws-shell-body:not(:has(> .shell-sidebar-slot[data-presentation="docked"])) .shell-stage-header {
+  padding-left: var(--traffic-light-inset);
+}
+/* A square icon control on the one scale (30 px). */
+.shell-icon-control {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-md);
+  height: var(--control-md);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.shell-icon-control:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.shell-sidebar-toggle {
+  position: relative;
+  margin-top: calc(var(--space-2xs) * -1);
+}
+/* GH #323: with the sidebar out of sight, its button keeps the signal — the
+   Inbox count, or a dot when a status row waits. */
+.shell-toggle-count {
+  position: absolute;
+  top: calc(-1 * var(--space-2xs));
+  right: calc(-1 * var(--space-xs));
+  min-width: var(--icon-md);
+  padding: 0 var(--space-2xs);
+  border-radius: var(--radius-pill);
+  background: var(--claude-accent);
+  color: var(--on-accent);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.shell-toggle-dot {
+  position: absolute;
+  top: var(--space-2xs);
+  right: var(--space-2xs);
+}
+.shell-stage-header .ux-screen-actions .cbtn {
+  min-height: var(--control-md);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-md);
+  font-size: var(--type-ui);
+}
+.shell-stage-header .ux-screen-actions .cbtn .ux-icon {
+  margin-left: calc(var(--space-2xs) * -1);
+}
+.shell-stage-header .ux-more .cicon {
+  width: var(--control-md);
+  height: var(--control-md);
+  border-color: transparent;
+  border-radius: var(--radius-md);
+}
+.tile-grid-host > .tile-grid-empty {
+  height: auto;
+  min-height: 0;
+}
+/* The card page keeps its own header (C6); with the sidebar hidden it starts
+   below the traffic lights. */
+.ws-shell-body:not(:has(> .shell-sidebar-slot[data-presentation="docked"])) .center-card-host {
+  padding-top: 28px;
+}
+/* Windows (W5): no traffic lights, so no strip for them and no room kept
+   below them; the window is dragged by its own title bar. */
+:root[data-platform="windows"] .shell-titlebar {
+  height: 0;
+}
+:root[data-platform="windows"] .ws-shell-body:not(:has(> .shell-sidebar-slot[data-presentation="docked"])) .center-card-host {
+  padding-top: 0;
+}
+
+/* ── UX-3.6: the one ⌘K ────────────────────────────────────────────── */
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-palette);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 96px;
+  background: var(--scrim);
+}
+.palette-card {
+  display: flex;
+  flex-direction: column;
+  width: min(640px, calc(100vw - 2 * var(--space-lg)));
+  max-height: min(70vh, 600px);
+  overflow: hidden;
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sheet);
+  color: var(--fg);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+.palette-field {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--border);
+}
+.palette-field > .ux-icon {
+  color: var(--muted);
+}
+.palette-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--type-subheading);
+  line-height: var(--type-subheading-lh);
+}
+.palette-input::placeholder {
+  color: var(--placeholder);
+}
+.palette-rescan {
+  flex: none;
+  height: var(--control-sm);
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--type-small);
+  cursor: pointer;
+}
+.palette-rescan:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--fg);
+}
+.palette-scopes {
+  flex: none;
+  display: flex;
+  gap: var(--space-2xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+}
+.palette-scope {
+  height: var(--control-sm);
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--type-small);
+  cursor: pointer;
+}
+.palette-scope:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.palette-scope.is-selected {
+  background: var(--selected);
+  color: var(--fg);
+}
+.palette-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.palette-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: var(--space-xs);
+  overflow-y: auto;
+  list-style: none;
+}
+.palette-section {
+  padding: var(--space-sm) var(--space-sm) var(--space-xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.palette-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  min-height: var(--row-compact);
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+}
+.palette-item.active {
+  background: var(--selected);
+}
+.palette-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.palette-item-icon {
+  flex: none;
+  display: inline-flex;
+  width: var(--icon-md);
+  color: var(--muted);
+}
+.palette-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.palette-item-label.is-path {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono);
+}
+.palette-item-hint {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--type-caption);
+  color: var(--muted);
+}
+.palette-empty {
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--type-small);
+}
+.palette-foot {
+  flex: none;
+  padding: var(--space-xs) var(--space-lg);
+  border-top: 1px solid var(--border);
+  font-size: var(--type-caption);
+  color: var(--muted);
+}
+/* GH #285: the "In files" and History scopes draw ⌘K's own rows — an
+   icon, the line, a quiet hint — under sentence-case captions; their options
+   are a Segmented control and small toggles in words. They fill the surface
+   and scroll. */
+.history-search-body,
+.search-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.palette-options {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md) 0;
+}
+.palette-status {
+  flex: none;
+  margin: 0;
+  padding: var(--space-sm) var(--space-md) 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.palette-status:empty {
+  display: none;
+}
+.palette-status--warn {
+  color: var(--warn);
+}
+.palette-empty-text,
+.palette-empty-hint {
+  margin: 0;
+}
+.palette-empty-hint {
+  margin-top: var(--space-xs);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.palette-group,
+.palette-group-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* A row that is a button (the History and In files hits): the row's look. */
+.palette-item--button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+}
+.palette-item--button:hover,
+.palette-item--button:focus-visible {
+  background: var(--selected);
+}
+.palette-item--button:focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: calc(-1 * var(--focus-w));
+}
+/* A file's caption over its matches: the path, then how many. */
+.palette-section--file {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.palette-section-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── UX-3.7: the ⌘/ shortcuts sheet ───────────────────────────────── */
+.shell-shortcuts {
+  /* 1.169.0 Mac walk: never shrunk to the body's height (its last rows
+     were cut off with nothing to scroll); the body scrolls instead. */
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-lg) var(--space-xl);
+}
+.shell-shortcuts-heading {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.shell-shortcuts-list {
+  margin: 0;
+}
+/* X6 (G1 Windows walk): the label gets the width — at least 45% of the
+   row — and a long chip ("Ctrl+K · in a terminal Ctrl+Shift+K", "Ctrl+Shift+C,
+   or Ctrl+C on a selection") wraps inside its own cell instead of pushing
+   the label to one word per line or overflowing the column. */
+.shell-shortcuts-row {
+  display: grid;
+  grid-template-columns: minmax(45%, 1fr) minmax(0, auto);
+  align-items: center;
+  gap: var(--space-md);
+  min-height: var(--row-compact);
+  border-bottom: 1px solid var(--border);
+}
+.shell-shortcuts-label {
+  min-width: 0;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+}
+.shell-shortcuts-keys {
+  margin: 0;
+  min-width: 0;
+  justify-self: end;
+  text-align: right;
+}
+.shell-shortcuts-keys kbd {
+  display: inline-block;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  white-space: normal;
+  overflow-wrap: break-word;
+  text-align: left;
+}
+/* X6: the sheet's note in the body font (the sheet foot's note is mono). */
+.ux-sheet-note .shell-shortcuts-note {
+  font-family: var(--font-ui);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}

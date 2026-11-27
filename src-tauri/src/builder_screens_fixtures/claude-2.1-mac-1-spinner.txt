@@ -1,0 +1,48 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: running
+# truth: working: mid-turn, Board said Working until ~11:19:30; spinner with its timer
+# vendor: claude
+# cli: Claude Code 2.1.330
+# platform: macos
+# source: real capture, Mac walk C, 2026-11-23 (Start build 11:19:19 Claude, 11:22:10 Codex, 11:25:17 Codex trust; Board read every ~5 s); capture mac-111922, frame 1 of 3; home path replaced
+# captured-at: 2026-11-23T10:19:22.725Z
+# key: card-mwt45p4e-0
+# size: 31 rows x 89 cols
+# cursor: row 26, col 2, shown
+# alternate-screen: false
+# exited: false
+# last-output-ago-ms: 48
+# content-changed-ago-ms: 0
+# ----
+  socket or port errors. That is expected, not a blocker: report what you ran and what
+  passed; Plyloft runs the full gate outside the sandbox at Finish and check.
+  - A skill in this repository can live in two copies: .claude/skills/<name> (Claude's)
+  and .agents/skills/<name> (Codex's). Edit one copy only. At Finish and check Plyloft
+  brings the other copy in line in a commit of its own (skill: align <name>); that
+  commit is Plyloft's, so do not undo it.
+
+  Task:
+  Read each file in this folder, one at a time
+
+  Read each file in this folder, one at a time. After reading each one, say in one short
+  sentence how many lines it has, before you read the next. Do not create, change or
+  delete any file, and do not run any command that changes anything.
+
+⏺ Bash(git ls-files; echo ---; ls -la)
+  ⎿  f1.txt
+     f2.txt
+     f3.txt
+     … +12 lines (ctrl+o to expand)
+  ⎿  Allowed by auto mode
+
+⏺ Reading 1 file… (ctrl+o to expand)
+
+✳ Smooshing… (2s · ↓ 79 tokens)
+
+─────────────────────────────────────────────────────────────────────────────────────────
+❯
+─────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · esc to interrupt · ← for agents
+                                                                     ◐ medium · /effort
+

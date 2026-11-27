@@ -1,0 +1,52 @@
+# plyloft builder screen frame v1
+# expect: waiting
+# screen: asking
+# truth: waiting: Claude's edit permission menu, unanswered for over 60 s, the session's name drawn as the screen's last row under it
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: windows
+# source: transcribed from the Windows walk 2026-11-25 (1.177.0 round 4), step 9, screenshot 09b-first-edit-permission-target.png (the walk read no grid; scale 2.0); the rows as the tile shows them, the rules at the tile's width
+# exited: false
+# last-output-ago-ms: 60000
+# content-changed-ago-ms: 60000
+# ----
+    that renderList([{ text: 'a' }]) returns
+    <h2>Notes</h2><ul><li>a</li></ul>.
+
+  Files
+
+  - notes.js – the only file modified.
+
+● Update(notes.js)
+
+● Running renderList in Node and printing its output
+  ⎿ $ cp notes.js "$TEMP/notes-check.mjs" && node -e
+    "import('file:///' +
+    process.env.TEMP.replace(/\\\\/g,'/') +
+    '/notes-check.mjs').then(m =>
+    console.log(m.renderList([{text:'a'}])))"; rm -f
+    "$TEMP/notes-check.mjs"
+
+──────────────────────────────────────────────────────────
+ Edit file
+ notes.js
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ 3   return `<li>${n.text}</li>`;
+ 4 }
+ 5
+ 6 -export function renderList(notes) {
+ 7 -  return `<ul>${notes.map(renderNote).join('')}</ul>`;
+ 6 +export function renderList(notes, title = 'Notes') {
+ 7 +  return `<h2>${title}</h2><ul>${notes.map(renderNote).jo
+   +in('')}</ul>`;
+ 8 }
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+ Do you want to make this edit to notes.js?
+ ❯ 1. Yes
+   2. Yes, and switch to accept edits (auto-approve file
+      edits and common file commands) for this session
+      (shift+tab)
+   3. No
+
+ Esc to cancel · Tab to amend
+─────────────────────────────────── add-notes-list-title ─

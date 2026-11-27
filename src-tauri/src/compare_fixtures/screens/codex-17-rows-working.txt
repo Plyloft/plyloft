@@ -1,0 +1,26 @@
+# plyloft compare screen v1
+# vendor: codex
+# cli: Codex 0.172.0
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 13, cap 13-G (working); rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: working
+# cells: plain
+# turn: open
+# ----
+› Say ORANGE in one word.
+• ORANGE
+ 
+  Worked for 1s • 09:38                                 
+ 
+ 
+› Count from 1 to 30, one per line, slowly.
+ 
+ 
+• Working (1s • esc to interrupt)
+ 
+ 
+› Ask Codex to do anything
+ 
+  GPT-6.2-Sol default · ~/Library/Application Support/
+  com.mbadv.ply.test/app-tester/sandboxes/compare-1177/…
+  ← for agents · ? for shortcuts

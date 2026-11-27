@@ -1,0 +1,60 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "severity": "P2",
+      "preExisting": false,
+      "sweepSaw": false,
+      "path": "docs/STATUS.md",
+      "line": 12,
+      "title": "Describe the required Tier 4 walkthrough",
+      "body": "The owner following these release notes sees only “Tier 4 pending (mini)” without instructions or expected results. This omits all four acceptance observations: Compact makes every card one line, the demo Backlog fits the window, Comfortable restores two lines, and the selected density survives a relaunch. Pending execution is acceptable; the missing walkthrough is the defect.",
+      "fix": "Keep Tier 4 marked pending and add steps on the mini to select Compact and verify one-line cards and the demo Backlog fitting the window, select Comfortable and verify two-line cards return, then quit and relaunch to verify the selected density persists."
+    }
+  ],
+  "nonBlocking": [],
+  "checklist": [
+    {
+      "class": "A. Requirements",
+      "result": "The complete diff implements both helper contracts and the requested tests, including an unknown stored value. Found the missing Tier 4 walkthrough description. Application integration is unavailable in this snapshot."
+    },
+    {
+      "class": "B. Concurrency and ordering",
+      "result": "Checked — nothing. Both helpers are synchronous pure functions; the changes introduce no asynchronous operations or shared mutable state."
+    },
+    {
+      "class": "C. State and persistence",
+      "result": "Checked — nothing in the changed code. readDensity preserves compact and defaults comfortable, null, and unknown strings to comfortable. No persisted fields or writes are introduced."
+    },
+    {
+      "class": "D. Failure paths",
+      "result": "Checked — nothing. Missing storage values and unknown strings safely fall back to comfortable; neither helper performs fallible I/O."
+    },
+    {
+      "class": "E. Processes and resources",
+      "result": "Not applicable — the changed helpers, tests, and documentation create no processes, handles, subscriptions, or temporary files."
+    },
+    {
+      "class": "F. Boundaries and contracts",
+      "result": "Checked — nothing in the available code. Density values, helper signatures, return strings, and test imports agree. No IPC or trust-boundary changes."
+    },
+    {
+      "class": "G. Data safety",
+      "result": "Not applicable — the change contains no deletion, overwrite, push, publication, or other state-changing operation."
+    },
+    {
+      "class": "H. Tests",
+      "result": "Checked — nothing in the test assertions. Tests cover both class mappings and compact, comfortable, null, and unknown stored values; they would detect the original always-comfortable implementation. No timing or shared-resource dependencies."
+    },
+    {
+      "class": "I. User-facing text and states",
+      "result": "Checked — no additional defect in available text. The incomplete owner walkthrough is reported under A; application UI states are absent from the snapshot."
+    }
+  ],
+  "earlierFindings": [],
+  "verificationGaps": [
+    "The tracked snapshot contains only AGENTS.md, CLAUDE.md, docs/STATUS.md, and the two density files. Board callers, CSS, Settings persistence, and the referenced PPVP documentation are unavailable, so end-to-end integration cannot be assessed.",
+    "Tests and builds were not run, as instructed. The documented PPVP 9/9 result cannot be independently verified from the provided files.",
+    "The installed-app Tier 4 checks remain the owner's post-release verification."
+  ]
+}

@@ -1,0 +1,48 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: running
+# truth: working: mid-turn, the turn's last seconds (it ended by 13:59:19); Working line with a background terminal
+# vendor: codex
+# cli: Codex 0.171.0
+# platform: windows
+# source: real capture, Windows walk C2, 2026-11-23 (ConPTY; Start build ~13:55:10 Claude, ~13:58:46 Codex; Board read every ~5 s); capture win-135914, frame 3 of 3; home path replaced
+# captured-at: 2026-11-23T12:59:16.503Z
+# key: card-mwt9uilf-1
+# size: 31 rows x 92 cols
+# cursor: row 26, col 2, shown
+# alternate-screen: true
+# exited: false
+# last-output-ago-ms: 9
+# content-changed-ago-ms: 0
+# ----
+› You are the Builder for the Plyloft card "Read each file in this folder, one at a time. …
+• .git has 1 line.
+
+• Ran (Get-Content -LiteralPath f1.txt | Measure-Object).Count
+  └ 3
+
+• f1.txt has 3 lines.
+
+• Ran (Get-Content -LiteralPath f2.txt | Measure-Object).Count
+  └ 6
+
+• f2.txt has 6 lines.
+
+• Ran (Get-Content -LiteralPath f3.txt | Measure-Object).Count
+  └ 9
+
+• f3.txt has 9 lines.
+
+• Ran (Get-Content -LiteralPath f4.txt | Measure-Object).Count
+  └ 12
+
+• f4.txt has 12 lines.
+
+• Working (26s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to…
+
+
+› Ask Codex to do anything
+
+  GPT-6.2-Sol default · C:\work\sandboxes\n1763\s1\.plyloft-worktrees\card-mwt9uilf-1 ·
+  You are the Builder for the Plyloft card "Read each file in…
+  ← for agents · ? for shortcuts

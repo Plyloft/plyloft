@@ -1,0 +1,210 @@
+# Windows feasibility spike: does Ply build and pass its tests on Windows?
+# Every step keeps going and saves its output, so one run lists every error.
+name: windows-check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "windows/**"
+      - "next/windows-sidebar"
+
+env:
+  CARGO_TERM_COLOR: never
+
+concurrency:
+  group: windows-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Sidecar (ply-mcp)
+        id: sidecar
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          bash scripts/build-sidecar.sh --target x86_64-pc-windows-msvc 2>&1 | tee out/sidecar.txt
+          exit ${PIPESTATUS[0]}
+      - name: cargo check (workspace, all targets)
+        id: check
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          cargo check --manifest-path src-tauri/Cargo.toml --workspace --all-targets --message-format short 2>&1 | tee out/check.txt
+          exit ${PIPESTATUS[0]}
+      - name: cargo test (lib)
+        id: test
+        if: steps.check.outcome == 'success'
+        continue-on-error: true
+        env:
+          PLY_TEST_REQUIRE_ALL: "1"
+        run: |
+          cargo test --manifest-path src-tauri/Cargo.toml --workspace --lib --no-fail-fast 2>&1 | tee out/test.txt
+          exit ${PIPESTATUS[0]}
+      - name: Summary
+        if: always()
+        run: |
+          mkdir -p out
+          {
+            echo "sidecar=${{ steps.sidecar.outcome }} check=${{ steps.check.outcome }} test=${{ steps.test.outcome }}"
+            echo "errors: $(grep -c ': error' out/check.txt 2>/dev/null || echo 0)"
+            echo "warnings: $(grep -c ': warning' out/check.txt 2>/dev/null || echo 0)"
+            grep -E '^test result|FAILED|panicked' out/test.txt 2>/dev/null | tail -40 || true
+          } | tee out/summary.txt
+          cat out/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rust-out
+          path: out/
+      # The steps above keep going so every output is saved; the run still
+      # fails when any of them did (a skipped test step included).
+      - name: Gate
+        if: always()
+        run: |
+          for outcome in "${{ steps.sidecar.outcome }}" "${{ steps.check.outcome }}" "${{ steps.test.outcome }}"; do
+            [ "$outcome" = success ] || { echo "a step did not pass: sidecar=${{ steps.sidecar.outcome }} check=${{ steps.check.outcome }} test=${{ steps.test.outcome }}"; exit 1; }
+          done
+
+  # An unsigned NSIS installer, to try the app on a Windows machine. Built
+  # through the real beforeBuildCommand (node scripts/build-sidecar.mjs, which
+  # builds the sidecar with Git Bash, then the frontend), so the hook is
+  # tested too. Gated: a Windows build that stops bundling fails the run.
+  bundle:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: bundle
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: tauri build (nsis)
+        id: tauri
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          npx tauri build --target x86_64-pc-windows-msvc --bundles nsis 2>&1 | tee out/bundle.txt
+          exit ${PIPESTATUS[0]}
+      # A clean Windows has no Visual C++ runtime: neither shipped binary may
+      # import VCRUNTIME140.dll (the sidecar once did and failed to start).
+      - name: No VC++ runtime import
+        id: vcrt
+        if: steps.tauri.outcome == 'success'
+        continue-on-error: true
+        run: |
+          rel=src-tauri/target/x86_64-pc-windows-msvc/release
+          bad=0
+          for exe in "$rel/atelier.exe" "$rel/ply-mcp.exe" src-tauri/binaries/ply-mcp-x86_64-pc-windows-msvc.exe; do
+            [ -f "$exe" ] || continue
+            if grep -qai 'vcruntime140' "$exe"; then echo "imports VCRUNTIME140: $exe" | tee -a out/bundle.txt; bad=1; else echo "static runtime: $exe"; fi
+          done
+          exit $bad
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bundle-out
+          path: out/
+      - uses: actions/upload-artifact@v4
+        if: steps.tauri.outcome == 'success'
+        with:
+          name: ply-windows-installer
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+      - name: Gate
+        if: always()
+        run: |
+          [ "${{ steps.tauri.outcome }}" = success ] || { echo "tauri build did not pass"; exit 1; }
+          [ "${{ steps.vcrt.outcome }}" = success ] || { echo "a binary needs the VC++ runtime"; exit 1; }
+
+  frontend:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: tsc
+        id: tsc
+        continue-on-error: true
+        run: |
+          mkdir -p out
+          npx tsc --noEmit 2>&1 | tee out/tsc.txt
+          exit ${PIPESTATUS[0]}
+      - name: vite build
+        id: build
+        continue-on-error: true
+        run: |
+          npx vite build 2>&1 | tee out/build.txt
+          exit ${PIPESTATUS[0]}
+      - name: vitest
+        id: vitest
+        continue-on-error: true
+        run: |
+          npx vitest run 2>&1 | tee out/vitest.txt
+          exit ${PIPESTATUS[0]}
+      - name: pure contracts (src/lib/*.test.ts)
+        id: lib
+        continue-on-error: true
+        run: |
+          fail=0
+          for t in src/lib/*.test.ts; do
+            node --experimental-strip-types "$t" > /dev/null 2>> out/lib.txt || { echo "FAIL $t" | tee -a out/lib-fails.txt; fail=1; }
+          done
+          exit $fail
+      - name: ux-check
+        id: uxcheck
+        continue-on-error: true
+        run: |
+          node scripts/ux-check.mjs 2>&1 | tee out/uxcheck.txt
+          exit ${PIPESTATUS[0]}
+      - name: Summary
+        if: always()
+        run: |
+          mkdir -p out
+          {
+            echo "tsc=${{ steps.tsc.outcome }} build=${{ steps.build.outcome }} vitest=${{ steps.vitest.outcome }} lib=${{ steps.lib.outcome }} ux-check=${{ steps.uxcheck.outcome }}"
+            grep -E 'Tests |Test Files' out/vitest.txt 2>/dev/null || true
+            cat out/lib-fails.txt 2>/dev/null || true
+          } | tee out/summary.txt
+          cat out/summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-out
+          path: out/
+      - name: Gate
+        if: always()
+        run: |
+          for outcome in "${{ steps.tsc.outcome }}" "${{ steps.build.outcome }}" "${{ steps.vitest.outcome }}" "${{ steps.lib.outcome }}" "${{ steps.uxcheck.outcome }}"; do
+            [ "$outcome" = success ] || { echo "a step did not pass: tsc=${{ steps.tsc.outcome }} build=${{ steps.build.outcome }} vitest=${{ steps.vitest.outcome }} lib=${{ steps.lib.outcome }} ux-check=${{ steps.uxcheck.outcome }}"; exit 1; }
+          done

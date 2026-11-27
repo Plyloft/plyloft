@@ -1,0 +1,17 @@
+[package]
+name = "ply-test-mcp"
+version = "0.1.0"
+description = "SL-0 app tester: the MCP server the app-tester agent drives Plyloft Test through (dev tooling, never bundled)"
+edition = "2021"
+publish = false
+
+# Standalone on purpose: not a member of src-tauri's workspace, so it never
+# touches Plyloft's dependency graph, bundle or Windows check.
+[workspace]
+
+[dependencies]
+serde_json = "1"
+base64 = "0.22"
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,0 +1,33 @@
+# CODEOWNERS — auto-requests @MatteoB-adv as a reviewer on high-blast-radius
+# paths. GitHub applies the LAST matching rule only (last-match-wins); a rule
+# with no owners clears ownership for that subpath. Ply's in-app ribbon
+# (src-tauri/src/codeowners.rs, v1.62.0) parses THIS file to warn when an
+# edit will need the owner's review — so keep the patterns honest.
+#
+# Branch protection on `main` requires 1 standard approval (not CODEOWNERS-only),
+# so the PR author can still self-merge once the owner approves. See
+# docs/BRANCH_PROTECTION.md.
+
+# Hard-rule surfaces: PTY/auth lifecycle, the kanban persistence + claim gate,
+# the swarm engine, the ship gate, and settings.
+/src-tauri/src/pty.rs              @MatteoB-adv
+/src-tauri/src/kanban.rs           @MatteoB-adv
+/src-tauri/src/swarms.rs           @MatteoB-adv
+/src-tauri/src/swarm_templates.rs  @MatteoB-adv
+/src-tauri/src/ship.rs             @MatteoB-adv
+/src-tauri/src/settings.rs         @MatteoB-adv
+
+# Persistence layer (atomic-write stores keyed by app-data).
+/src-tauri/src/workspace.rs        @MatteoB-adv
+/src-tauri/src/agents.rs           @MatteoB-adv
+/src-tauri/src/prompts.rs          @MatteoB-adv
+/src-tauri/src/snapshots.rs        @MatteoB-adv
+
+# The ship gate's IPC + GitHub sync glue (card_ship is the only sanctioned push).
+/src-tauri/src/commands.rs         @MatteoB-adv
+/src-tauri/src/github_sync.rs      @MatteoB-adv
+
+# Release + signing path, capabilities, and this ownership file itself.
+/scripts/release.sh                @MatteoB-adv
+/src-tauri/capabilities/           @MatteoB-adv
+/.github/CODEOWNERS                @MatteoB-adv

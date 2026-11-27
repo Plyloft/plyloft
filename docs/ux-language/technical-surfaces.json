@@ -1,0 +1,18 @@
+{
+  "about": "UX P-D1 (docs/plans/UX_P1.md point 6): the surfaces where developer words are the point, so scripts/ux-check.mjs does not count jargon in them. A whole file, or a named function inside a file. Raw errors are counted everywhere. Keep this list short: a page a newcomer reads by default never belongs here.",
+  "files": [
+    { "file": "src/components/settings/DiagnosticsPage.tsx", "why": "Settings › Diagnostics" },
+    { "file": "src/components/settings/WorktreesPage.tsx", "why": "Settings › Worktrees" },
+    { "file": "src/components/Terminal.tsx", "why": "the terminals" },
+    { "file": "src/components/InstalledSelfCheckObserver.tsx", "why": "the installed build's P3-1 self-check, a validation tool opened only from ⌘K (Ply diagnostics)" },
+    { "file": "src/lib/installedSelfCheck.ts", "why": "the installed build's P3-1 self-check: scripts/runtime-smoke.mjs types its palette query verbatim" }
+  ],
+  "functions": [
+    { "file": "src/components/CardTechnicalDetails.tsx", "name": "CardTechnicalDetails", "why": "the card's Details rows (drawn inside its Technical details disclosure)" },
+    { "file": "src/components/CardReviewPanel.tsx", "name": "DiffFiles", "why": "the Changes section's own code view" },
+    { "file": "src/components/CardReviewPanel.tsx", "name": "ReviewFile", "why": "the Changes section's own code view" },
+    { "file": "src/components/CardReviewPanel.tsx", "name": "ReviewHunk", "why": "the Changes section's own code view" },
+    { "file": "src/components/RunChangesPanel.tsx", "name": "DiffView", "why": "a run's own code view" },
+    { "file": "src/lib/worktreeBase.ts", "name": "describeWorktreeBase", "why": "the card's Technical details base row (only CardTechnicalDetails draws it)" }
+  ]
+}

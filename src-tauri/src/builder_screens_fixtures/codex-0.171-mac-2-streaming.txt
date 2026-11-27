@@ -1,0 +1,48 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: idle
+# truth: working: mid-turn (frames before and after show Working; the turn ended 11:22:38); Codex streams its answer with no status line, an idle shape whose content moves
+# vendor: codex
+# cli: Codex 0.171.0
+# platform: macos
+# source: real capture, Mac walk C, 2026-11-23 (Start build 11:19:19 Claude, 11:22:10 Codex, 11:25:17 Codex trust; Board read every ~5 s); capture mac-112228, frame 3 of 3; home path replaced
+# captured-at: 2026-11-23T10:22:29.891Z
+# key: card-mwt49998-1
+# size: 31 rows x 89 cols
+# cursor: row 25, col 2, shown
+# alternate-screen: true
+# exited: false
+# last-output-ago-ms: 22
+# content-changed-ago-ms: 0
+# ----
+  delete any file, and do not run any command that changes anything.
+
+
+• I’ll list the files in this folder, then read and report on each one in order.
+
+• Explored
+  └ List .
+    Read .git
+    + Show details
+
+• .git has 1 line.
+
+• Explored
+  └ Read f1.txt
+    + Show details
+
+• f1.txt has 3 lines.
+
+• Explored
+  └ Read f2.txt
+    + Show details
+
+• `f
+
+
+› Ask Codex to do anything
+
+  GPT-6.2-Sol default · ~/Library/Application Support/com.mbadv.ply.test/app-tester/
+  sandboxes/n1763/s1/.plyloft-worktrees/card-mwt49998-1 · You are the Builder for the
+  Plyloft card "Read each file in…
+  ← for agents · ? for shortcuts

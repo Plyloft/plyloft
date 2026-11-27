@@ -1,0 +1,38 @@
+# plyloft compare screen v1
+# vendor: codex
+# cli: Codex 0.172.0
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 4, the tile after the answer; rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: ready
+# cells: plain
+# ----
+ 
+› From Claude Code:
+  GREEN
+ 
+  My note:
+  reply with the single word RECEIVED
+ 
+ 
+• RECEIVED
+ 
+  Worked for 3s • 09:30                                 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+› Ask Codex to do anything
+ 
+  GPT-6.2-Sol default · ~/Library/Application Support/
+  com.mbadv.ply.test/app-tester/sandboxes/compare-1177/
+  app · From Claude Code: GREEN My note: reply with the…
+  ← for agents · ? for shortcuts

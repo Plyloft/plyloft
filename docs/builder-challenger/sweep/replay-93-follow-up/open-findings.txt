@@ -1,0 +1,6 @@
+- F1 — P1 — Settings writes race: two saves in flight overwrite each other `src/store/settingsStore.ts` (raised in round 1)
+  **P1 — Settings writes race.** A window resize saves the whole settings object from a stale copy while the Settings draft saves another block; the later write drops the earlier one's fields.
+- F6 — P2 — The Settings shell does not trap Tab or yield Esc to a dialog above it `src/components/SettingsOverlay.tsx` (raised in round 1)
+  **P2 — Shell ignores the dialog stack.** With the swarm template editor open over Settings, Esc closes Settings under it and Tab leaves the dialog.
+- F8 — P2 — Build & release's scope badge ignores the shared definition `src/lib/settingsNav.ts` (raised in round 1)
+  **P2 — Wrong scope badge.** A repository with .atelier/workspace.json shows "This Mac" on Build & release although edits there go to the shared definition.

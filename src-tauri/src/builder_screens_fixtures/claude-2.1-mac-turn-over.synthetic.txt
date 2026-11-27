@@ -1,0 +1,18 @@
+# plyloft builder screen frame v1
+# expect: nothing
+# screen: idle
+# truth: nothing: the turn's done line over an empty box, a minute on
+# vendor: claude
+# source: synthetic, ported from src/lib/attention.test.ts R3_TURN_OVER (re-walk R3, Claude 2.1, macOS xterm rows); not a grid capture (the real ones sit beside it)
+# exited: false
+# last-output-ago-ms: 60000
+# content-changed-ago-ms: 60000
+# ----
+● ok
+
+✻ Worked for 55s · done 2:55 PM
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents

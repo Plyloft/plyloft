@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Hardened-runtime entitlements for the notarized Ply build.
+      Ply is a WKWebView app (needs JS JIT) that spawns the `claude` / `codex`
+      CLIs as PTY child processes inheriting an injected PATH. The first four
+      entitlements are the standard, notarization-safe set for that shape; the
+      fifth lets those children use the microphone:
+    -->
+
+    <!-- WKWebView's JavaScriptCore JIT compiler. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!-- WKWebView maps writable+executable memory for the JIT. -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!-- Allow loading libraries / running child binaries (claude, codex, git,
+         node) that aren't signed by this team. Without it, hardened runtime
+         can block spawned subprocesses that load their own dylibs. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!-- Ply injects PATH (and other env) into PTY children; this permits the
+         DYLD_* / custom environment that the shell-env probe sets up. -->
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+
+    <!-- Microphone input. macOS attributes a PTY child's audio request (Claude
+         Code's /voice dictation) to Ply, the responsible process; hardened
+         runtime refuses it without this, before any prompt appears. Pairs
+         with NSMicrophoneUsageDescription in Info.plist. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+</dict>
+</plist>

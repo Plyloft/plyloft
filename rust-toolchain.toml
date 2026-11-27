@@ -1,0 +1,7 @@
+# Pin the Rust toolchain so a fresh checkout builds identically to CI.
+# `rustup` reads this file and auto-installs the channel + target on the
+# first `cargo` invocation in this directory.
+[toolchain]
+channel = "stable"
+targets = ["aarch64-apple-darwin"]
+profile = "default"

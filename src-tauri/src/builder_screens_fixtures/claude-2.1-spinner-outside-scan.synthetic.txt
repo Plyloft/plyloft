@@ -1,0 +1,40 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: idle
+# truth: working: the spinner with its timer sits more than 20 rows above the box, under a long todo list
+# vendor: claude
+# source: synthetic, phase 2 review (REV-offscreen-p2 MF2); not a grid capture
+# exited: false
+# last-output-ago-ms: 60000
+# content-changed-ago-ms: 60000
+# ----
+✳ Pondering… (1m 12s · ↓ 2.1k tokens)
+  ⎿  Todos
+     ☐ Step 1: update file1.ts
+     ☐ Step 2: update file2.ts
+     ☐ Step 3: update file3.ts
+     ☐ Step 4: update file4.ts
+     ☐ Step 5: update file5.ts
+     ☐ Step 6: update file6.ts
+     ☐ Step 7: update file7.ts
+     ☐ Step 8: update file8.ts
+     ☐ Step 9: update file9.ts
+     ☐ Step 10: update file10.ts
+     ☐ Step 11: update file11.ts
+     ☐ Step 12: update file12.ts
+     ☐ Step 13: update file13.ts
+     ☐ Step 14: update file14.ts
+     ☐ Step 15: update file15.ts
+     ☐ Step 16: update file16.ts
+     ☐ Step 17: update file17.ts
+     ☐ Step 18: update file18.ts
+     ☐ Step 19: update file19.ts
+     ☐ Step 20: update file20.ts
+     ☐ Step 21: update file21.ts
+     ☐ Step 22: update file22.ts
+     ☐ Step 23: update file23.ts
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

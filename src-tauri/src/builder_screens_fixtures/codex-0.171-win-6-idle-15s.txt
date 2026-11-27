@@ -1,0 +1,48 @@
+# plyloft builder screen frame v1
+# expect: nothing
+# screen: idle
+# truth: nothing: idle 15 s after the turn; Board Your turn
+# vendor: codex
+# cli: Codex 0.171.0
+# platform: windows
+# source: real capture, Windows walk C2, 2026-11-23 (ConPTY; Start build ~13:55:10 Claude, ~13:58:46 Codex; Board read every ~5 s); capture win-135934, frame 1 of 3; home path replaced
+# captured-at: 2026-11-23T12:59:35.293Z
+# key: card-mwt9uilf-1
+# size: 31 rows x 92 cols
+# cursor: row 26, col 2, shown
+# alternate-screen: true
+# exited: false
+# last-output-ago-ms: 15764
+# content-changed-ago-ms: 14780
+# ----
+› You are the Builder for the Plyloft card "Read each file in this folder, one at a time. …
+• Ran (Get-Content -LiteralPath f2.txt | Measure-Object).Count
+  └ 6
+
+• f2.txt has 6 lines.
+
+• Ran (Get-Content -LiteralPath f3.txt | Measure-Object).Count
+  └ 9
+
+• f3.txt has 9 lines.
+
+• Ran (Get-Content -LiteralPath f4.txt | Measure-Object).Count
+  └ 12
+
+• f4.txt has 12 lines.
+
+• Ran (Get-Content -LiteralPath f5.txt | Measure-Object).Count
+  └ 15
+
+• f5.txt has 15 lines.
+
+• Done. I read all six files in this folder one at a time and made no changes.
+
+  Worked for 30s • 13:59
+
+
+› Ask Codex to do anything
+
+  GPT-6.2-Sol default · C:\work\sandboxes\n1763\s1\.plyloft-worktrees\card-mwt9uilf-1 ·
+  You are the Builder for the Plyloft card "Read each file in…
+  ← for agents · ? for shortcuts

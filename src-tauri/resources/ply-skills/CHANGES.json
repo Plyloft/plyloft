@@ -1,0 +1,21 @@
+{
+  "answer-the-challenger": [
+    { "version": "1.174.0", "contentId": "89896c6c3a6d013f34f263a5d93c2c0baa5648f4", "summary": "its description says it is the old name of ply:answer-the-reviewer" },
+    { "version": "1.173.0", "contentId": "3ba402ae6eb96594806c95318557712f96cc5281", "summary": "says Reviewer, the second AI's name from 1.173.0; also answers to ply:answer-the-reviewer" },
+    { "version": "1.152.0", "contentId": "3d4116af103aa5ffa23ce721e3cb78eb57f3bd5b", "summary": "first version" }
+  ],
+  "answer-the-reviewer": [
+    { "version": "1.173.0", "contentId": "baee1c8fb498af34fccbd6ad25efaa443352b58c", "summary": "first version: ply:answer-the-challenger under the Reviewer's name" }
+  ],
+  "card-brief": [
+    { "version": "1.155.0", "contentId": "bfe8b8a3445f9fb71cb52b407b72ee1bd5d91ad8", "summary": "names the project's own heading for manual checks, or Manual checks" },
+    { "version": "1.152.0", "contentId": "eade2f744682008a2ced157fd966ce1791c6b0b4", "summary": "first version" }
+  ],
+  "release-notes": [
+    { "version": "1.167.0", "contentId": "c8b257b93919f24c28330177ecf63e2aba0c9915", "summary": "lists an in-app tour's steps new in this release, under New in this version" },
+    { "version": "1.152.0", "contentId": "ff562f80e9b568c125f043d8cd892be70a3b6d3b", "summary": "first version" }
+  ],
+  "verify-before-done": [
+    { "version": "1.152.0", "contentId": "0b72cd4e2a4f8d4aaab9f8337fe705ce4d09055f", "summary": "first version" }
+  ]
+}

@@ -1,0 +1,28 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, narrow-tile Mac walk 2026-11-26 (app-walks/2026-11-26-122139, Plyloft Test 1.177.1 build 35bb0818, layout Six (2x3), Claude's rule 35 columns, read with ui_terminal), step 5, after Esc (last 20 rows; the picker's leftover rows at the top); rows verbatim
+# verdict: ready
+# cells: dim
+# ----
+    ↑ 1 more
+    2.  Opus 5.5         For 
+                         complex 
+✻ Worked for 4s · done 12:23 PM
+
+⏺ Background command "Attende 20
+  secondi" completed (exit code 0)
+
+⏺ sleep 20 è terminato con exit
+  code 0.
+
+✻ Cooked for 0s · done 12:23 PM
+
+❯ /model 
+  ⎿  Kept model as Fable 5.2
+
+───────────────────────────────────
+❯ 
+───────────────────────────────────
+  ⏵⏵ auto mode on

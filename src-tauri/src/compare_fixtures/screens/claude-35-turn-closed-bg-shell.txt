@@ -1,0 +1,28 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, narrow-tile Mac walk 2026-11-26 (app-walks/2026-11-26-122139, Plyloft Test 1.177.1 build 35bb0818, layout Six (2x3), Claude's rule 35 columns, read with ui_terminal), step 4, turn closed, its sleep still running as a BACKGROUND shell (footer · 1 shell · ↓ …; header Your turn); rows verbatim
+# verdict: ready
+# cells: dim
+# ----
+
+❯ Run the shell command: sleep 20  
+
+⏺ Bash(sleep 20)
+  ⎿  Running in the backgroun…
+  ⎿  Allowed by auto mode
+
+⏺ Ho avviato sleep 20 in background
+  (lo sleep in foreground è
+  bloccato in questo ambiente): non
+  è ancora terminato, riceverò una
+  notifica al completamento.
+
+✻ Worked for 4s · done 12:23 PM · 1
+  shell still running
+
+───────────────────────────────────
+❯ 
+───────────────────────────────────
+  ⏵⏵ auto mode on · 1 shell · ↓ …

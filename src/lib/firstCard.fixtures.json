@@ -1,0 +1,5 @@
+{
+  "_comment": "UX P-C: the guided first card's title and brief, held equal to FIRST_CARD_TITLE / FIRST_CARD_BRIEF in src/lib/firstCardGuide.ts and src-tauri/src/builder.rs by a test on each side. Rust grants the guided permission mode only to a card whose title and brief still read exactly these words (after trimming).",
+  "title": "Describe this project in the README",
+  "brief": "Add a short section to README.md: what this project is for and how to run it, based on the code. Create README.md if there is none. Change nothing else."
+}

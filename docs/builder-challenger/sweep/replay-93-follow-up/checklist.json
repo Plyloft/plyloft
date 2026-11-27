@@ -1,0 +1,2 @@
+[{"name":"Branch discovery","sentence":"Every lookup of a branch or its tip names the remote and the ref it reads, and says what happens when the branch is missing locally."},
+ {"name":"Unreadable definitions","sentence":"A shared file that does not parse, or was written by a newer Ply, keeps the last good copy and is reported, never written over."}]

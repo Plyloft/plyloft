@@ -1,0 +1,47 @@
+test	Run npm test	﻿2026-09-28T21:54:36.2260526Z ##[group]Run npm test
+test	Run npm test	2026-09-28T21:54:36.2260926Z ^[[36;1mnpm test^[[0m
+test	Run npm test	2026-09-28T21:54:36.2325257Z shell: /usr/bin/bash -e {0}
+test	Run npm test	2026-09-28T21:54:36.2325555Z ##[endgroup]
+test	Run npm test	2026-09-28T21:54:36.4618434Z 
+test	Run npm test	2026-09-28T21:54:36.4623507Z > plyloft-ci-sandbox@1.0.0 test
+test	Run npm test	2026-09-28T21:54:36.4623964Z > node --test
+test	Run npm test	2026-09-28T21:54:36.4624162Z 
+test	Run npm test	2026-09-28T21:54:36.5159224Z TAP version 13
+test	Run npm test	2026-09-28T21:54:36.5570313Z # Subtest: sum adds
+test	Run npm test	2026-09-28T21:54:36.5585916Z ok 1 - sum adds
+test	Run npm test	2026-09-28T21:54:36.5587147Z   ---
+test	Run npm test	2026-09-28T21:54:36.5587990Z   duration_ms: 0.843479
+test	Run npm test	2026-09-28T21:54:36.5588571Z   type: 'test'
+test	Run npm test	2026-09-28T21:54:36.5588991Z   ...
+test	Run npm test	2026-09-28T21:54:36.5590169Z # Subtest: sandbox switch
+test	Run npm test	2026-09-28T21:54:36.5594491Z not ok 2 - sandbox switch
+test	Run npm test	2026-09-28T21:54:36.5595356Z   ---
+test	Run npm test	2026-09-28T21:54:36.5595787Z   duration_ms: 2.774856
+test	Run npm test	2026-09-28T21:54:36.5596279Z   type: 'test'
+test	Run npm test	2026-09-28T21:54:36.5597202Z   location: '/home/runner/work/plyloft-ci-sandbox/plyloft-ci-sandbox/sum.test.js:10:1'
+test	Run npm test	2026-09-28T21:54:36.5598474Z   failureType: 'testCodeFailure'
+test	Run npm test	2026-09-28T21:54:36.5599053Z   error: |-
+test	Run npm test	2026-09-28T21:54:36.5599580Z     FAIL_CI is present: failing on purpose
+test	Run npm test	2026-09-28T21:54:36.5600144Z     
+test	Run npm test	2026-09-28T21:54:36.5600539Z     true !== false
+test	Run npm test	2026-09-28T21:54:36.5600960Z     
+test	Run npm test	2026-09-28T21:54:36.5601366Z   code: 'ERR_ASSERTION'
+test	Run npm test	2026-09-28T21:54:36.5601885Z   name: 'AssertionError'
+test	Run npm test	2026-09-28T21:54:36.5602383Z   expected: false
+test	Run npm test	2026-09-28T21:54:36.5602774Z   actual: true
+test	Run npm test	2026-09-28T21:54:36.5603191Z   operator: 'strictEqual'
+test	Run npm test	2026-09-28T21:54:36.5603574Z   stack: |-
+test	Run npm test	2026-09-28T21:54:36.5604199Z     TestContext.<anonymous> (file:///home/runner/work/plyloft-ci-sandbox/plyloft-ci-sandbox/sum.test.js:12:10)
+test	Run npm test	2026-09-28T21:54:36.5605239Z     async Test.run (node:internal/test_runner/test:1054:7)
+test	Run npm test	2026-09-28T21:54:36.5605796Z     async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+test	Run npm test	2026-09-28T21:54:36.5606207Z   ...
+test	Run npm test	2026-09-28T21:54:36.5673396Z 1..2
+test	Run npm test	2026-09-28T21:54:36.5675005Z # tests 2
+test	Run npm test	2026-09-28T21:54:36.5675727Z # suites 0
+test	Run npm test	2026-09-28T21:54:36.5676472Z # pass 1
+test	Run npm test	2026-09-28T21:54:36.5676955Z # fail 1
+test	Run npm test	2026-09-28T21:54:36.5678384Z # cancelled 0
+test	Run npm test	2026-09-28T21:54:36.5679136Z # skipped 0
+test	Run npm test	2026-09-28T21:54:36.5679467Z # todo 0
+test	Run npm test	2026-09-28T21:54:36.5679923Z # duration_ms 70.706041
+test	Run npm test	2026-09-28T21:54:36.5814112Z ##[error]Process completed with exit code 1.

@@ -1,0 +1,442 @@
+{
+  "note": "CH-4 (1.174.0): the model and effort a spawn for a card passes, layer by layer: card > this Mac's workspace > team > this Mac's app rows > the tool's default (null). A field in a layer's cliDefault passes nothing, whatever lies below. `fits` (optional) lists the efforts each named model takes; a model not listed takes any, and without `fits` every effort fits. Held by cardModels.test.ts (cardEffectivePart/cardEffectiveEffort/cardRoleModel) and settings.rs (resolve_card_model_with_team/resolve_card_model_fitted).",
+  "cases": [
+    {
+      "name": "nothing chosen anywhere: the tool's default",
+      "card": null,
+      "workspace": null,
+      "team": null,
+      "app": {},
+      "vendor": "claude",
+      "role": "builder",
+      "expected": {
+        "model": null,
+        "reasoning": null
+      }
+    },
+    {
+      "name": "the app's rows alone",
+      "card": null,
+      "workspace": null,
+      "team": null,
+      "app": {
+        "codex": {
+          "builder": "gpt-6-astra",
+          "builderReasoning": "high"
+        }
+      },
+      "vendor": "codex",
+      "role": "builder",
+      "expected": {
+        "model": "gpt-6-astra",
+        "reasoning": "high"
+      }
+    },
+    {
+      "name": "the workspace over the app, field by field",
+      "card": null,
+      "workspace": {
+        "codex": {
+          "builderReasoning": "low"
+        }
+      },
+      "team": null,
+      "app": {
+        "codex": {
+          "builder": "gpt-6-astra",
+          "builderReasoning": "high"
+        }
+      },
+      "vendor": "codex",
+      "role": "builder",
+      "expected": {
+        "model": "gpt-6-astra",
+        "reasoning": "low"
+      }
+    },
+    {
+      "name": "the card first, the rest from below",
+      "card": {
+        "claude": {
+          "challenger": "opus"
+        }
+      },
+      "workspace": {
+        "claude": {
+          "challenger": "claude-fable-5-1",
+          "challengerReasoning": "medium"
+        }
+      },
+      "team": null,
+      "app": {
+        "claude": {
+          "challenger": "sonnet",
+          "challengerReasoning": "high"
+        }
+      },
+      "vendor": "claude",
+      "role": "challenger",
+      "expected": {
+        "model": "opus",
+        "reasoning": "medium"
+      }
+    },
+    {
+      "name": "the team between the workspace and the app",
+      "card": null,
+      "workspace": {
+        "codex": {
+          "challenger": "gpt-6-luna"
+        }
+      },
+      "team": {
+        "codex": {
+          "challenger": "gpt-6-sol",
+          "challengerReasoning": "xhigh"
+        }
+      },
+      "app": {
+        "codex": {
+          "challenger": "gpt-5.5",
+          "challengerReasoning": "medium"
+        }
+      },
+      "vendor": "codex",
+      "role": "challenger",
+      "expected": {
+        "model": "gpt-6-luna",
+        "reasoning": "xhigh"
+      }
+    },
+    {
+      "name": "the card forces the tool's default model over every layer",
+      "card": {
+        "cliDefault": [
+          "claude.builder"
+        ]
+      },
+      "workspace": {
+        "claude": {
+          "builder": "claude-fable-5-1"
+        }
+      },
+      "team": {
+        "claude": {
+          "builder": "opus"
+        }
+      },
+      "app": {
+        "claude": {
+          "builder": "sonnet",
+          "builderReasoning": "high"
+        }
+      },
+      "vendor": "claude",
+      "role": "builder",
+      "expected": {
+        "model": null,
+        "reasoning": "high"
+      }
+    },
+    {
+      "name": "the workspace forces the tool's default effort; the card's own still wins",
+      "card": {
+        "codex": {
+          "builderReasoning": "medium"
+        }
+      },
+      "workspace": {
+        "cliDefault": [
+          "codex.builderReasoning"
+        ]
+      },
+      "team": null,
+      "app": {
+        "codex": {
+          "builder": "gpt-6-astra",
+          "builderReasoning": "high"
+        }
+      },
+      "vendor": "codex",
+      "role": "builder",
+      "expected": {
+        "model": "gpt-6-astra",
+        "reasoning": "medium"
+      }
+    },
+    {
+      "name": "the workspace forces the tool's default effort: nothing from the team or the app",
+      "card": null,
+      "workspace": {
+        "cliDefault": [
+          "codex.builderReasoning"
+        ]
+      },
+      "team": {
+        "codex": {
+          "builderReasoning": "xhigh"
+        }
+      },
+      "app": {
+        "codex": {
+          "builder": "gpt-6-astra",
+          "builderReasoning": "high"
+        }
+      },
+      "vendor": "codex",
+      "role": "builder",
+      "expected": {
+        "model": "gpt-6-astra",
+        "reasoning": null
+      }
+    },
+    {
+      "name": "blanks and spaces are nothing chosen; values are trimmed",
+      "card": {
+        "claude": {
+          "builder": "  ",
+          "builderReasoning": ""
+        }
+      },
+      "workspace": {
+        "claude": {
+          "builder": "  opus  "
+        }
+      },
+      "team": null,
+      "app": {
+        "claude": {
+          "builderReasoning": " high "
+        }
+      },
+      "vendor": "claude",
+      "role": "builder",
+      "expected": {
+        "model": "opus",
+        "reasoning": "high"
+      }
+    },
+    {
+      "name": "another vendor's and role's rows don't count",
+      "card": {
+        "codex": {
+          "builder": "gpt-6-luna"
+        },
+        "claude": {
+          "challenger": "opus"
+        }
+      },
+      "workspace": null,
+      "team": null,
+      "app": {
+        "claude": {
+          "builder": "sonnet"
+        }
+      },
+      "vendor": "claude",
+      "role": "builder",
+      "expected": {
+        "model": "sonnet",
+        "reasoning": null
+      }
+    },
+    {
+      "name": "a team effort the model doesn't take falls to the app's",
+      "card": null,
+      "workspace": {
+        "codex": {
+          "builder": "gpt-6-luna"
+        }
+      },
+      "team": {
+        "codex": {
+          "builderReasoning": "xhigh"
+        }
+      },
+      "app": {
+        "codex": {
+          "builderReasoning": "high"
+        }
+      },
+      "vendor": "codex",
+      "role": "builder",
+      "fits": {
+        "gpt-6-luna": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "expected": {
+        "model": "gpt-6-luna",
+        "reasoning": "high"
+      }
+    },
+    {
+      "name": "no layer's effort fits: no effort passed",
+      "card": {
+        "codex": {
+          "builderReasoning": "minimal"
+        }
+      },
+      "workspace": null,
+      "team": null,
+      "app": {
+        "codex": {
+          "builder": "gpt-6-luna",
+          "builderReasoning": "xhigh"
+        }
+      },
+      "vendor": "codex",
+      "role": "builder",
+      "fits": {
+        "gpt-6-luna": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "expected": {
+        "model": "gpt-6-luna",
+        "reasoning": null
+      }
+    },
+    {
+      "name": "a forced layer stops the walk before a fitting one below",
+      "card": {
+        "claude": {
+          "challengerReasoning": "max"
+        },
+        "cliDefault": []
+      },
+      "workspace": {
+        "cliDefault": [
+          "claude.challengerReasoning"
+        ]
+      },
+      "team": null,
+      "app": {
+        "claude": {
+          "challenger": "opus",
+          "challengerReasoning": "high"
+        }
+      },
+      "vendor": "claude",
+      "role": "challenger",
+      "fits": {
+        "opus": [
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      "expected": {
+        "model": "opus",
+        "reasoning": null
+      }
+    },
+    {
+      "name": "a model the list doesn't name takes any effort",
+      "card": {
+        "claude": {
+          "builder": "claude-opus-5-5",
+          "builderReasoning": "max"
+        }
+      },
+      "workspace": null,
+      "team": null,
+      "app": {},
+      "vendor": "claude",
+      "role": "builder",
+      "fits": {
+        "opus": [
+          "low"
+        ]
+      },
+      "expected": {
+        "model": "claude-opus-5-5",
+        "reasoning": "max"
+      }
+    },
+    {
+      "name": "the card forces the tool's default effort over every layer",
+      "card": {
+        "cliDefault": [
+          "codex.challengerReasoning"
+        ]
+      },
+      "workspace": {
+        "codex": {
+          "challengerReasoning": "low"
+        }
+      },
+      "team": {
+        "codex": {
+          "challengerReasoning": "xhigh"
+        }
+      },
+      "app": {
+        "codex": {
+          "challenger": "gpt-6-luna",
+          "challengerReasoning": "high"
+        }
+      },
+      "vendor": "codex",
+      "role": "challenger",
+      "expected": {
+        "model": "gpt-6-luna",
+        "reasoning": null
+      }
+    },
+    {
+      "name": "the workspace forces the tool's default model; the team's and the app's don't count",
+      "card": null,
+      "workspace": {
+        "cliDefault": [
+          "claude.challenger"
+        ],
+        "claude": {
+          "challengerReasoning": "medium"
+        }
+      },
+      "team": {
+        "claude": {
+          "challenger": "opus"
+        }
+      },
+      "app": {
+        "claude": {
+          "challenger": "sonnet"
+        }
+      },
+      "vendor": "claude",
+      "role": "challenger",
+      "expected": {
+        "model": null,
+        "reasoning": "medium"
+      }
+    },
+    {
+      "name": "fits given and no layer names a model: any effort fits",
+      "card": null,
+      "workspace": null,
+      "team": null,
+      "app": {
+        "codex": {
+          "builderReasoning": "xhigh"
+        }
+      },
+      "vendor": "codex",
+      "role": "builder",
+      "fits": {
+        "gpt-6-luna": [
+          "low"
+        ]
+      },
+      "expected": {
+        "model": null,
+        "reasoning": "xhigh"
+      }
+    }
+  ]
+}

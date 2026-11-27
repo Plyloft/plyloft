@@ -1,0 +1,17 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: idle
+# truth: working: idle-shaped with no Worked-for line, nothing printed for 30 s: no proof the turn ended (the 2-minute rule decides)
+# vendor: codex
+# source: synthetic, phase 2 review (REV-offscreen-p2 MF2); not a grid capture
+# exited: false
+# last-output-ago-ms: 30000
+# content-changed-ago-ms: 30000
+# ----
+• f5.txt has 15 lines.
+
+
+› Ask Codex to do anything
+
+  GPT-6.2-Sol default · ~/work/s1
+  ← for agents · ? for shortcuts

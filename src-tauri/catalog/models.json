@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "updated": "2026-10-23",
+  "vendors": {
+    "claude": {
+      "efforts": ["low", "medium", "high", "xhigh", "max"],
+      "models": [
+        { "id": "claude-opus-5-5", "label": "Opus 5.5" },
+        { "id": "claude-fable-5-1", "label": "Fable 5.1" },
+        { "id": "claude-sonnet-5-5", "label": "Sonnet 5.5" },
+        { "id": "claude-haiku-5-5", "label": "Haiku 5.5" }
+      ]
+    },
+    "codex": {
+      "efforts": ["low", "medium", "high", "xhigh", "max", "ultra"],
+      "models": [
+        { "id": "gpt-6.1-sol", "label": "GPT-6.1-Sol", "efforts": ["low", "medium", "high", "xhigh", "max", "ultra"], "defaultEffort": "low" },
+        { "id": "gpt-6-astra", "label": "GPT-6-Astra", "efforts": ["low", "medium", "high", "xhigh", "max", "ultra"], "defaultEffort": "medium" },
+        { "id": "gpt-6-luna", "label": "GPT-6-Luna", "efforts": ["low", "medium", "high", "xhigh", "max"], "defaultEffort": "medium" },
+        { "id": "gpt-5.6-terra", "label": "GPT-5.6-Terra", "efforts": ["low", "medium", "high", "xhigh", "max", "ultra"], "defaultEffort": "medium" },
+        { "id": "gpt-6-sol", "label": "GPT-6-Sol", "efforts": ["low", "medium", "high", "xhigh", "max", "ultra"], "defaultEffort": "medium" },
+        { "id": "gpt-5.6-sol", "label": "GPT-5.6-Sol", "efforts": ["low", "medium", "high", "xhigh", "max", "ultra"], "defaultEffort": "low" },
+        { "id": "gpt-5.6-luna", "label": "GPT-5.6-Luna", "efforts": ["low", "medium", "high", "xhigh", "max"], "defaultEffort": "medium" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,44 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: idle
+# truth: nothing: idle, only its animated composer moving, printed 0.3 s ago; no Worked-for line in 0.154, so counted working on the safe side by the 2-minute byte rule, as in 1.176.2 (0.171 prints nothing when idle)
+# vendor: codex
+# source: synthetic, ported from src/lib/tileHeaderStatus.test.ts CODEX_STARFIELD_A (codex-cli 0.154.0's animated idle composer); not a grid capture (the real ones sit beside it)
+# exited: false
+# last-output-ago-ms: 300
+# content-changed-ago-ms: 60000
+# ----
+
+╭───────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.154.0)                │
+│                                           │
+│ model:     gpt-6-astra   /model to change │
+│ directory: ~/code/atelier                 │
+╰───────────────────────────────────────────╯
+
+  Tip: Try the Desktop app. Run 'codex app' or visit https://chatgpt.com/codex
+
+  ·      .         ·     .            ·
+›·    .        ·        .     ·
+
+  gpt-6-astra default · ~/code/atelier
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "com.mbadv.ply.test",
+  "productName": "Plyloft Test",
+  "app": {
+    "windows": [
+      {
+        "decorations": true,
+        "dragDropEnabled": false,
+        "height": 820,
+        "label": "main",
+        "minHeight": 600,
+        "minWidth": 900,
+        "title": "Plyloft Test",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 20 },
+        "width": 1280
+      }
+    ]
+  },
+  "bundle": {
+    "createUpdaterArtifacts": false
+  }
+}

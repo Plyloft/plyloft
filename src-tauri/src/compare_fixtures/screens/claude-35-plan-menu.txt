@@ -1,0 +1,39 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, narrow-tile Mac walk 2026-11-26 (app-walks/2026-11-26-122139, Plyloft Test 1.177.1 build 35bb0818, layout Six (2x3), Claude's rule 35 columns, read with ui_terminal), step 6, the plan menu open (last 30 of 146 rows); rows verbatim
+# verdict: asking
+# cells: plain
+# privacy: the Claude session id in the plan file's name is replaced by zeros of the same length
+# ----
+ - index.html (unica modifica)
+
+ Verifica
+
+ Servire la cartella (es. python3
+ -m http.server, necessario per
+ type="module") e controllare
+ visivamente la pagina. Se il
+ titolo non compare o sparisce,
+ significa che notes.js scrive
+ fuori da #app: in quel caso il
+ titolo va aggiunto nel render di
+ notes.js.
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+───────────────────────────────────
+ Claude has written up a plan and
+ is ready to execute. Would you
+ like to proceed?
+
+ ❯ 1. Yes, and use auto mode
+   2. Yes, manually approve edits
+   3. Tell Claude what to change
+      shift+tab to approve with
+      this feedback
+ ↑ 51 more lines
+ ctrl+g to edit in Vim ·
+ ~/.claude/plans/plan-in-two-short
+ -cozy-ember-of-00000000-0000-0000
+ -0000-000000000000.md

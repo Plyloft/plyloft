@@ -1,0 +1,826 @@
+{
+ "name": "acme-project",
+ "environments": {
+  "edges": [
+   {
+    "node": {
+     "name": "staging",
+     "serviceInstances": {
+      "edges": [
+       {
+        "node": {
+         "serviceName": "app-staging",
+         "latestDeployment": {
+          "canRedeploy": true,
+          "meta": {
+           "branch": "staging",
+           "buildOnly": false,
+           "commitHash": "0123456789abcdef0123456789abcdef01234567",
+           "fileServiceManifest": {},
+           "logsV2": true,
+           "nixpacksProviders": [],
+           "plan": "pro",
+           "propertyFileMapping": {},
+           "queuedReason": "Waiting for build slot",
+           "reason": "deploy",
+           "repo": "acme/monorepo",
+           "rootDirectory": null,
+           "runtime": "V2",
+           "serviceManifest": {
+            "build": {
+             "buildCommand": "pip install -r requirements.txt",
+             "buildEnvironment": "V3",
+             "builder": "NIXPACKS",
+             "dockerfilePath": null,
+             "nixpacksPlan": null,
+             "watchPatterns": []
+            },
+            "deploy": {
+             "cronSchedule": null,
+             "drainingSeconds": null,
+             "healthcheckPath": "/api/health",
+             "healthcheckTimeout": 300,
+             "ipv6EgressEnabled": false,
+             "limitOverride": null,
+             "multiRegionConfig": {
+              "europe-west4-drams3a": {
+               "numReplicas": 1
+              }
+             },
+             "numReplicas": 1,
+             "overlapSeconds": null,
+             "preDeployCommand": null,
+             "preDeployTimeoutSeconds": null,
+             "region": null,
+             "registryCredentials": null,
+             "requiredMountPath": null,
+             "restartPolicyMaxRetries": 10,
+             "restartPolicyType": "ON_FAILURE",
+             "runtime": "V2",
+             "sleepApplication": false,
+             "startCommand": "python main.py",
+             "useLegacyStacker": false
+            }
+           },
+           "volumeMounts": [
+            "/app/uploads"
+           ]
+          },
+          "status": "SUCCESS",
+          "createdAt": "2026-10-29T15:50:02.225Z",
+          "deploymentStopped": false
+         },
+         "activeDeployments": [
+          {
+           "status": "SUCCESS",
+           "createdAt": "2026-10-29T15:50:02.225Z",
+           "meta": {
+            "branch": "staging",
+            "buildOnly": false,
+            "commitHash": "0123456789abcdef0123456789abcdef01234567",
+            "fileServiceManifest": {},
+            "logsV2": true,
+            "nixpacksProviders": [],
+            "plan": "pro",
+            "propertyFileMapping": {},
+            "queuedReason": "Waiting for build slot",
+            "reason": "deploy",
+            "repo": "acme/monorepo",
+            "rootDirectory": null,
+            "runtime": "V2",
+            "serviceManifest": {
+             "build": {
+              "buildCommand": "pip install -r requirements.txt",
+              "buildEnvironment": "V3",
+              "builder": "NIXPACKS",
+              "dockerfilePath": null,
+              "nixpacksPlan": null,
+              "watchPatterns": []
+             },
+             "deploy": {
+              "cronSchedule": null,
+              "drainingSeconds": null,
+              "healthcheckPath": "/api/health",
+              "healthcheckTimeout": 300,
+              "ipv6EgressEnabled": false,
+              "limitOverride": null,
+              "multiRegionConfig": {
+               "europe-west4-drams3a": {
+                "numReplicas": 1
+               }
+              },
+              "numReplicas": 1,
+              "overlapSeconds": null,
+              "preDeployCommand": null,
+              "preDeployTimeoutSeconds": null,
+              "region": null,
+              "registryCredentials": null,
+              "requiredMountPath": null,
+              "restartPolicyMaxRetries": 10,
+              "restartPolicyType": "ON_FAILURE",
+              "runtime": "V2",
+              "sleepApplication": false,
+              "startCommand": "python main.py",
+              "useLegacyStacker": false
+             }
+            },
+            "volumeMounts": [
+             "/app/uploads"
+            ]
+           }
+          }
+         ],
+         "source": {
+          "repo": "acme/monorepo",
+          "image": null
+         },
+         "domains": {
+          "serviceDomains": [
+           {
+            "domain": "app-staging-staging.up.railway.app",
+            "targetPort": 8080
+           }
+          ],
+          "customDomains": []
+         },
+         "cronSchedule": null,
+         "nextCronRunAt": null,
+         "startCommand": "python main.py"
+        }
+       },
+       {
+        "node": {
+         "serviceName": "nightly-job",
+         "latestDeployment": {
+          "canRedeploy": true,
+          "meta": {
+           "branch": "staging",
+           "buildOnly": true,
+           "commitHash": "0123456789abcdef0123456789abcdef01234567",
+           "fileServiceManifest": {},
+           "logsV2": true,
+           "nixpacksProviders": [],
+           "plan": "pro",
+           "propertyFileMapping": {},
+           "queuedReason": "Waiting for build slot",
+           "railpackInfo": {
+            "detectedProviders": [
+             "python"
+            ],
+            "metadata": {
+             "providers": "python",
+             "pythonPackageManager": "pip",
+             "pythonRuntime": "fastapi"
+            },
+            "railpackVersion": "0.43.0",
+            "resolvedPackages": {
+             "python": {
+              "requestedVersion": "3.12",
+              "resolvedVersion": "3.12.15"
+             }
+            }
+           },
+           "reason": "deploy",
+           "repo": "acme/monorepo",
+           "rootDirectory": null,
+           "runtime": "V2",
+           "serviceManifest": {
+            "build": {
+             "buildCommand": null,
+             "buildEnvironment": "V3",
+             "builder": "RAILPACK",
+             "dockerfilePath": null,
+             "nixpacksConfigPath": null,
+             "nixpacksPlan": null,
+             "watchPatterns": [
+              "scripts/**",
+              "services/**",
+              "models/**",
+              "config/**",
+              "routers/**",
+              "requirements.txt",
+              "requirements-prod.txt",
+              "railway.json"
+             ]
+            },
+            "deploy": {
+             "cronSchedule": "15 4 * * *",
+             "drainingSeconds": null,
+             "healthcheckPath": null,
+             "healthcheckTimeout": null,
+             "ipv6EgressEnabled": false,
+             "limitOverride": null,
+             "multiRegionConfig": {
+              "europe-west4-drams3a": {
+               "numReplicas": 1
+              }
+             },
+             "numReplicas": 1,
+             "overlapSeconds": null,
+             "preDeployCommand": null,
+             "preDeployTimeoutSeconds": null,
+             "region": null,
+             "registryCredentials": null,
+             "requiredMountPath": null,
+             "restartPolicyMaxRetries": null,
+             "restartPolicyType": "NEVER",
+             "runtime": "V2",
+             "sleepApplication": false,
+             "startCommand": "python3 scripts/nightly.py",
+             "useLegacyStacker": false
+            }
+           },
+           "volumeMounts": []
+          },
+          "status": "SUCCESS",
+          "createdAt": "2026-10-29T15:50:02.233Z",
+          "deploymentStopped": false
+         },
+         "activeDeployments": [
+          {
+           "status": "SUCCESS",
+           "createdAt": "2026-10-29T15:50:02.233Z",
+           "meta": {
+            "branch": "staging",
+            "buildOnly": true,
+            "commitHash": "0123456789abcdef0123456789abcdef01234567",
+            "fileServiceManifest": {},
+            "logsV2": true,
+            "nixpacksProviders": [],
+            "plan": "pro",
+            "propertyFileMapping": {},
+            "queuedReason": "Waiting for build slot",
+            "railpackInfo": {
+             "detectedProviders": [
+              "python"
+             ],
+             "metadata": {
+              "providers": "python",
+              "pythonPackageManager": "pip",
+              "pythonRuntime": "fastapi"
+             },
+             "railpackVersion": "0.43.0",
+             "resolvedPackages": {
+              "python": {
+               "requestedVersion": "3.12",
+               "resolvedVersion": "3.12.15"
+              }
+             }
+            },
+            "reason": "deploy",
+            "repo": "acme/monorepo",
+            "rootDirectory": null,
+            "runtime": "V2",
+            "serviceManifest": {
+             "build": {
+              "buildCommand": null,
+              "buildEnvironment": "V3",
+              "builder": "RAILPACK",
+              "dockerfilePath": null,
+              "nixpacksConfigPath": null,
+              "nixpacksPlan": null,
+              "watchPatterns": [
+               "scripts/**",
+               "services/**",
+               "models/**",
+               "config/**",
+               "routers/**",
+               "requirements.txt",
+               "requirements-prod.txt",
+               "railway.json"
+              ]
+             },
+             "deploy": {
+              "cronSchedule": "15 4 * * *",
+              "drainingSeconds": null,
+              "healthcheckPath": null,
+              "healthcheckTimeout": null,
+              "ipv6EgressEnabled": false,
+              "limitOverride": null,
+              "multiRegionConfig": {
+               "europe-west4-drams3a": {
+                "numReplicas": 1
+               }
+              },
+              "numReplicas": 1,
+              "overlapSeconds": null,
+              "preDeployCommand": null,
+              "preDeployTimeoutSeconds": null,
+              "region": null,
+              "registryCredentials": null,
+              "requiredMountPath": null,
+              "restartPolicyMaxRetries": null,
+              "restartPolicyType": "NEVER",
+              "runtime": "V2",
+              "sleepApplication": false,
+              "startCommand": "python3 scripts/nightly.py",
+              "useLegacyStacker": false
+             }
+            },
+            "volumeMounts": []
+           }
+          }
+         ],
+         "source": {
+          "repo": "acme/monorepo",
+          "image": null
+         },
+         "domains": {
+          "serviceDomains": [],
+          "customDomains": []
+         },
+         "cronSchedule": "15 4 * * *",
+         "nextCronRunAt": "2026-10-30T04:15:00Z",
+         "startCommand": "python3 scripts/nightly.py"
+        }
+       },
+       {
+        "node": {
+         "serviceName": "site-staging",
+         "latestDeployment": {
+          "canRedeploy": true,
+          "meta": {
+           "branch": "staging",
+           "buildOnly": false,
+           "commitHash": "0123456789abcdef0123456789abcdef01234567",
+           "deprecatedRegions": [
+            {
+             "region": "europe-west4-drams11a",
+             "replacementRegion": "europe-west4-drams3a"
+            }
+           ],
+           "fileServiceManifest": {},
+           "logsV2": true,
+           "nixpacksProviders": [],
+           "plan": "pro",
+           "propertyFileMapping": {},
+           "queuedReason": "Waiting for build slot",
+           "reason": "deploy",
+           "repo": "acme/monorepo",
+           "rootDirectory": "site",
+           "runtime": "V2",
+           "serviceManifest": {
+            "build": {
+             "buildCommand": "",
+             "buildEnvironment": "V3",
+             "builder": "DOCKERFILE",
+             "dockerfilePath": "/site/Dockerfile",
+             "nixpacksConfigPath": null,
+             "nixpacksPlan": {
+              "providers": [
+               "node"
+              ]
+             },
+             "watchPatterns": []
+            },
+            "deploy": {
+             "cronSchedule": null,
+             "drainingSeconds": null,
+             "healthcheckPath": null,
+             "healthcheckTimeout": null,
+             "ipv6EgressEnabled": false,
+             "limitOverride": null,
+             "multiRegionConfig": {
+              "europe-west4-drams11a": {
+               "numReplicas": 1
+              }
+             },
+             "numReplicas": 1,
+             "overlapSeconds": null,
+             "preDeployCommand": null,
+             "preDeployTimeoutSeconds": null,
+             "region": null,
+             "registryCredentials": null,
+             "requiredMountPath": null,
+             "restartPolicyMaxRetries": 10,
+             "restartPolicyType": "ON_FAILURE",
+             "runtime": "V2",
+             "sleepApplication": false,
+             "startCommand": null,
+             "useLegacyStacker": false
+            }
+           },
+           "volumeMounts": []
+          },
+          "status": "SUCCESS",
+          "createdAt": "2026-10-29T15:50:03.584Z",
+          "deploymentStopped": false
+         },
+         "activeDeployments": [
+          {
+           "status": "SUCCESS",
+           "createdAt": "2026-10-29T15:50:03.584Z",
+           "meta": {
+            "branch": "staging",
+            "buildOnly": false,
+            "commitHash": "0123456789abcdef0123456789abcdef01234567",
+            "deprecatedRegions": [
+             {
+              "region": "europe-west4-drams11a",
+              "replacementRegion": "europe-west4-drams3a"
+             }
+            ],
+            "fileServiceManifest": {},
+            "logsV2": true,
+            "nixpacksProviders": [],
+            "plan": "pro",
+            "propertyFileMapping": {},
+            "queuedReason": "Waiting for build slot",
+            "reason": "deploy",
+            "repo": "acme/monorepo",
+            "rootDirectory": "site",
+            "runtime": "V2",
+            "serviceManifest": {
+             "build": {
+              "buildCommand": "",
+              "buildEnvironment": "V3",
+              "builder": "DOCKERFILE",
+              "dockerfilePath": "/site/Dockerfile",
+              "nixpacksConfigPath": null,
+              "nixpacksPlan": {
+               "providers": [
+                "node"
+               ]
+              },
+              "watchPatterns": []
+             },
+             "deploy": {
+              "cronSchedule": null,
+              "drainingSeconds": null,
+              "healthcheckPath": null,
+              "healthcheckTimeout": null,
+              "ipv6EgressEnabled": false,
+              "limitOverride": null,
+              "multiRegionConfig": {
+               "europe-west4-drams11a": {
+                "numReplicas": 1
+               }
+              },
+              "numReplicas": 1,
+              "overlapSeconds": null,
+              "preDeployCommand": null,
+              "preDeployTimeoutSeconds": null,
+              "region": null,
+              "registryCredentials": null,
+              "requiredMountPath": null,
+              "restartPolicyMaxRetries": 10,
+              "restartPolicyType": "ON_FAILURE",
+              "runtime": "V2",
+              "sleepApplication": false,
+              "startCommand": null,
+              "useLegacyStacker": false
+             }
+            },
+            "volumeMounts": []
+           }
+          }
+         ],
+         "source": {
+          "repo": "acme/monorepo",
+          "image": null
+         },
+         "domains": {
+          "serviceDomains": [
+           {
+            "domain": "site-staging-staging.up.railway.app",
+            "targetPort": 8080
+           }
+          ],
+          "customDomains": []
+         },
+         "cronSchedule": null,
+         "nextCronRunAt": null,
+         "startCommand": null
+        }
+       }
+      ]
+     }
+    }
+   },
+   {
+    "node": {
+     "name": "production",
+     "serviceInstances": {
+      "edges": [
+       {
+        "node": {
+         "serviceName": "app-production",
+         "latestDeployment": {
+          "canRedeploy": true,
+          "meta": {
+           "branch": "main",
+           "buildOnly": false,
+           "commitHash": "89abcdef0123456789abcdef0123456789abcdef",
+           "fileServiceManifest": {},
+           "ignoreWatchPatterns": true,
+           "logsV2": true,
+           "nixpacksProviders": [],
+           "plan": "pro",
+           "propertyFileMapping": {},
+           "railpackInfo": {
+            "detectedProviders": [
+             "python"
+            ],
+            "metadata": {
+             "providers": "python",
+             "pythonPackageManager": "pip",
+             "pythonRuntime": "fastapi"
+            },
+            "railpackVersion": "0.43.0",
+            "resolvedPackages": {
+             "python": {
+              "requestedVersion": "3.12",
+              "resolvedVersion": "3.12.15"
+             }
+            }
+           },
+           "reason": "deploy",
+           "repo": "acme/monorepo",
+           "rootDirectory": null,
+           "runtime": "V2",
+           "serviceManifest": {
+            "build": {
+             "buildCommand": "pip install -r requirements.txt",
+             "buildEnvironment": "V3",
+             "builder": "RAILPACK",
+             "dockerfilePath": null,
+             "nixpacksConfigPath": null,
+             "nixpacksPlan": null,
+             "watchPatterns": []
+            },
+            "deploy": {
+             "cronSchedule": null,
+             "drainingSeconds": null,
+             "healthcheckPath": "/api/health",
+             "healthcheckTimeout": 300,
+             "ipv6EgressEnabled": false,
+             "limitOverride": null,
+             "multiRegionConfig": {
+              "europe-west4-drams3a": {
+               "numReplicas": 1
+              }
+             },
+             "numReplicas": 1,
+             "overlapSeconds": null,
+             "preDeployCommand": null,
+             "preDeployTimeoutSeconds": null,
+             "region": null,
+             "registryCredentials": null,
+             "requiredMountPath": null,
+             "restartPolicyMaxRetries": 10,
+             "restartPolicyType": "ON_FAILURE",
+             "runtime": "V2",
+             "sleepApplication": false,
+             "startCommand": "python main.py",
+             "useLegacyStacker": false
+            }
+           },
+           "volumeMounts": []
+          },
+          "status": "SUCCESS",
+          "createdAt": "2026-10-29T16:35:08.521Z",
+          "deploymentStopped": false
+         },
+         "activeDeployments": [
+          {
+           "status": "SUCCESS",
+           "createdAt": "2026-10-29T16:35:08.521Z",
+           "meta": {
+            "branch": "main",
+            "buildOnly": false,
+            "commitHash": "89abcdef0123456789abcdef0123456789abcdef",
+            "fileServiceManifest": {},
+            "ignoreWatchPatterns": true,
+            "logsV2": true,
+            "nixpacksProviders": [],
+            "plan": "pro",
+            "propertyFileMapping": {},
+            "railpackInfo": {
+             "detectedProviders": [
+              "python"
+             ],
+             "metadata": {
+              "providers": "python",
+              "pythonPackageManager": "pip",
+              "pythonRuntime": "fastapi"
+             },
+             "railpackVersion": "0.43.0",
+             "resolvedPackages": {
+              "python": {
+               "requestedVersion": "3.12",
+               "resolvedVersion": "3.12.15"
+              }
+             }
+            },
+            "reason": "deploy",
+            "repo": "acme/monorepo",
+            "rootDirectory": null,
+            "runtime": "V2",
+            "serviceManifest": {
+             "build": {
+              "buildCommand": "pip install -r requirements.txt",
+              "buildEnvironment": "V3",
+              "builder": "RAILPACK",
+              "dockerfilePath": null,
+              "nixpacksConfigPath": null,
+              "nixpacksPlan": null,
+              "watchPatterns": []
+             },
+             "deploy": {
+              "cronSchedule": null,
+              "drainingSeconds": null,
+              "healthcheckPath": "/api/health",
+              "healthcheckTimeout": 300,
+              "ipv6EgressEnabled": false,
+              "limitOverride": null,
+              "multiRegionConfig": {
+               "europe-west4-drams3a": {
+                "numReplicas": 1
+               }
+              },
+              "numReplicas": 1,
+              "overlapSeconds": null,
+              "preDeployCommand": null,
+              "preDeployTimeoutSeconds": null,
+              "region": null,
+              "registryCredentials": null,
+              "requiredMountPath": null,
+              "restartPolicyMaxRetries": 10,
+              "restartPolicyType": "ON_FAILURE",
+              "runtime": "V2",
+              "sleepApplication": false,
+              "startCommand": "python main.py",
+              "useLegacyStacker": false
+             }
+            },
+            "volumeMounts": []
+           }
+          }
+         ],
+         "source": {
+          "repo": "acme/monorepo",
+          "image": null
+         },
+         "domains": {
+          "serviceDomains": [
+           {
+            "domain": "app-production-production.up.railway.app",
+            "targetPort": 8080
+           }
+          ],
+          "customDomains": [
+           {
+            "domain": "app.example.com",
+            "targetPort": 8080
+           }
+          ]
+         },
+         "cronSchedule": null,
+         "nextCronRunAt": null,
+         "startCommand": "python main.py"
+        }
+       },
+       {
+        "node": {
+         "serviceName": "site-production",
+         "latestDeployment": {
+          "canRedeploy": true,
+          "meta": {
+           "branch": "main",
+           "buildOnly": false,
+           "commitHash": "89abcdef0123456789abcdef0123456789abcdef",
+           "fileServiceManifest": {},
+           "logsV2": true,
+           "nixpacksProviders": [],
+           "plan": "pro",
+           "propertyFileMapping": {},
+           "reason": "deploy",
+           "repo": "acme/monorepo",
+           "rootDirectory": "/site",
+           "runtime": "V2",
+           "serviceManifest": {
+            "build": {
+             "buildCommand": "",
+             "buildEnvironment": "V3",
+             "builder": "DOCKERFILE",
+             "dockerfilePath": "/site/Dockerfile",
+             "nixpacksConfigPath": null,
+             "nixpacksPlan": null,
+             "watchPatterns": []
+            },
+            "deploy": {
+             "cronSchedule": null,
+             "drainingSeconds": null,
+             "healthcheckPath": null,
+             "healthcheckTimeout": null,
+             "ipv6EgressEnabled": false,
+             "limitOverride": null,
+             "multiRegionConfig": {
+              "europe-west4-drams3a": {
+               "numReplicas": 1
+              }
+             },
+             "numReplicas": 1,
+             "overlapSeconds": null,
+             "preDeployCommand": null,
+             "preDeployTimeoutSeconds": null,
+             "region": null,
+             "registryCredentials": null,
+             "requiredMountPath": null,
+             "restartPolicyMaxRetries": 10,
+             "restartPolicyType": "ON_FAILURE",
+             "runtime": "V2",
+             "sleepApplication": false,
+             "startCommand": null,
+             "useLegacyStacker": false
+            }
+           },
+           "volumeMounts": []
+          },
+          "status": "SUCCESS",
+          "createdAt": "2026-10-29T16:12:56.885Z",
+          "deploymentStopped": false
+         },
+         "activeDeployments": [
+          {
+           "status": "SUCCESS",
+           "createdAt": "2026-10-29T16:12:56.885Z",
+           "meta": {
+            "branch": "main",
+            "buildOnly": false,
+            "commitHash": "89abcdef0123456789abcdef0123456789abcdef",
+            "fileServiceManifest": {},
+            "logsV2": true,
+            "nixpacksProviders": [],
+            "plan": "pro",
+            "propertyFileMapping": {},
+            "reason": "deploy",
+            "repo": "acme/monorepo",
+            "rootDirectory": "/site",
+            "runtime": "V2",
+            "serviceManifest": {
+             "build": {
+              "buildCommand": "",
+              "buildEnvironment": "V3",
+              "builder": "DOCKERFILE",
+              "dockerfilePath": "/site/Dockerfile",
+              "nixpacksConfigPath": null,
+              "nixpacksPlan": null,
+              "watchPatterns": []
+             },
+             "deploy": {
+              "cronSchedule": null,
+              "drainingSeconds": null,
+              "healthcheckPath": null,
+              "healthcheckTimeout": null,
+              "ipv6EgressEnabled": false,
+              "limitOverride": null,
+              "multiRegionConfig": {
+               "europe-west4-drams3a": {
+                "numReplicas": 1
+               }
+              },
+              "numReplicas": 1,
+              "overlapSeconds": null,
+              "preDeployCommand": null,
+              "preDeployTimeoutSeconds": null,
+              "region": null,
+              "registryCredentials": null,
+              "requiredMountPath": null,
+              "restartPolicyMaxRetries": 10,
+              "restartPolicyType": "ON_FAILURE",
+              "runtime": "V2",
+              "sleepApplication": false,
+              "startCommand": null,
+              "useLegacyStacker": false
+             }
+            },
+            "volumeMounts": []
+           }
+          }
+         ],
+         "source": {
+          "repo": "acme/monorepo",
+          "image": null
+         },
+         "domains": {
+          "serviceDomains": [],
+          "customDomains": [
+           {
+            "domain": "www.example.com",
+            "targetPort": 8080
+           }
+          ]
+         },
+         "cronSchedule": null,
+         "nextCronRunAt": null,
+         "startCommand": null
+        }
+       }
+      ]
+     }
+    }
+   }
+  ]
+ }
+}

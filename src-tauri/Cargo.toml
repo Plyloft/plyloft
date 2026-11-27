@@ -1,0 +1,237 @@
+[package]
+name = "atelier"
+version = "1.178.0"
+description = "Personal Mac workspace shell"
+license = "MIT"
+authors = ["matteo"]
+edition = "2021"
+
+[workspace]
+members = ["crates/ply-collab", "crates/ply-memory", "crates/ply-mcp", "crates/vt100"]
+resolver = "2"
+
+[lib]
+name = "atelier_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-fs = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-log = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-process = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml_ng = "0.10"
+portable-pty = "0.8"
+# PtySystem::openpty's error type, for pty::ChosenPty. Already in the tree via
+# portable-pty, same version.
+anyhow = "1"
+parking_lot = "0.12"
+uuid = { version = "1", features = ["v4", "serde"] }
+log = "0.4"
+notify = "6"
+notify-debouncer-full = "0.3"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+globset = "0.4"
+# v1.85.0 (team tier): offline license-key verification. Same trust
+# pattern as the updater (Ed25519, private half on the owner's Mac).
+ed25519-dalek = "2"
+base64 = "0.22"
+sha2 = "0.10"
+tempfile = "3"
+# Launch A1 (account.rs): the Plyloft account. plyloft-server and GitHub's
+# Device Flow over the same reqwest + rustls/ring stack the updater already
+# pulls in (same versions, no new TLS code); `blocking` because every call
+# runs on its own thread. The session token lives in the OS keychain through
+# `keyring` (macOS Keychain, Windows Credential Manager; native backends only).
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+keyring = { version = "3.6", features = ["apple-native", "windows-native"] }
+ply-memory = { path = "crates/ply-memory" }
+ply-collab = { path = "crates/ply-collab" }
+
+# v1.116.0: the Codex overlay's config.toml is the member's own, parsed and
+# added to. Appending text cannot see that they already declare the same
+# marketplace, and a duplicate TOML table makes Codex refuse the whole file —
+# their own settings included.
+toml = "0.9"
+
+# The watcher's rename cache walks a workspace without its build and
+# dependency dirs (watcher::WorkspaceFileIds). Already in the tree via notify.
+walkdir = "2"
+
+# QoL 6.1 (E1/E2): Go to file (⌘P) reads the project's `.gitignore` the way
+# git does (nested files, `.git/info/exclude`, the global excludes), with the
+# walker ripgrep is built on. Its dependencies (globset, walkdir, memchr,
+# regex-automata, crossbeam) are already in the tree.
+ignore = "0.4"
+
+# Card chat attachments (chat_extract.rs): Plyloft reads the text of a PDF
+# and a Word file itself, on the Mac and on Windows alike, because neither
+# vendor's own file tool can (Claude's Read needs poppler's `pdftoppm` past
+# 10 pages and refuses .docx; Codex has no PDF reader). Pure Rust, no system
+# library. `pdf-extract` (on `lopdf`) decodes the fonts' encodings and CMaps;
+# a .docx is a zip whose `word/document.xml` is read with `zip` (already in
+# the tree, here with flate2's deflate only: reading, no other codec) and
+# `quick-xml` (already in the tree, same version).
+pdf-extract = "0.12"
+zip = { version = "4", default-features = false, features = ["deflate-flate2"] }
+quick-xml = "0.37"
+# A card chat reads Claude's screen as a terminal would show it: an emulated
+# grid (rows x columns) fed every PTY byte, so cursor moves, partial
+# repaints and erase-line read right (chat.rs). Small (vte + unicode-width).
+vt100 = "0.16"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-updater = "2"
+# Version order for the updater's no-downgrade rule (legacy_install.rs).
+# Already in the tree via tauri and the updater plugin, same version.
+semver = "1"
+
+[target.'cfg(windows)'.dependencies]
+# The notification-area icon that shows the hidden window and quits
+# (windows_shell.rs): Windows has no dock or app menu. Windows only, so the
+# Mac build is unchanged.
+# Ordering trap: tauri-build (and the CLI's manifest rewrite) check the
+# features of the first `tauri` entry they find, and `[dependencies]` comes
+# before any target table. The config-managed features (`protocol-asset`)
+# must stay on that main entry; this one may only add `tray-icon`, which
+# neither manages. Moving `tauri` out of `[dependencies]` would make this
+# entry the checked one and fail the build.
+tauri = { version = "2", features = ["tray-icon"] }
+# WebView2's settings behind `with_webview` (browser accelerator keys off).
+# Already in the tree via tauri/wry, same version.
+webview2-com = "0.38"
+# canonicalize() without the `\\?\` verbatim prefix git and prefix checks
+# choke on (platform::canonicalize). Already in the tree via tauri-utils.
+dunce = "1"
+# Whether two paths are one file (volume serial + file index), so the Codex
+# overlay never adopts a member's own file. Already in the tree via walkdir.
+same-file = "1"
+# Job Objects for process groups (platform::adopt): a tree killed at once, and
+# every child gone with Ply even when it crashes; ToolHelp for a tile's parent
+# pids, so a kill spares its GUI apps. Already in the tree via tauri.
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  # OB-6: GetUserNameExW(NameDisplay), Setup's name prefill.
+  "Win32_Security_Authentication_Identity",
+  # A terminal's Ctrl+C (SetConsoleCtrlHandler) and right-click paste (the
+  # clipboard's text): platform::restore_ctrl_c_for_children, clipboard_text.
+  "Win32_System_Console",
+  "Win32_System_DataExchange",
+  "Win32_System_Memory",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_JobObjects",
+  # H1 (1.173.0): the watchdog's memory facts — this process's working set
+  # (K32GetProcessMemoryInfo; GlobalMemoryStatusEx is SystemInformation's).
+  "Win32_System_ProcessStatus",
+  "Win32_System_Threading",
+  # H1 round 1: QueryUnbiasedInterruptTime, a clock that stops while the PC
+  # sleeps, so the watchdog tells sleep from a starved Plyloft.
+  "Win32_System_WindowsProgramming",
+  # conpty_host (1.169.0, B2): the bundled ConPTY loaded by its path and
+  # tried once (a pseudo console on two pipes), and the machine's arch.
+  "Win32_System_LibraryLoader",
+  "Win32_System_Pipes",
+  "Win32_System_SystemInformation",
+  # worktree_ports: SO_EXCLUSIVEADDRUSE on the port probe (socket2 enables
+  # it already).
+  "Win32_Networking_WinSock",
+  # 1.176.2 R1 (A5R-05): GetOEMCP and MultiByteToWideChar, so cmd.exe's and
+  # Windows PowerShell's own words read right (platform::decode_console).
+  "Win32_Globalization",
+] }
+# worktree_ports: the port probe's socket, set up before its bind. Already in
+# the tree via tokio/hyper, same version.
+socket2 = "0.6"
+# The shell hand-offs macOS does with `open` and NSFileManager: ShellExecuteW
+# (platform::open_path/open_url), the Recycle Bin through IFileOperation with
+# a progress sink that says where each item landed (trash.rs), and the
+# microphone consent store (microphone.rs). Both already in the tree via
+# tauri/webview2-com; windows-core names what `#[implement]` expands to.
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Registry",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
+  "Win32_UI_WindowsAndMessaging",
+] }
+windows-core = "0.61"
+
+[target.'cfg(unix)'.dependencies]
+# Signal a whole process group when abandoning a spawned updater: killing the
+# direct child alone leaves its downloader running (2026-08-30 codex fix).
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.5"
+# GH #102: + NSFileManager/NSURL/NSError. `Move the local copy to Trash` calls
+# `-trashItemAtURL:resultingItemURL:error:`, the move Finder makes, so the
+# destructive way out is recoverable (trash.rs). Features on a crate that is
+# already here — no new dependency.
+objc2-foundation = { version = "0.2", features = [
+  "NSBundle",
+  "NSProcessInfo",
+  "NSString",
+  "NSFileManager",
+  "NSURL",
+  "NSError",
+] }
+# The doctor's Microphone row reads (and can request) Ply's
+# microphone authorization through AVFoundation, never by opening the device.
+# The 0.3 bindings sit on objc2 0.6 / block2 0.6, already in the tree via
+# Tauri; `objc2-v6` is only there to name the completion handler's `Bool`.
+objc2-av-foundation = { version = "0.3", default-features = false, features = ["std", "block2", "AVCaptureDevice", "AVMediaFormat"] }
+block2 = "0.6"
+objc2-v6 = { package = "objc2", version = "0.6" }
+# QoL 1.168 (F4, D6): Plyloft's notification authorization, read and requested
+# through UNUserNotificationCenter (notification_access.rs). The crates are
+# the 0.3 bindings already in the lockfile (objc2 0.6 / block2 0.6).
+objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNUserNotificationCenter", "UNNotificationSettings"] }
+objc2-foundation-v3 = { package = "objc2-foundation", version = "0.3", default-features = false, features = ["std", "NSError"] }
+# GH #169: whether Claude Code has a credential on this Mac, read as the
+# keychain item's *attributes* only (never its secret). Already in the tree via
+# the updater's rustls-platform-verifier — no new crate.
+security-framework = "3"
+# GH #169 review 1: NFC for the suffixed keychain service, as the CLI hashes
+# it. Both already in the tree (security-framework's own dependencies).
+core-foundation = "0.10"
+core-foundation-sys = "0.8"
+
+[features]
+# SL-0 app tester (docs/app-tester/DESIGN.md): the dev-only test bridge. Off by
+# default and refused without debug_assertions (lib.rs); only
+# scripts/app-tester/build-app.sh turns it on. Never in a release.
+test-bridge = []
+
+[dev-dependencies]
+filetime = "0.2"
+tauri = { version = "2", features = ["test"] }
+# chat_extract tests build compressed PDFs and .docx files (FlateDecode), the
+# shape real files have. Already in the tree via zip, same version.
+flate2 = "1"
+
+# v1.63.0: explicit release hardening (was Tauri/cargo defaults).
+# panic stays "unwind" — app_nap.rs relies on catch_unwind in both FFI
+# paths (beginActivityWithOptions + the Drop's endActivity:).
+[profile.release]
+opt-level = 3        # default, made explicit
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# 1.169.0 (B4): vt100 0.16.2 with grapheme-aware cell widths, so a card
+# chat's emulated screen sizes ⚠️ 👨‍👩‍👧 🇮🇹 👍🏽 as the terminals do
+# (crates/vt100/VENDORED.md).
+[patch.crates-io]
+vt100 = { path = "crates/vt100" }

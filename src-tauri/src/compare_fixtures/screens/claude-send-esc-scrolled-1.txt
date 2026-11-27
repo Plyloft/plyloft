@@ -1,0 +1,39 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 8, cap 8-a (right after Send+Esc; the turn's start off the page; grey suggestion); rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: ready
+# cells: dim
+# send-open: ready
+# ----
+  58
+  59
+  60
+  61
+  62
+  63
+  64
+  65
+  66
+  67
+  68
+  69
+  70
+  71
+  72
+  73
+  74
+  75
+  76
+  77
+  78
+  79
+  80
+
+✻ Sautéed for 1s · done 9:33 AM
+
+──────────────────────────────────────────── walk-pair ─
+❯ Say RED in one word.
+────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

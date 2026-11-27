@@ -1,0 +1,49 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: nothing drawn
+# truth: working: the session had just started (Start build 11:25:17), nothing drawn yet; the trust question came next
+# vendor: codex
+# cli: Codex 0.171.0
+# platform: macos
+# source: real capture, Mac walk C, 2026-11-23 (Start build 11:19:19 Claude, 11:22:10 Codex, 11:25:17 Codex trust; Board read every ~5 s); capture mac-112519, frame 1 of 3; home path replaced
+# captured-at: 2026-11-23T10:25:20.396Z
+# key: card-mwt4desl-2
+# size: 32 rows x 120 cols
+# cursor: row 0, col 0, shown
+# alternate-screen: false
+# exited: false
+# last-output-ago-ms: 218
+# content-changed-ago-ms: 0
+# ----
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

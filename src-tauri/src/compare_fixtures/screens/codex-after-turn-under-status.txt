@@ -1,0 +1,39 @@
+# plyloft compare screen v1
+# vendor: codex
+# cli: Codex 0.172.0
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 12, cap 12-e (a turn under the /status card); rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: ready
+# cells: plain
+# privacy: the account e-mail and the ChatGPT workspace and session ids were replaced by placeholders of the same length
+# ----
+                       00000000-0000-0000-0000-000000000
+                       000
+  Thread name:         From Claude Code: GREEN My note:
+                       reply with the single word…
+  Collaboration mode:  Default
+  Session:
+                       11111111-1111-1111-1111-111111111
+                       111
+ 
+  Context window:      98% left (20K used / 475K)
+  Weekly limit:        [███████████████████░] 94% left
+                       (resets 09:01 on 28 Nov)
+  Credits:             62500 credits
+ 
+ 
+› Say ORANGE in one word.
+ 
+ 
+• ORANGE
+  └ Tip: Press f3 to search this conversation.
+ 
+  Worked for 1s • 09:38                                 
+ 
+ 
+› Ask Codex to do anything
+ 
+  GPT-6.2-Sol default · ~/Library/Application Support/
+  com.mbadv.ply.test/app-tester/sandboxes/compare-1177/
+  app · From Claude Code: GREEN My note: reply with the…
+  ← for agents · ? for shortcuts

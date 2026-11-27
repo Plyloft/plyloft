@@ -1,0 +1,17 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 8, cap 8-d (after Ctrl+C: the box empty; Esc left the transcript turn open); rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: ready
+# cells: dim
+# send-open: ready
+# ----
+  80
+
+✻ Sautéed for 1s · done 9:33 AM
+
+──────────────────────────────────────────── walk-pair ─
+❯ 
+────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

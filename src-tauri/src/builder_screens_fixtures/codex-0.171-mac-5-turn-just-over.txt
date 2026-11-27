@@ -1,0 +1,48 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: idle
+# truth: nothing: turn over (Worked for 21s; Board Your turn at ~11:22:38); counted working on the safe side until 10 s after the last change above the composer
+# vendor: codex
+# cli: Codex 0.171.0
+# platform: macos
+# source: real capture, Mac walk C, 2026-11-23 (Start build 11:19:19 Claude, 11:22:10 Codex, 11:25:17 Codex trust; Board read every ~5 s); capture mac-112238, frame 2 of 3; home path replaced
+# captured-at: 2026-11-23T10:22:39.306Z
+# key: card-mwt49998-1
+# size: 31 rows x 89 cols
+# cursor: row 25, col 2, shown
+# alternate-screen: true
+# exited: false
+# last-output-ago-ms: 427
+# content-changed-ago-ms: 0
+# ----
+› You are the Builder for the Plyloft card "Read each file in this folder, one at a tim…
+
+• Explored
+  └ Read f3.txt
+    + Show details
+
+• f3.txt has 9 lines.
+
+• Explored
+  └ Read f4.txt
+    + Show details
+
+• f4.txt has 12 lines.
+
+• Explored
+  └ Read f5.txt
+    + Show details
+
+• f5.txt has 15 lines.
+
+• Finished reading all six files and reporting each line count using read-only commands.
+
+  Worked for 21s • 11:22
+
+
+› Ask Codex to do anything
+
+  GPT-6.2-Sol default · ~/Library/Application Support/com.mbadv.ply.test/app-tester/
+  sandboxes/n1763/s1/.plyloft-worktrees/card-mwt49998-1 · You are the Builder for the
+  Plyloft card "Read each file in…
+  ← for agents · ? for shortcuts

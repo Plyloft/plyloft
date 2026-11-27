@@ -1,0 +1,38 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, narrow-tile Mac walk 2026-11-26 (app-walks/2026-11-26-122139, Plyloft Test 1.177.1 build 35bb0818, layout Six (2x3), Claude's rule 35 columns, read with ui_terminal), step 5, /model picker open (last 30 of 63 rows); rows verbatim
+# verdict: asking
+# cells: plain
+# ----
+
+✻ Cooked for 0s · done 12:23 PM
+
+❯ /model                           
+
+───────────────────────────────────
+  Select model
+  Your pick is the default for 
+  new sessions. For other models,
+  use --model.
+    ↑ 1 more
+    2.  Opus 5.5         For 
+                         complex 
+                         work and
+                          
+                         everyday
+                         tasks
+  ❯ 3.  Fable 5.2 ✔      For your
+                          
+                         toughest
+                         challen
+                         ges
+    ↓ 3 more
+
+
+  ◐ Medium effort (default) ←/→
+  to adjust
+
+  s to use this session only ·
+  Enter to save · Esc to cancel

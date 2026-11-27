@@ -1,0 +1,216 @@
+{
+  "contract": "One overlap rule, two callers: ply_collab::workspace_status_from_state (live warnings) and coordination::overlap_warning_pair (observed at spawn). Each case is two active sessions of one workspace; aWarns is the code session a carries about b, bWarns the code b carries about a (null: none). Owner decision 2026-10-30 (1.173.0 A4): two Claude/Codex terminals in one folder warn; plain shell tiles stay out; a different folder (a card's copy, a copy without a card) never warns. A side with \"nonProject\": true is a session with no project context (its worktree is ignored).",
+  "cases": [
+    {
+      "name": "two provider tiles in the project folder",
+      "a": {
+        "executionKind": "provider-tile",
+        "provider": "claude",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "provider-tile",
+        "provider": "codex",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "aWarns": "two-provider-tiles",
+      "bWarns": "two-provider-tiles"
+    },
+    {
+      "name": "two Claude tiles in the project folder",
+      "a": {
+        "executionKind": "provider-tile",
+        "provider": "claude",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "provider-tile",
+        "provider": "claude",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "aWarns": "two-provider-tiles",
+      "bWarns": "two-provider-tiles"
+    },
+    {
+      "name": "a provider tile and a shell tile",
+      "a": {
+        "executionKind": "provider-tile",
+        "provider": "claude",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "shell-tile",
+        "provider": "shell",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "aWarns": null,
+      "bWarns": null
+    },
+    {
+      "name": "two shell tiles",
+      "a": {
+        "executionKind": "shell-tile",
+        "provider": "shell",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "shell-tile",
+        "provider": "shell",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "aWarns": null,
+      "bWarns": null
+    },
+    {
+      "name": "two provider tiles in different worktrees",
+      "a": {
+        "executionKind": "provider-tile",
+        "provider": "claude",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "provider-tile",
+        "provider": "codex",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo/.plyloft-worktrees/card-1"
+      },
+      "aWarns": null,
+      "bWarns": null
+    },
+    {
+      "name": "a provider tile beside an unattended writer keeps the writer codes",
+      "a": {
+        "executionKind": "provider-tile",
+        "provider": "claude",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "agent-oneshot",
+        "provider": "claude",
+        "attendance": "unattended",
+        "writeIntent": "writer",
+        "worktree": "/repo"
+      },
+      "aWarns": "unattended-writer-active",
+      "bWarns": "human-session-active"
+    },
+    {
+      "name": "a shell tile beside an unattended writer keeps the writer codes",
+      "a": {
+        "executionKind": "shell-tile",
+        "provider": "shell",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "agent-oneshot",
+        "provider": "codex",
+        "attendance": "unattended",
+        "writeIntent": "writer",
+        "worktree": "/repo"
+      },
+      "aWarns": "unattended-writer-active",
+      "bWarns": "human-session-active"
+    },
+    {
+      "name": "an unattended writer in another worktree",
+      "a": {
+        "executionKind": "provider-tile",
+        "provider": "claude",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "agent-oneshot",
+        "provider": "claude",
+        "attendance": "unattended",
+        "writeIntent": "writer",
+        "worktree": "/repo/.plyloft-worktrees/card-1"
+      },
+      "aWarns": null,
+      "bWarns": null
+    },
+    {
+      "name": "a provider tile beside an unattended reader",
+      "a": {
+        "executionKind": "provider-tile",
+        "provider": "claude",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "reviewer",
+        "provider": "codex",
+        "attendance": "unattended",
+        "writeIntent": "read-only",
+        "worktree": "/repo"
+      },
+      "aWarns": null,
+      "bWarns": null
+    },
+    {
+      "name": "a provider tile beside a session with no project",
+      "a": {
+        "executionKind": "provider-tile",
+        "provider": "claude",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "provider-tile",
+        "provider": "codex",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo",
+        "nonProject": true
+      },
+      "aWarns": null,
+      "bWarns": null
+    },
+    {
+      "name": "an unattended writer with no project",
+      "a": {
+        "executionKind": "shell-tile",
+        "provider": "shell",
+        "attendance": "human-attended",
+        "writeIntent": "unknown",
+        "worktree": "/repo"
+      },
+      "b": {
+        "executionKind": "agent-oneshot",
+        "provider": "claude",
+        "attendance": "unattended",
+        "writeIntent": "writer",
+        "worktree": "/repo",
+        "nonProject": true
+      },
+      "aWarns": null,
+      "bWarns": null
+    }
+  ]
+}

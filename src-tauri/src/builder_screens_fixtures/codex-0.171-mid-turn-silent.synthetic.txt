@@ -1,0 +1,20 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: idle
+# truth: working: mid-turn, the status line hidden after a streamed line while the model silently writes a long patch (no byte, no change for 60 s)
+# vendor: codex
+# source: synthetic, phase 2 review (REV-offscreen-p2 MF2); not a grid capture
+# exited: false
+# last-output-ago-ms: 60000
+# content-changed-ago-ms: 60000
+# ----
+• Explored
+  └ Read src/lib/attention.ts
+
+• I'll now rewrite the matcher and its tests in one patch.
+
+
+› Ask Codex to do anything
+
+  GPT-6.2-Sol default · ~/work/s1
+  ← for agents · ? for shortcuts

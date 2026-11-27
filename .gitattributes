@@ -1,0 +1,5 @@
+# Source is LF everywhere: tests read files as text, and a Windows checkout
+# would otherwise turn them CRLF.
+* text=auto eol=lf
+# 1.169.0 (B2): raw ConPTY captures; their CRLFs are the evidence.
+src-tauri/src/conpty_fixtures/*.bin binary

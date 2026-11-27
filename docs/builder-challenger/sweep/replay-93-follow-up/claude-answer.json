@@ -1,0 +1,112 @@
+{
+  "verdict": "APPROVE",
+  "earlierFindings": [
+    {
+      "id": "F1",
+      "state": "closed",
+      "reason": "All settings writes now go through one queue (`createMutationQueue` in settingsStore). Each change is applied to the latest committed state when its turn comes. The resize (`persist` \u2192 `update`), the draft (`update(latest => withDraftPreferences(latest, draft))`, which writes only the preference blocks), TeamSection's clone root and WelcomeScreen's first-run all use it. No direct `settings_set` caller is left, and settingsQueue.test.ts covers both orders of a slow write and a fast one."
+    },
+    {
+      "id": "F6",
+      "state": "closed",
+      "reason": "SettingsOverlay now uses the shared `useDialogFocus` stack, and SwarmTemplateEditorModal and AgentForm join it. Only the top visible dialog handles Esc and Tab, so with the template editor open, Esc closes the editor only and Tab stays inside it. ConfirmDialog was already on the stack, and the other `.modal-backdrop` dialogs are not reachable from Settings pages."
+    },
+    {
+      "id": "F8",
+      "state": "closed",
+      "reason": "`entryScope` returns \"repository\" for build-release when `ctx.hasSharedDefinition` is true. SettingsOverlay sets that from `status?.hasDefinition` and passes `entryScope(shown, ctx)` to `SettingsApp` \u2192 `PageHeader`, so a repository with .atelier/workspace.json shows Repository."
+    }
+  ],
+  "findings": [],
+  "nonBlocking": [
+    {
+      "severity": "P3",
+      "preExisting": false,
+      "sweepSaw": false,
+      "path": "scripts/ux-check.mjs",
+      "line": null,
+      "title": "The class-name check follows boolean constants and reports their comparison strings as classes",
+      "body": "`classWords` follows every bare identifier to its local binding. In a migrated file, `const editing = mode === \"edit\"; <div className={editing ? \"ux-a\" : \"ux-b\"} />` resolves `editing` to `mode === \"edit\"`. That yields the word `edit`, and the check fails with `className \"edit\" is off the catalogue` on code that is correct. `localBinding` also matches the first `const name` anywhere in the file, whatever its scope.",
+      "fix": "Follow an identifier only where it is used as a class value: the whole expression, a `${}` hole, or a ternary branch, never a ternary condition or an `&&` left side. Or take string words from a binding only when the binding is itself a string, a template or an array/join of them."
+    },
+    {
+      "severity": "P3",
+      "preExisting": false,
+      "sweepSaw": false,
+      "path": "src/store/settingsStore.ts",
+      "line": 278,
+      "title": "A late `settings-changed` event can roll the store back between two queued writes",
+      "body": "`applyExternal` replaces `settings` with whatever the backend event carries. Take write 1 (a resize) and write 2 (a draft save) in the queue. If write 1's event arrives after write 2 has committed, the store briefly goes back to state 1. A mutation that runs in that window reads state 1 and drops write 2's fields. The ordering between a Tauri event and an invoke response is not guaranteed.",
+      "fix": "Ignore an external payload that equals the last state this window saved itself. Or keep a generation counter and skip events that are older than the latest commit."
+    },
+    {
+      "severity": "P3",
+      "preExisting": true,
+      "sweepSaw": false,
+      "path": "src/components/DiscussionModal.tsx",
+      "line": 266,
+      "title": "The synthesis default still saves a whole-settings snapshot",
+      "body": "DiscussionModal calls `store.save({...store.settings, behavior: {...}})`. This snapshot is built before the queue runs, so it undoes any queued write that lands before it (for example a clone-root save). It can only happen when the two overlap, which is unlikely because the modal and Settings are rarely open together.",
+      "fix": "Use `useSettings.getState().update(latest => ({...latest, behavior: {...latest.behavior, discussionSynthesizer: next}}))`."
+    },
+    {
+      "severity": "P3",
+      "preExisting": true,
+      "sweepSaw": false,
+      "path": "src/store/settingsStore.ts",
+      "line": 264,
+      "title": "Reset to defaults also clears first-run and the remembered modal size",
+      "body": "`resetToDefaults` writes `DEFAULT_SETTINGS` whole. It clears `onboarding.firstRunCompletedAt`, so the Welcome screen can come back on the next launch. It also clears `team.cloneRoot` and the new `windows.settings` size, although the Reset page is about preferences.",
+      "fix": "Reset through `update(latest => withDraftPreferences(latest, DEFAULT_SETTINGS))`, or state explicitly which blocks Reset clears."
+    }
+  ],
+  "checklist": [
+    {
+      "class": "A. Requirements",
+      "result": "All three findings are addressed. The ux-check widening (template holes, local constants, named colours, trailing `;`, fallbacks) is tested, and the baseline rose to 381 because of the wider colour detection, as STATUS.md says. Nothing is missing against the brief."
+    },
+    {
+      "class": "B. Concurrency and ordering",
+      "result": "The queue serialises writes and reads the latest state when each write runs. One remote rollback window remains through `applyExternal` event ordering (P3)."
+    },
+    {
+      "class": "C. State and persistence",
+      "result": "The draft saves only its preference blocks, and `rebaseDraft` keeps unsaved edits when only blocks outside the draft change. `resetToDefaults` clearing onboarding and the modal size predates this change (P3)."
+    },
+    {
+      "class": "D. Failure paths",
+      "result": "A failed write rejects only its own caller and does not block the queue (tested). The resize save logs with console.warn."
+    },
+    {
+      "class": "E. Processes and resources",
+      "result": "useEscapeFirst, MutationObserver, ResizeObserver and the dialog stack entries are all cleaned up on unmount. The MutationObserver does not watch attributes, so the inline width `naturalWidth` sets and restores cannot loop."
+    },
+    {
+      "class": "F. Boundaries and contracts",
+      "result": "`hasDefinition` exists on the adoption status. `settings_set` has the same shape as before."
+    },
+    {
+      "class": "G. Data safety",
+      "result": "No write can drop another write's fields any more, except DiscussionModal's pre-existing snapshot save (P3)."
+    },
+    {
+      "class": "H. Tests",
+      "result": "New tests cover the queue in both orders plus failure, entryScope, legacyDialogAbove on hidden and visible dialogs, naturalWidth and effectiveDisabled, and the new ux-check failure modes. Some tests are source-regex assertions, which are weaker but acceptable."
+    },
+    {
+      "class": "I. User-facing text and states",
+      "result": "The \"above\" pointers in ProjectConfigPanel now name Settings \u203a Agent instructions and Settings \u203a General. Esc goes to the top dialog first, then Settings."
+    },
+    {
+      "class": "J. Branch discovery",
+      "result": "Not applicable: no branch lookups in the touched files."
+    },
+    {
+      "class": "K. Unreadable definitions",
+      "result": "Not applicable: the badge only reads `hasDefinition` and writes nothing."
+    }
+  ],
+  "verificationGaps": [
+    "I could not run PPVP, ux-check or the node tests (Bash is denied). I did not confirm that the stricter ux-check still passes on the layer and SettingsOverlay with the committed baseline of 381, or that the new tests pass."
+  ]
+}

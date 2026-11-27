@@ -1,0 +1,48 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: running
+# truth: working: mid-turn; the Working line also names a background terminal (the Rust commentary reads it as unknown)
+# vendor: codex
+# cli: Codex 0.171.0
+# platform: windows
+# source: real capture, Windows walk C2, 2026-11-23 (ConPTY; Start build ~13:55:10 Claude, ~13:58:46 Codex; Board read every ~5 s); capture win-135859, frame 3 of 3; home path replaced
+# captured-at: 2026-11-23T12:59:01.751Z
+# key: card-mwt9uilf-1
+# size: 31 rows x 92 cols
+# cursor: row 26, col 2, shown
+# alternate-screen: true
+# exited: false
+# last-output-ago-ms: 28
+# content-changed-ago-ms: 0
+# ----
+  Read each file in this folder, one at a time. After reading each one, say in one short
+  sentence how many lines it has, before you read the next. Do not create, change or delete
+  any file, and do not run any command that changes anything.
+
+  Read each file in this folder, one at a time. After reading each one, say in one short
+  sentence how many lines it has, before you read the next. Do not create, change or delete
+  any file, and do not run any command that changes anything.
+
+
+• I’ll list the files in this folder, then read them one at a time and report each line
+  count before opening the next file.
+
+• Ran Get-ChildItem -LiteralPath . -Force -File | Select-Object -ExpandProperty Name
+  └ f3.txt
+    f4.txt
+    f5.txt
+    + 3 lines (ctrl+t to expand)
+
+• Ran (Get-Content -LiteralPath .git | Measure-Object -Line).Lines
+  └ 1
+
+• .git has 1 line.
+
+• Working (12s • esc to interrupt) · 1 background terminal running · /ps to view · /stop to…
+
+
+› Ask Codex to do anything
+
+  GPT-6.2-Sol default · C:\work\sandboxes\n1763\s1\.plyloft-worktrees\card-mwt9uilf-1 ·
+  You are the Builder for the Plyloft card "Read each file in…
+  ← for agents · ? for shortcuts

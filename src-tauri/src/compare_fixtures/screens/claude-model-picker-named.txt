@@ -1,0 +1,38 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 10, cap 10-a (/model picker open, named session: the name row above an empty row and a full rule, no box); rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: asking
+# cells: plain
+# ----
+
+⏺ Ricevuto di nuovo PURPLE da Codex. Non ci vedo una
+  richiesta: dimmi tu se devo farci qualcosa.
+
+✻ Churned for 1s · done 9:34 AM
+
+❯ /model                                                
+──────────────────────────────────────────── walk-pair ─
+
+────────────────────────────────────────────────────────
+  Select model
+  Your pick is the default for new sessions. For other
+  models, use --model.
+
+    1.  Default (recommended)  Opus 5.5
+    2.  Opus 5.5               For complex work and 
+                               everyday tasks
+  ❯ 3.  Fable 5.2 ✔            For your toughest 
+                               challenges
+    4.  Sonnet 5.5             Most efficient for 
+                               simpler tasks
+    5.  Haiku 5.5              Fastest for quick 
+                               answers
+    ▸   More models             
+
+
+  ◐ Medium effort (default) ←/→ to adjust
+
+  s to use this session only · Enter to save · Esc to 
+  cancel

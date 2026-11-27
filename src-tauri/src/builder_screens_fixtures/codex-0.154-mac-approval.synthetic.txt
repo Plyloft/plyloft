@@ -1,0 +1,20 @@
+# plyloft builder screen frame v1
+# expect: waiting
+# screen: asking
+# truth: waiting: Codex asks to run a command
+# vendor: codex
+# source: synthetic, ported from src/lib/tileHeaderStatus.test.ts CODEX_APPROVAL (codex-cli 0.154.0); not a grid capture (the real ones sit beside it)
+# exited: false
+# last-output-ago-ms: 30000
+# content-changed-ago-ms: 30000
+# ----
+• Running touch /tmp/ply-probe.txt
+
+  Would you like to run the following command?
+
+  $ touch /tmp/ply-probe.txt
+
+› 1. Yes, proceed (y)
+  2. No, and tell Codex what to do differently (esc)
+
+  Press enter to confirm or esc to cancel

@@ -1,0 +1,686 @@
+/* UX revamp C5 (ADR 0007): the Board on the one scale — attention columns,
+   cards, the list view and the header's controls. Tokens only: no colour
+   literal, spacing from --space-*, type from --type-*. */
+
+.board-columns {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: 0 var(--board-inset) var(--space-2xl);
+  /* GH #249: the row of columns only scrolls sideways (900 px); each column
+     scrolls its own cards under a heading that stays put. */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.board-column {
+  flex: 1 1 0;
+  /* 1.172.0 B3 (walk 2026-10-27, Mac and Windows): five columns with cards
+     fit a 1280 px window with the sidebar at its widest (320 px) — Done is
+     never cut off nor behind a sideways scroll (boardLayout.test.ts). A
+     narrower window still scrolls sideways. */
+  min-width: 160px;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.board-column-heading {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+  /* 1.174.0 G3a walk: "Not started" stays on one line at 1280. */
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: var(--space-xs) var(--space-xs) 0;
+  font-size: var(--type-subheading);
+  line-height: var(--type-subheading-lh);
+  font-weight: var(--type-subheading-weight);
+  color: var(--fg);
+}
+
+.board-column-count {
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+
+.board-column-body {
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  /* F6: border-box, so the ring room is added to the old minimum. */
+  min-height: calc(var(--row-comfortable) + 2 * var(--space-xs));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* F6: overflow-y makes x clip too, so a card's focus ring (button outline
+     + offset, 4 px, outside the card) was cut at the sides and the first
+     card's top. Room for the ring inside the scroller; the same amount of
+     negative margin keeps the cards where they were. */
+  padding: var(--space-xs);
+  margin: calc(-1 * var(--space-xs));
+}
+
+.board-card--new {
+  padding: var(--space-sm);
+}
+
+/* QoL 1.168 (C6, C10): the new-card field's keys, and a card not made. */
+.board-card-new-hint {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.board-new-card-error {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--fg);
+}
+
+/* QoL 1.168 (C9): a card just made is marked for a moment where it lands.
+   1.174.0 (C13, VC-10): the ring is drawn inside the card, so the column's
+   scroll never cuts it to its corners, and (round 1) on a layer above the
+   card's button, which the pointer's hover paints over — it takes no press. */
+.board-card--arrived {
+  position: relative;
+}
+.board-card--arrived::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 2px transparent;
+  animation: board-card-arrived 1.6s ease-out;
+}
+@keyframes board-card-arrived {
+  from {
+    box-shadow: inset 0 0 0 2px var(--claude-accent);
+  }
+  to {
+    box-shadow: inset 0 0 0 2px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-card--arrived::after {
+    animation: none;
+    box-shadow: inset 0 0 0 2px var(--claude-accent);
+  }
+}
+
+.board-card-new-input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+
+/* Plan with two AIs: the new card's other way in, quiet under its title. */
+.board-card-new-plan {
+  margin-top: var(--space-xs);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--type-small);
+  cursor: pointer;
+  text-align: left;
+}
+
+.board-card-new-plan:hover:not(:disabled),
+.board-card-new-plan:focus-visible {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+.board-card-new-plan:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* UX-5.4: a card — raised, the one radius, a 14 px title that wraps to
+   three lines and one fact line. */
+.board-card {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: grab;
+}
+
+.board-card[draggable="false"] {
+  cursor: default;
+}
+
+.board-card:active {
+  cursor: grabbing;
+}
+
+.board-card-open {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-md);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.board-card-open:hover {
+  background: var(--hover);
+}
+
+.board-card-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  font-weight: var(--type-ui-weight);
+}
+
+.board-card-fact {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+
+/* 1.174.0 (A7, BCI-15): "Behind main" as a quiet fact under the state. */
+.board-card-fact--quiet {
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+}
+/* 1.175.0 (B3): a quiet fact with its icon before the words. */
+.board-card-fact--icon {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 1.174.0 (A7, VC-9; the 1.171 item 8 regression): a chip keeps its own
+   width inside the card's column instead of stretching to it. */
+.board-card-open > .cchip {
+  align-self: flex-start;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-card-open {
+    transition: none;
+  }
+}
+
+/* UX-5.3: where a dragged card would land — a column (reorder, or archive
+   on Done) or the archive row. */
+.board-drop-target {
+  outline: var(--focus-w) dashed var(--claude-accent);
+  outline-offset: calc(-1 * var(--focus-w));
+}
+
+/* UX-5.6: the List view; its selection bar is the ListView's (GH #298). */
+.board-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 var(--board-inset) var(--space-2xl);
+}
+
+/* GH #248: the Board has no reading column; its list spans the Board, as
+   the columns do, and the title column takes what the others leave. */
+.board-list .ux-list-frame,
+.board-list .ux-list {
+  max-width: none;
+}
+
+.board-list-bar-count {
+  flex: 1;
+  color: var(--fg);
+}
+
+.board-list-bar-note {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+
+/* CL-9: "Group by" before the List's grouping buttons. */
+.board-group-by {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-sm);
+  white-space: nowrap;
+}
+.board-group-by-label {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+
+/* UX-5.7: search, filter and the line under the header. */
+/* QoL 1.168 (block 10, C16): narrower, so the header is one row at 1280
+   with the sidebar open — the List's Group by included. */
+.board-search .ux-field {
+  width: 168px;
+}
+/* The title is one word: it needs less than the shared minimum. */
+.kanban-view .ux-screen-title {
+  min-width: min(4.5em, 40%);
+}
+
+.board-filter-count {
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+}
+
+/* QoL 1.168 (block 10, C16): on a short window the list scrolls inside the
+   popover and Clear filters stays at its foot, in reach. */
+.board-filter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 220px;
+  max-height: min(70vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.board-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.board-filter-legend {
+  padding: 0;
+  margin-bottom: var(--space-xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+
+.board-filter-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--row-compact);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.board-filter-muted {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.board-filter-foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--border);
+  background: var(--raised);
+}
+
+/* 1.174.0 (A4): the Board's notes sit in one slot (.ux-notes, ux.css),
+   inside the Board's inset like its columns (D6, 1.172.2). Inside the Board's notes slot (.ux-notes) a note draws no
+   box of its own — the slot is the box, with a hairline between notes. */
+.ux-notes-item > .adoption-banner {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.ux-notes-item > [data-ply-folder-state] .ux-callout {
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.ux-notes-item > [data-ply-project-folder-gone] .ux-callout {
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.board-status-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding: 0 var(--board-inset) var(--space-md);
+}
+
+.board-filter-empty {
+  padding: var(--space-xl) var(--board-inset);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--muted);
+}
+
+/* UX-5.8: Done's "Show all N", and the archive under the columns. */
+.board-done-toggle {
+  align-self: flex-start;
+}
+
+.board-archive {
+  flex: none;
+  margin: 0 var(--board-inset) var(--space-lg);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-sm);
+}
+
+.board-archive-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--row-compact);
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  cursor: pointer;
+}
+
+/* QoL 1.168 S1-3: while a card is dragged. */
+.board-archive-hint {
+  color: var(--muted);
+}
+
+.board-archive-toggle:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+.board-archive-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.board-archive-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+
+.board-archive-item .board-card {
+  align-self: stretch;
+}
+
+/* GH #300: read-only is one quiet line with its link, on the one scale. */
+.board-read-only {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+
+.board-status-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--claude-accent);
+  cursor: pointer;
+}
+
+.board-status-link:hover {
+  text-decoration: underline;
+}
+
+/* GH #251: the empty Board — a heading, one sentence and a quiet field that
+   Enter starts. The header's New card stays the one primary. */
+.board-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-2xl);
+  text-align: center;
+}
+
+.board-empty-title {
+  margin: 0;
+  font-size: var(--type-title);
+  line-height: var(--type-title-lh);
+  font-weight: var(--type-title-weight);
+  color: var(--fg);
+}
+
+.board-empty-sub {
+  margin: 0 0 var(--space-md);
+  max-width: 440px;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+}
+
+.board-empty-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 540px;
+  max-width: 100%;
+}
+
+.board-empty-field .ux-field {
+  flex: 1;
+}
+
+/* 1.171.0 (E2): New card on the empty Board marks its field for a moment,
+   as a card just made is marked (C9). */
+.board-empty-field--asked .ux-field {
+  border-radius: var(--radius-md);
+  animation: board-field-asked 1.6s ease-out;
+}
+/* 1.174.0 (C13 round 1): the field keeps its outer ring (the card's moved
+   inside). */
+@keyframes board-field-asked {
+  from {
+    box-shadow: 0 0 0 2px var(--claude-accent);
+  }
+  to {
+    box-shadow: 0 0 0 2px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-empty-field--asked .ux-field {
+    animation: none;
+    box-shadow: 0 0 0 2px var(--claude-accent);
+  }
+}
+.board-empty-asked {
+  margin: 0;
+  min-height: var(--type-small-lh);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+
+/* Challenger on a pull request: the sheet's list of open pull requests. */
+.pr-review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.pr-review-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--space-sm);
+  align-items: baseline;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.pr-review-choice:hover {
+  background: var(--panel-bg);
+}
+
+.pr-review-choice > .ux-card-muted-inline {
+  grid-column: 2;
+}
+
+.pr-review-choice-title {
+  overflow-wrap: anywhere;
+}
+
+/* 1.172.1 (F2): under a GitHub-backed Board's title — "Cards come from the
+   GitHub issues of o/r · read 2 min ago · Get new issues". Muted, wraps at
+   narrow widths; the repository is a quiet link, Get new issues a visible
+   underlined press (owner: no invisible quiet buttons). */
+.board-source {
+  margin: 0;
+  min-width: 0;
+}
+
+.board-source-repo,
+.board-source-get {
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.board-source-repo {
+  color: var(--fg);
+  text-decoration-color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.board-source-get {
+  color: var(--claude-accent);
+  white-space: nowrap;
+}
+
+.board-source-repo:hover,
+.board-source-get:hover {
+  text-decoration-thickness: 2px;
+}
+
+.board-source-get:disabled {
+  color: var(--muted);
+  cursor: default;
+  text-decoration: none;
+}
+
+/* QoL 7.3 (B3): the Free slot's line in the Board's header (once QoL 14.1's
+   freshness line, which became the source line above). */
+.board-freshness {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* 1.174.0 G3a walk: "Board · Site" keeps one line at 1280. The title's
+   side takes the free room; New card and ⋯ stay together at the right
+   edge (`board-head-end`); on a short row the actions wrap among
+   themselves and the Free slot's line is cut first. Only past all that,
+   the title itself ends in "…" — it never wraps. */
+.kanban-view .ux-screen-title {
+  flex: 1 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kanban-view .ux-screen-actions {
+  flex: 0 1 auto;
+}
+.board-head-end {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex: none;
+  white-space: nowrap;
+}
+/* 1.171.0 E3 (BI-3): a Needs you card's one press, under its state —
+   quiet; the card's own press opens it there. */
+.board-card-next {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--fg);
+  font-weight: var(--type-ui-weight);
+}
+
+/* 1.173.0 (C2): "On your MacBook Pro · 2 h ago" — a quiet fact line. */
+.board-card-device {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+
+/* 1.171.0 E3 (walk #5g): at 1280 px an empty column gives its room to the
+   ones with cards, so Done isn't cut off. */
+.board-column--empty {
+  flex: 0.5 1 0;
+  min-width: 112px;
+}

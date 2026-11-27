@@ -1,0 +1,59 @@
+diff --git a/docs/STATUS.md b/docs/STATUS.md
+index 08c0016..bfb5032 100644
+--- a/docs/STATUS.md
++++ b/docs/STATUS.md
+@@ -1,5 +1,16 @@
+ # Status
+ 
++## v1.1.0 — Compact board cards
++
++**Why.** A long board does not fit one screen.
++
++**What.** `readDensity` reads the stored density (anything but `compact` is
++the default) and `densityClass` gives the card list its class. Tests: both
++functions, including a stored value that is neither.
++
++**Verification.** PPVP 9/9. Tier 2 does not apply (no persisted field).
++**Tier 4 pending (mini).**
++
+ ## v1.0.0 — Board
+ 
+ The board shows cards in two lines.
+diff --git a/src/boardDensity.test.ts b/src/boardDensity.test.ts
+new file mode 100644
+index 0000000..1074bd2
+--- /dev/null
++++ b/src/boardDensity.test.ts
+@@ -0,0 +1,15 @@
++import { describe, expect, it } from "vitest";
++import { densityClass, readDensity } from "./boardDensity";
++
++describe("board density", () => {
++  it("reads compact and falls back to comfortable", () => {
++    expect(readDensity("compact")).toBe("compact");
++    expect(readDensity("comfortable")).toBe("comfortable");
++    expect(readDensity(null)).toBe("comfortable");
++    expect(readDensity("garbage")).toBe("comfortable");
++  });
++  it("maps a density to the card list's class", () => {
++    expect(densityClass("compact")).toBe("board-cards board-cards--compact");
++    expect(densityClass("comfortable")).toBe("board-cards");
++  });
++});
+diff --git a/src/boardDensity.ts b/src/boardDensity.ts
+index 8e79fce..f58e920 100644
+--- a/src/boardDensity.ts
++++ b/src/boardDensity.ts
+@@ -1,5 +1,11 @@
+ export type Density = "comfortable" | "compact";
+ 
++/** The board's card density as Settings stored it; anything else is the default. */
+ export function readDensity(stored: string | null): Density {
+-  return "comfortable";
++  return stored === "compact" ? "compact" : "comfortable";
++}
++
++/** The class the board's card list takes for a density. */
++export function densityClass(density: Density): string {
++  return density === "compact" ? "board-cards board-cards--compact" : "board-cards";
+ }

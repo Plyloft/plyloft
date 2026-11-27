@@ -1,0 +1,38 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 7, the tile after the answer (Claude's grey suggestion in the box); rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: ready
+# cells: dim
+# ----
+ ▝▝   ▝▝   ~/…/app-tester/sandboxes/compare-1177/app
+
+
+❯ /rename walk-pair 
+  ⎿  Session renamed to: walk-pair
+
+❯ Say GREEN in one word.                                
+
+⏺ GREEN
+
+✻ Churned for 0s · done 9:30 AM
+
+❯ Say YELLOW in one word.                               
+
+⏺ YELLOW
+
+✻ Cooked for 0s · done 9:30 AM
+
+❯  From Codex:                                          
+  PURPLE                                                
+  
+⏺ Ricevuto: Codex ha risposto PURPLE. Vuoi che ci faccia
+  qualcosa, o era solo per condividerlo?
+
+✻ Cogitated for 2s · done 9:33 AM
+
+──────────────────────────────────────────── walk-pair ─
+❯ Say PURPLE in one word.
+────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)

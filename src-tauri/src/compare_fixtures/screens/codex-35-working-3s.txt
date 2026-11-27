@@ -1,0 +1,27 @@
+# plyloft compare screen v1
+# vendor: codex
+# cli: Codex 0.172.0
+# platform: macos
+# source: real capture, narrow-tile Mac walk 2026-11-26 (app-walks/2026-11-26-122139, Plyloft Test 1.177.1 build 35bb0818, layout Six (2x3), Claude's rule 35 columns, read with ui_terminal), step 4, working, 3 s; rows verbatim
+# verdict: working
+# cells: plain
+# turn: open
+# ----
+› Say BLUE in one word.
+  Worked for 2s • 12:22            
+ 
+ 
+› Run the shell command: sleep 20
+ 
+ 
+• I’ll run sleep 20 and wait for it
+  to finish.
+ 
+• Working (3s • esc to interrupt) …
+ 
+ 
+› Ask Codex to do anything
+ 
+  GPT-6.2-Sol default · ~/Library/
+  Application Support/…
+  ← for agents · ? for shortcuts

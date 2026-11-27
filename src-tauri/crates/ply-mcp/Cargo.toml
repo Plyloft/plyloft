@@ -1,0 +1,17 @@
+[package]
+name = "ply-mcp"
+version = "0.1.0"
+description = "Read-only stdio MCP server for accepted Ply Knowledge"
+license = "MIT"
+edition = "2021"
+publish = false
+
+[dependencies]
+log = "0.4"
+ply-collab = { path = "../ply-collab" }
+ply-memory = { path = "../ply-memory" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"

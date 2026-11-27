@@ -1,0 +1,54 @@
+[
+  {
+    "name": "no findings",
+    "review": { "snapshotN": 1, "provider": "codex", "status": "done", "verdict": "changes_requested", "at": 1 },
+    "expected": "changes requested — needs you"
+  },
+  {
+    "name": "one P1 among the review's findings",
+    "review": {
+      "snapshotN": 1, "provider": "codex", "status": "done", "verdict": "changes_requested", "at": 1,
+      "findings": [
+        { "severity": "P1", "title": "Deletes user data", "body": "", "preExisting": false, "pass": null },
+        { "severity": "P2", "title": "Slow", "body": "", "preExisting": false, "pass": null }
+      ]
+    },
+    "expected": "1 serious issue · changes requested"
+  },
+  {
+    "name": "the ledger wins: open and still-open P1s count, closed, P2 and pre-existing ones don't",
+    "review": {
+      "snapshotN": 2, "provider": "codex", "status": "done", "verdict": "changes_requested", "at": 1,
+      "findings": [{ "severity": "P1", "title": "A", "body": "", "preExisting": false, "pass": null }],
+      "ledger": [
+        { "id": "F1", "severity": "P1", "preExisting": false, "location": null, "title": "A", "body": "", "reviewId": "r", "round": 1, "state": "open", "reason": null, "updatedRound": 1 },
+        { "id": "F2", "severity": "P1", "preExisting": false, "location": null, "title": "B", "body": "", "reviewId": "r", "round": 1, "state": "still-open", "reason": null, "updatedRound": 2 },
+        { "id": "F3", "severity": "P1", "preExisting": false, "location": null, "title": "C", "body": "", "reviewId": "r", "round": 1, "state": "closed", "reason": null, "updatedRound": 2 },
+        { "id": "F4", "severity": "P1", "preExisting": true, "location": null, "title": "D", "body": "", "reviewId": "r", "round": 1, "state": "open", "reason": null, "updatedRound": 1 },
+        { "id": "F5", "severity": "P2", "preExisting": false, "location": null, "title": "E", "body": "", "reviewId": "r", "round": 1, "state": "open", "reason": null, "updatedRound": 1 }
+      ]
+    },
+    "expected": "2 serious issues · changes requested"
+  },
+  {
+    "name": "a P1 reported as a note does not count",
+    "review": {
+      "snapshotN": 2, "provider": "codex", "status": "done", "verdict": "changes_requested", "at": 1,
+      "ledger": [
+        { "id": "F1", "severity": "P1", "preExisting": false, "note": true, "location": null, "title": "A", "body": "", "reviewId": "r", "round": 1, "state": "open", "reason": null, "updatedRound": 1 }
+      ]
+    },
+    "expected": "changes requested — needs you"
+  },
+  {
+    "name": "findings filter: a P1 note that blocks under All findings counts, a dismissed P1 does not",
+    "review": {
+      "snapshotN": 2, "provider": "codex", "status": "done", "verdict": "changes_requested", "at": 1,
+      "ledger": [
+        { "id": "F1", "severity": "P1", "preExisting": false, "note": true, "blocking": true, "location": null, "title": "A", "body": "", "reviewId": "r", "round": 1, "state": "open", "reason": null, "updatedRound": 1 },
+        { "id": "F2", "severity": "P1", "preExisting": false, "location": null, "title": "B", "body": "", "reviewId": "r", "round": 1, "state": "open", "reason": null, "updatedRound": 1, "dismissal": { "reason": "intended", "at": 2, "round": 1 } }
+      ]
+    },
+    "expected": "1 serious issue · changes requested"
+  }
+]

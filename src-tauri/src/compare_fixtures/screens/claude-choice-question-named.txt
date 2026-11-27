@@ -1,0 +1,38 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 11, cap 11-a (AskUserQuestion menu; the name row last on screen); rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: asking
+# cells: plain
+# ----
+     export function renderNote(n) {
+     … +7 lines (ctrl+o to expand)
+  ⎿  Allowed by auto mode
+
+────────────────────────────────────────────────────────
+ ☐ Commento 
+
+│ Posso aggiungere questa riga di commento in cima a 
+│ notes.js (prima di `export function renderNote`)?
+
+❯ 1. Sì, descrittivo           ┌────────────────────┐
+  2. Sì, solo nome file        │ // Funzioni di     │
+  3. No, non modificare        │ rendering HTML per │
+                               │  le note.          │
+                               │ export function    │
+                               │ renderNote(n) {    │
+                               │   return <li>${n.t │
+                               │ ext}</li>;         │
+                               │ }                  │
+                               └────────────────────┘
+
+                               Notes: press n to add
+                                      notes
+
+────────────────────────────────────────────────────────
+  Chat about this
+
+Enter to select · ↑/↓ to navigate · n to add notes · Esc
+to cancel
+──────────────────────────────────────────── walk-pair ─

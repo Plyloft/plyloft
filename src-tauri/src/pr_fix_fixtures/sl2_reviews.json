@@ -1,0 +1,16 @@
+[
+  {
+    "id": 5345085681,
+    "node_id": "PRR_kwDOUxJXac8AAAABPpeI8Q",
+    "user": {
+      "login": "test-owner"
+    },
+    "body": "Two things before this can go in: the probe comment should go, and FAIL_CI must be removed.",
+    "state": "COMMENTED",
+    "html_url": "https://github.com/test-owner/plyloft-ci-sandbox/pull/8#pullrequestreview-5345085681",
+    "pull_request_url": "https://api.github.com/repos/test-owner/plyloft-ci-sandbox/pulls/8",
+    "author_association": "OWNER",
+    "submitted_at": "2026-09-28T21:54:32Z",
+    "commit_id": "2ecc8bc1ec287047fc54482b9e2a3cd200e0e013"
+  }
+]

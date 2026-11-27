@@ -1,0 +1,9 @@
+Board: compact card density
+
+Expected.
+- `readDensity` reads the stored density; anything but `compact` is `comfortable`.
+- `densityClass` gives the card list `board-cards--compact` in compact.
+
+Tests. Both functions, including an unknown stored value.
+
+Tier 4. On the mini: Compact makes every card one line and the demo Backlog fits the window; Comfortable brings two lines back; the choice survives a relaunch.

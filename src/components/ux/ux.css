@@ -1,0 +1,7063 @@
+/* UX language — the component layer (ADR 0004, docs/ux-language/).
+   Measures from docs/ux-language/boards/SHEET.md; values are tokens only:
+   scripts/ux-check.mjs fails this file on a colour literal or on a
+   spacing (margin, padding, gap) that is not a token. Colours are today's
+   tokens plus the page tier in App.css. */
+
+/* ── Focus: one ring for every control, in every theme ─────────────── */
+.ux-page :focus-visible,
+.ux-surface :focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+}
+
+/* ── Icon (UX-2.2): Lucide at the one scale; colour follows the text ── */
+.ux-icon {
+  flex: none;
+  width: var(--icon-md);
+  height: var(--icon-md);
+  vertical-align: middle;
+}
+.ux-icon--sm {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+
+/* ── Page ────────────────────────────────────────────────────────── */
+.ux-page {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+}
+.ux-page-column {
+  width: 100%;
+  max-width: calc(var(--page-column) + 2 * var(--page-space-xl));
+  margin: 0 auto;
+  padding: var(--page-space-2xl) var(--page-space-xl) var(--page-space-3xl);
+}
+.ux-page-column--wide {
+  max-width: calc(var(--page-column-wide) + 2 * var(--page-space-xl));
+}
+.ux-page-footer {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+  z-index: var(--z-sticky);
+}
+
+.ux-page-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.ux-page-title {
+  margin: var(--page-space-sm) 0 0;
+  font-size: var(--type-title);
+  line-height: var(--type-title-lh);
+  font-weight: var(--type-title-weight);
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.ux-page-lede {
+  margin: var(--page-space-sm) 0 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+}
+.ux-page-status {
+  margin-top: var(--page-space-lg);
+}
+
+/* ── Scope label (UX-9.2): the scope's icon and name above the title, in
+   small muted type — a line, never a band or a box. */
+.ux-scope-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-xs);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Section and group ───────────────────────────────────────────── */
+.ux-section {
+  margin-top: var(--page-space-2xl);
+}
+.ux-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--page-space-lg);
+  margin-bottom: var(--page-space-xs);
+}
+.ux-section-title {
+  margin: 0;
+  font-size: var(--type-subheading);
+  line-height: var(--type-subheading-lh);
+  font-weight: var(--type-subheading-weight);
+  color: var(--fg);
+}
+/* 1.174.0 (DS1, D6): where a section's rows are kept, right of its title —
+   an icon and muted words, no colour and no box. */
+.ux-scope-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-xs);
+  margin-left: auto;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ux-section-count {
+  font-size: var(--type-small);
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* GH #310: a group's count beside its heading ("Needs you 3"). */
+.ux-section-head--inline {
+  justify-content: flex-start;
+  gap: var(--space-sm);
+}
+.ux-section-head--inline .ux-section-count {
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+}
+/* UX-9.2 "fewer boxes, more type": a group is rows on the page ground under
+   a hairline, not a filled rounded box. The two groups that are about
+   something other than settings keep a box: the empty state, and the danger
+   zone that has to stand apart. */
+.ux-group {
+  border-top: 1px solid var(--border);
+}
+.ux-group + .ux-group {
+  margin-top: var(--page-space-lg);
+}
+.ux-group > .ux-row {
+  padding-left: 0;
+  padding-right: 0;
+}
+.ux-empty,
+.ux-danger-zone {
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+}
+.ux-empty > .ux-row,
+.ux-danger-zone > .ux-row {
+  padding-left: var(--page-space-lg);
+  padding-right: var(--page-space-lg);
+}
+/* GH #318: red is only for destruction, never the aborted amber. 1.174.0
+   (A7, P32): the danger zone is the calm group surface; its red lives on its
+   icon and the destructive buttons' border and words (mockups/board.html
+   §7b). */
+.ux-danger-zone {
+  position: relative;
+  border-color: var(--border-strong);
+}
+.ux-danger-zone > .ux-row {
+  padding-left: calc(var(--page-space-lg) + var(--page-space-lg) + var(--page-space-sm));
+}
+.ux-danger-zone-icon {
+  position: absolute;
+  top: calc(var(--page-space-sm) + var(--space-2xs));
+  left: var(--page-space-lg);
+  display: inline-flex;
+  color: var(--danger);
+  pointer-events: none;
+}
+
+/* ── Part (UX-9.3): a page merged into a fuller one keeps its own heading,
+   one step above its sections, and its own status line. */
+.ux-part {
+  margin-top: var(--page-space-3xl);
+}
+.ux-part-title {
+  margin: 0;
+  font-size: var(--type-heading);
+  line-height: var(--type-heading-lh);
+  font-weight: var(--type-heading-weight);
+  color: var(--fg);
+}
+.ux-part-lede {
+  margin: var(--page-space-xs) 0 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+}
+.ux-part-status {
+  margin-top: var(--page-space-md);
+}
+
+/* ── Row ─────────────────────────────────────────────────────────── */
+.ux-row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--page-space-sm) var(--page-space-lg);
+  min-height: var(--row-min);
+  padding: var(--page-space-sm) var(--page-space-lg);
+}
+.ux-row + .ux-row {
+  border-top: 1px solid var(--border);
+}
+.ux-group > .ux-row:first-child {
+  border-top-left-radius: var(--radius-group);
+  border-top-right-radius: var(--radius-group);
+}
+.ux-group > .ux-row:last-child {
+  border-bottom-left-radius: var(--radius-group);
+  border-bottom-right-radius: var(--radius-group);
+}
+.ux-row-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.ux-row-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--page-space-sm);
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--fg);
+}
+.ux-row-label-text {
+  overflow-wrap: anywhere;
+}
+.ux-row-label-text--mono {
+  font-family: var(--page-font-mono);
+  font-weight: 600;
+}
+.ux-row-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--page-space-xs);
+}
+.ux-row-hint {
+  margin: var(--page-space-xs) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.ux-row-side {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+.ux-row-fieldset {
+  min-inline-size: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.ux-row--stacked .ux-row-fieldset {
+  width: 100%;
+}
+.ux-row-side-inner {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--page-space-sm);
+  max-width: 100%;
+}
+/* QoL 1.168 G11: `Model` over the model field, `Effort` over its effort. */
+.ux-captioned {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--page-space-xs);
+  max-width: 100%;
+}
+.ux-caption {
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+/* Cold read 2026-10-19: an action drawn on every row of a section (`On this
+   Mac`'s `Share with Team…`) shows on hover or focus only. Opacity, not
+   display: the button stays in the Tab order, and focusing it shows it. */
+.ux-row-action-reveal {
+  display: inline-flex;
+}
+.ux-row:not(:hover):not(:focus-within) .ux-row-action-reveal {
+  opacity: 0;
+}
+/* No hover to reveal it (a touch screen): always shown. */
+@media (hover: none) {
+  .ux-row:not(:hover):not(:focus-within) .ux-row-action-reveal {
+    opacity: 1;
+  }
+}
+.ux-row--stacked .ux-row-side {
+  flex-basis: 100%;
+  justify-content: flex-start;
+}
+.ux-row--stacked .ux-row-side-inner {
+  width: 100%;
+}
+.ux-row--stacked .ux-field--wide {
+  flex: 1;
+}
+.ux-row-chevron {
+  font-size: var(--type-body);
+  color: var(--muted);
+}
+.ux-row-value {
+  font-size: var(--type-ui);
+  line-height: var(--ctl-page);
+  color: var(--muted);
+}
+/* 1.176.1 walk: a value that can wrap (Program folders' "Finds…") keeps a
+   text's line spacing, not a control's height per line. */
+.ux-row-value-lines {
+  display: inline-block;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+.ux-row-value--mono {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  color: var(--fg);
+}
+
+/* ── Tidy tables (A0, owner 2026-10-31) ──────────────────────────────
+   A Row is drawn as cells: main | value | action | more (⋯ and the chevron).
+   Outside a table the cells draw no box of their own, so a row on its own
+   (a sheet, a flow) lays out as it always has. */
+.ux-row-cell {
+  display: contents;
+}
+/* In a table (`Group`, `DangerZone`: useTidyTable) the rows share the
+   table's columns through subgrid: every action button stretches to the
+   column, so all are as wide as the widest and share one right edge; ⋯ has
+   one slot, kept in every row once any row has one (and never narrower than
+   the square ⋯ itself); a value and an action never share a column, and an
+   empty cell keeps its column's width, so no row shifts the others. The
+   columns carry no gap of their own: a filled cell brings its own, so a
+   column nobody uses takes no space at all.
+   The side, its fieldset and its inner box draw no box in a table, so the
+   cells are the row's own grid items: a fieldset cannot be a subgrid in
+   Chromium (WebView2), and `display: contents` keeps its `disabled`. */
+.ux-table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto var(--ux-action-w, auto) auto;
+  align-items: start;
+}
+.ux-table > :not(.ux-row--cells) {
+  grid-column: 1 / -1;
+}
+.ux-table > .ux-row--cells {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  gap: var(--page-space-sm) 0;
+  align-items: start;
+}
+.ux-table > .ux-row--cells > .ux-row-main {
+  grid-column: 1;
+  grid-row: 1;
+  padding-inline-end: var(--page-space-sm);
+}
+/* A row with nothing on its side: its label takes the row. */
+.ux-table > .ux-row--no-side > .ux-row-main {
+  grid-column: 1 / -1;
+  padding-inline-end: 0;
+}
+.ux-table > .ux-row--cells > .ux-row-side,
+.ux-table > .ux-row--cells > .ux-row-side > .ux-row-fieldset,
+.ux-table > .ux-row--cells > .ux-row-side > .ux-row-fieldset > .ux-row-side-inner {
+  display: contents;
+}
+/* Each cell is one control tall and centred on the label's first line,
+   however long the hint under it. */
+.ux-table > .ux-row--cells .ux-row-cell {
+  display: flex;
+  grid-row: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--page-space-sm);
+  min-width: 0;
+  min-height: var(--ctl-page);
+  margin-top: calc((var(--type-body-lh) - var(--ctl-page)) / 2);
+}
+.ux-table > .ux-row--cells .ux-row-cell:not(:empty) {
+  padding-inline-start: var(--page-space-sm);
+}
+.ux-table > .ux-row--cells .ux-row-cell--value {
+  grid-column: 2;
+  flex-wrap: wrap;
+}
+.ux-table > .ux-row--cells .ux-row-cell--action {
+  grid-column: 3;
+  text-align: end;
+}
+.ux-table > .ux-row--cells .ux-row-cell--more {
+  grid-column: 4;
+}
+/* A row with no action: its value or control stays flush right, across the
+   action column too (settings.html). The action column's width comes from
+   the actions alone (`--ux-action-w`, measured), so a wide select in such a
+   row never widens every button. */
+.ux-table > .ux-row--no-action .ux-row-cell--value {
+  grid-column: 2 / 4;
+}
+/* ⋯ keeps its slot in every row, filled or not, once one row has it. */
+.ux-table[data-has-more="true"] > .ux-row--cells .ux-row-cell--more {
+  min-width: calc(var(--ctl-page) + var(--page-space-sm));
+}
+/* The one action fills its column: the widest button sets the width. */
+.ux-table > .ux-row--cells .ux-row-cell--action > :not(.cicon),
+.ux-table > .ux-row--cells .ux-row-cell--action > .ux-row-action-reveal > :not(.cicon) {
+  flex: 1 1 auto;
+}
+/* F6: a borderless (quiet) action fills the column like the others, but its
+   words were centred in it, so rows ended at different x. Their words sit on
+   the column's right edge, where a bordered button's border does. */
+.ux-table > .ux-row--cells .ux-row-cell--action > .cbtn--quiet,
+.ux-table > .ux-row--cells .ux-row-cell--action > .ux-row-action-reveal > .cbtn--quiet {
+  justify-content: flex-end;
+}
+/* The whole table wraps at once: every row's side under its label — the
+   value on a line of its own, then the action and ⋯, both columns kept and
+   starting from the left edge. */
+.ux-table--stacked {
+  grid-template-columns: auto auto minmax(0, 1fr);
+}
+.ux-table--stacked > .ux-row--cells > .ux-row-main {
+  grid-column: 1 / -1;
+  padding-inline-end: 0;
+}
+.ux-table--stacked > .ux-row--cells .ux-row-cell {
+  grid-row: auto;
+  justify-content: flex-start;
+  margin-top: 0;
+}
+.ux-table--stacked > .ux-row--cells .ux-row-cell--value,
+.ux-table--stacked > .ux-row--no-action .ux-row-cell--value {
+  grid-column: 1 / -1;
+}
+.ux-table--stacked > .ux-row--cells .ux-row-cell:empty {
+  display: none;
+}
+.ux-table--stacked > .ux-row--cells .ux-row-cell--action {
+  grid-column: 1;
+}
+.ux-table--stacked > .ux-row--cells .ux-row-cell--more {
+  grid-column: 2;
+}
+.ux-table--stacked > .ux-row--cells .ux-row-cell:not(:empty) {
+  padding-inline-start: 0;
+}
+.ux-table--stacked > .ux-row--cells .ux-row-cell--action:not(:empty) {
+  padding-inline-end: var(--page-space-sm);
+}
+.ux-table--stacked > .ux-row--cells .ux-field--wide {
+  flex: 1;
+}
+/* No subgrid (macOS 11 without Safari 16): each row is a grid of its own
+   with the widths the table measured (useTidyTable sets the variables). */
+@supports not (grid-template-columns: subgrid) {
+  .ux-table {
+    display: block;
+  }
+  .ux-table > .ux-row--cells {
+    grid-template-columns:
+      minmax(0, 1fr) var(--ux-value-w, auto) var(--ux-action-w, auto)
+      var(--ux-more-w, auto);
+  }
+  .ux-table > .ux-row--no-action .ux-row-cell--value {
+    grid-column: 2 / 4;
+  }
+  .ux-table--stacked > .ux-row--no-action .ux-row-cell--value {
+    grid-column: 1 / -1;
+  }
+  .ux-table--stacked > .ux-row--cells {
+    grid-template-columns: var(--ux-action-w, auto) var(--ux-more-w, auto) minmax(0, 1fr);
+  }
+}
+
+/* A row hovers only when the whole row opens something (A5: or a mouse
+   press on it does, its action being the keyboard's way in). */
+.ux-row--opens,
+.ux-row--presses {
+  cursor: pointer;
+}
+.ux-row--opens:hover,
+.ux-row--presses:hover {
+  background: var(--hover);
+}
+.ux-row--opens:active {
+  background: var(--tab-active-bg);
+}
+/* GH #181: the open affordance is the label, as a real button, so the row is
+   not a button and its controls stay exposed. The button looks like the label
+   it wraps, and its focus draws the ring the row drew before: around the whole
+   row, inset on a page. */
+.ux-row-open {
+  appearance: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: inherit;
+}
+/* Only where `:has()` works (Safari 15.4+): on an older WebKit the button
+   keeps its own ring, since the row could not draw one (review 1, M1). */
+@supports selector(:has(*)) {
+  :is(.ux-page, .ux-surface, .ux-sheet) .ux-row-open:focus-visible {
+    outline: none;
+  }
+  /* GH #314: outside the row, clear of its content. A page row has no
+     inline padding (`.ux-group > .ux-row`), so an inset ring touched the
+     label's first letter and crossed the chevron; the group is a hairline,
+     not a clipping box, so the ring has room around it. */
+  :is(.ux-page, .ux-surface, .ux-sheet) .ux-row--opens:has(.ux-row-open:focus-visible) {
+    outline: var(--focus-w) solid var(--claude-accent);
+    outline-offset: var(--focus-offset);
+  }
+}
+.ux-row--error .ux-row-hint {
+  color: var(--fg);
+}
+.ux-row--disabled .ux-row-label-text {
+  color: var(--muted);
+}
+
+/* Changed here, not published yet: never colour alone. E4 (owner,
+   2026-10-28): no edge on the row — the numbered mark before the label and
+   the hint's sentence, in ink, say it. */
+.ux-row--changed .ux-row-hint {
+  color: var(--fg);
+}
+.ux-changed-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 var(--page-space-xs);
+  border: 1px solid var(--fg);
+  border-radius: var(--radius-control);
+  font-size: var(--type-caption);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--fg);
+}
+.ux-mono-fg {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  color: var(--fg);
+}
+
+/* ── Status line ─────────────────────────────────────────────────── */
+.ux-status {
+  display: flex;
+  align-items: baseline;
+  gap: var(--page-space-sm);
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: 20px;
+  color: var(--muted);
+}
+.ux-member-result:not(:empty) {
+  margin-bottom: var(--page-space-sm);
+}
+.ux-status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  transform: translateY(-1px);
+  border: 1px solid transparent;
+}
+.ux-status--running .ux-status-dot {
+  background: var(--signal-running-fg);
+  animation: ux-pulse 1.4s ease-in-out infinite;
+}
+.ux-status--done .ux-status-dot {
+  background: var(--signal-done-fg);
+}
+.ux-status--aborted .ux-status-dot {
+  background: var(--signal-aborted-fg);
+}
+.ux-status--warn .ux-status-dot {
+  background: var(--warn);
+}
+.ux-status--empty .ux-status-dot {
+  border-color: var(--border-strong);
+}
+.ux-status-text {
+  min-width: 0;
+}
+.ux-status code,
+.ux-status .ux-mono-fg {
+  font-family: var(--page-font-mono);
+  color: var(--fg);
+}
+@keyframes ux-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+/* UX-0.9: the layer's one pulse; every dot that pulses uses it, and
+   reduced motion stops all of them. */
+@media (prefers-reduced-motion: reduce) {
+  .ux-status--running .ux-status-dot,
+  .ux-row-signal--running .ux-row-signal-dot,
+  .ux-publish-dot--running {
+    animation: none;
+  }
+}
+
+/* ── Details ───────────────────────────────────────────────────────
+   GH #270 (UX-9.2 "fewer boxes, more type"): a quiet disclosure — the
+   expand chevron and `Details` in small muted type — whose body opens
+   without a frame, so it sits inside a hairline row at the row's height.
+   Only the dense error block keeps a box (below). */
+.ux-details {
+  min-width: 0;
+}
+.ux-details-summary {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  border-radius: var(--radius-control);
+}
+.ux-details-summary::-webkit-details-marker {
+  display: none;
+}
+/* GH #274: the Lucide expand chevron, pointing right while closed — the
+   Details summary's, and a work surface's own disclosure caret. */
+.ux-disclosure-caret {
+  display: inline-flex;
+}
+.ux-disclosure-caret--closed > .ux-icon {
+  transform: rotate(-90deg);
+}
+.ux-details-summary > .ux-icon {
+  margin-right: var(--page-space-xs);
+  transition: transform 120ms ease;
+}
+.ux-details:not([open]) > .ux-details-summary > .ux-icon {
+  transform: rotate(-90deg);
+}
+.ux-details-summary:hover {
+  color: var(--fg);
+}
+.ux-details-body {
+  margin-top: var(--page-space-sm);
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  line-height: 20px;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────── */
+.ux-empty {
+  padding: var(--page-space-3xl) var(--page-space-xl);
+  text-align: center;
+}
+.ux-empty-text {
+  max-width: 420px;
+  margin: 0 auto;
+  font-size: var(--type-body);
+  color: var(--muted);
+}
+.ux-empty-action {
+  margin-top: var(--page-space-lg);
+}
+
+/* ── Toggle: 38 × 22, knob 18 (16 when off) ──────────────────────── */
+.ux-toggle {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--panel-bg);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+/* Skills hub H9: a switch a level above overrules here — live, quieter. */
+.ux-toggle--overruled {
+  opacity: 0.55;
+}
+.ux-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--border-strong);
+  transition:
+    left 120ms ease,
+    width 120ms ease;
+}
+.ux-toggle[aria-checked="true"] {
+  background: var(--claude-accent);
+  border-color: var(--claude-accent);
+}
+.ux-toggle[aria-checked="true"] .ux-toggle-knob {
+  top: 1px;
+  left: 17px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--page-knob);
+}
+.ux-toggle:hover:not(:disabled) {
+  background-image: linear-gradient(var(--hover), var(--hover));
+}
+.ux-toggle[aria-checked="true"]:hover:not(:disabled) {
+  background-image: none;
+  filter: brightness(1.08);
+}
+.ux-toggle:active:not(:disabled) {
+  background-image: linear-gradient(var(--tab-active-bg), var(--tab-active-bg));
+}
+.ux-toggle[aria-checked="true"]:active:not(:disabled) {
+  background-image: none;
+  filter: brightness(0.88);
+}
+.ux-page .ux-toggle:focus-visible,
+.ux-surface .ux-toggle:focus-visible {
+  outline-offset: 2px;
+}
+.ux-toggle--changed {
+  border-color: var(--fg);
+}
+.ux-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Fields: select, text, search — h 30, pad 0 10, r 6 ──────────── */
+.ux-field {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: var(--ctl-page);
+  min-width: 160px;
+  max-width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--panel-bg);
+  color: var(--fg);
+  font-size: var(--type-ui);
+}
+.ux-field:hover:not(:has(:disabled)) {
+  border-color: var(--muted);
+}
+/* The field's box carries the ring of its input or select; any other
+   control inside (the search field's ✕) keeps a ring of its own, so focus
+   is seen to move to it (Challenger F12). */
+.ux-page .ux-field:has(.ux-input:focus-visible, .ux-select:focus-visible),
+.ux-surface .ux-field:has(.ux-input:focus-visible, .ux-select:focus-visible) {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+}
+.ux-page .ux-field .ux-input:focus-visible,
+.ux-page .ux-field .ux-select:focus-visible,
+.ux-surface .ux-field .ux-input:focus-visible,
+.ux-surface .ux-field .ux-select:focus-visible {
+  outline: none;
+}
+.ux-select,
+.ux-input {
+  appearance: none;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 var(--page-inset-field);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+.ux-select {
+  padding-right: var(--page-space-xl);
+  cursor: pointer;
+}
+.ux-input::placeholder {
+  color: var(--placeholder);
+}
+.ux-input::-webkit-search-cancel-button {
+  display: none;
+}
+.ux-field-caret {
+  position: absolute;
+  right: var(--page-space-sm);
+  display: inline-flex;
+  pointer-events: none;
+  color: var(--muted);
+}
+.ux-field--mono {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+}
+.ux-field--wide {
+  min-width: 280px;
+}
+.ux-field--changed {
+  border-color: var(--fg);
+}
+.ux-field--error {
+  border-color: var(--signal-aborted-border);
+}
+.ux-field:has(:disabled) {
+  opacity: 0.45;
+}
+.ux-field :disabled {
+  cursor: not-allowed;
+}
+.ux-field--select,
+.ux-field--text {
+  flex: none;
+}
+.ux-field--search {
+  width: 100%;
+}
+.ux-field--search .ux-input {
+  padding-left: calc(var(--page-inset-field) + var(--page-space-lg));
+  padding-right: var(--page-space-2xl);
+}
+.ux-field-glyph {
+  position: absolute;
+  left: var(--page-inset-field);
+  display: inline-flex;
+  pointer-events: none;
+  color: var(--muted);
+}
+.ux-field-clear {
+  position: absolute;
+  right: var(--page-space-xs);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.ux-field-clear:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.ux-field-clear:active {
+  background: var(--tab-active-bg);
+}
+.ux-readonly-value {
+  font-size: var(--type-body);
+  line-height: var(--ctl-page);
+  color: var(--fg);
+}
+.ux-readonly-value--mono {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+}
+
+/* ── Buttons and chips: CBtn / CIcon / PChip, restyled on a page ─── */
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn {
+  height: var(--ctl-page);
+  min-height: var(--ctl-page);
+  padding: 0 var(--page-space-md);
+  gap: var(--page-space-sm);
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-strong);
+  background: var(--panel-bg);
+  color: var(--fg);
+  font-size: var(--type-ui);
+  font-weight: 400;
+  opacity: 1;
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn:hover:not(:disabled) {
+  background: var(--panel-bg);
+  background-image: linear-gradient(var(--hover), var(--hover));
+  border-color: var(--border-strong);
+  color: var(--fg);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn:active:not(:disabled) {
+  background-image: linear-gradient(var(--tab-active-bg), var(--tab-active-bg));
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--sm {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 var(--page-space-sm);
+  font-size: var(--type-small);
+}
+/* Primary: accent fill; ink #fff in light, --bg in dark and void. */
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--accent,
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--accent:hover:not(:disabled) {
+  background: var(--claude-accent);
+  background-image: none;
+  border-color: var(--claude-accent);
+  color: var(--page-on-accent);
+  font-weight: 600;
+  opacity: 1;
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--accent:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--accent:active:not(:disabled) {
+  filter: brightness(0.88);
+}
+/* Quiet: no border, --muted. */
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--quiet:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--hover);
+  color: var(--fg);
+}
+/* Danger: --danger border and ink, the neutral wash under a hover (1.174.0
+   A7, P32: never the danger wash), filled
+   --danger only when pressed — never the aborted amber, which is a failure's
+   colour (GH #318). */
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--danger,
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--danger:hover:not(:disabled) {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--danger:hover:not(:disabled) {
+  background: var(--hover);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--danger:active:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-danger);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+:is(.ux-page, .ux-surface, .ux-sheet) .cicon {
+  width: var(--ctl-page);
+  height: var(--ctl-page);
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: var(--type-ui);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cicon:hover:not(:disabled) {
+  background: var(--hover);
+  border-color: var(--border);
+  color: var(--fg);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cicon:active:not(:disabled) {
+  background: var(--tab-active-bg);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cicon.ux-icon-sm {
+  width: 26px;
+  height: 26px;
+}
+
+:is(.ux-page, .ux-surface, .ux-sheet) .cchip {
+  height: 18px;
+  padding: 0 var(--page-inset-chip);
+  border-radius: var(--radius-control);
+  font-size: var(--type-caption);
+}
+
+/* ── Menus: the MoreMenu and the compact navigation ──────────────── */
+.ux-more,
+.ux-nav-menu {
+  position: relative;
+  display: inline-flex;
+}
+/* TU-8: New in this version's rows. */
+.ux-whats-new {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ux-whats-new-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+/* New in this version: an earlier release's block under "Since you last
+   looked". */
+.ux-whats-new-release {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+.ux-whats-new-release--newest {
+  margin-top: 0;
+}
+/* F6: "Since you last looked" starts at the text's own edge (the chapter
+   label's 12 px inset is the tour panel's). */
+.ux-sheet-body .ux-tour-chapter {
+  padding-inline: 0;
+}
+.ux-whats-new-release h3.ux-tour-note-title {
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+/* TU-8 (TUTORIAL_SPEC §12.2): the dot on Help while something is new. */
+.ux-more-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--claude-accent);
+  pointer-events: none;
+}
+/* 1.169.0 (C9): a menu whose trigger its caller draws as a full row (the
+   sidebar's Help): the row's width, the menu from its left edge — unless
+   placement turned it — and the dot at the row's end where a count sits. */
+.ux-more.ux-more--row {
+  display: flex;
+  flex-direction: column;
+}
+.ux-more--row > .ux-menu:not(.ux-menu--end) {
+  left: 0;
+  right: auto;
+}
+.ux-more--row .ux-more-dot {
+  position: static;
+  flex: none;
+}
+.ux-menu {
+  position: absolute;
+  top: calc(100% + var(--page-space-xs));
+  right: 0;
+  z-index: var(--z-menu);
+  display: flex;
+  flex-direction: column;
+  width: 260px;
+  max-height: 60vh;
+  overflow-y: auto;
+  /* G2 Windows walk: a menu drawn inside a no-wrap group (the Board
+     header's New card and ⋯) still wraps its hints, never scrolls sideways
+     or runs past the window. */
+  overflow-x: hidden;
+  white-space: normal;
+  padding: var(--page-space-xs);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-menu);
+  box-shadow: var(--page-shadow-menu);
+  font-size: var(--type-ui);
+  line-height: var(--type-small-lh);
+}
+.ux-nav-menu .ux-menu {
+  left: 0;
+  right: auto;
+}
+/* Walk follow-ups 2026-10-19: MenuList turns a menu that would be cut off
+   (menuPlacement.ts) — rightwards from the trigger's left edge, leftwards
+   from its right edge, or above it. */
+.ux-menu.ux-menu--start {
+  left: 0;
+  right: auto;
+}
+.ux-menu.ux-menu--end {
+  left: auto;
+  right: 0;
+}
+.ux-menu.ux-menu--up {
+  top: auto;
+  bottom: calc(100% + var(--page-space-xs));
+}
+.ux-menu-item {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  padding: var(--page-space-sm) var(--page-inset-field);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ux-menu-item:hover:not(:disabled),
+.ux-menu-item:focus-visible {
+  background: var(--hover);
+}
+.ux-menu-item:active:not(:disabled) {
+  background: var(--tab-active-bg);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .ux-menu-item:focus-visible {
+  outline-offset: calc(-1 * var(--focus-w));
+}
+.ux-menu-item:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+.ux-menu-item--current {
+  font-weight: 600;
+  background: var(--tab-active-bg);
+}
+.ux-menu-item--danger {
+  color: var(--danger);
+}
+/* GH #325: a choice's check, in a slot every choice keeps so the labels
+   line up. */
+.ux-menu-check {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  width: 14px;
+  margin-right: var(--space-sm);
+}
+/* UX-8.2: a menu row's shortcut, muted at its end. */
+.ux-menu-item-label {
+  flex: 1;
+  min-width: 0;
+}
+/* v1.154.1: why an item is off, under its label. */
+.ux-menu-hint {
+  display: block;
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+.ux-menu-shortcut {
+  margin-left: var(--space-md);
+  font-family: inherit;
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+/* Launch G2: a plan's mark after a feature's label (TeamMark's "Team"). A
+   mark, not a lock: the control stays pressable and the press explains
+   what the plan adds. */
+.ux-pro-mark {
+  display: inline-block;
+  margin-left: var(--page-space-xs);
+  padding: 0 var(--page-space-xs);
+  border: 1px solid var(--claude-accent);
+  border-radius: 999px;
+  color: var(--claude-accent);
+  font-size: var(--type-caption);
+  font-weight: 600;
+  line-height: 1.45;
+  vertical-align: 1px;
+}
+.ux-menu-heading {
+  padding: var(--page-space-sm) var(--page-inset-field) var(--page-space-xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.ux-menu-heading:not(:first-child),
+.ux-menu-group:not(:first-child) > .ux-menu-heading {
+  margin-top: var(--page-space-xs);
+  border-top: 1px solid var(--border);
+}
+.ux-menu-divider {
+  height: 1px;
+  margin: var(--page-space-xs) 0;
+  background: var(--border);
+}
+
+/* ── Navigation column ───────────────────────────────────────────── */
+.ux-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-space-sm);
+}
+.ux-nav-group {
+  display: flex;
+  flex-direction: column;
+}
+/* UX-9.2: a group's name is a sentence-case caption with its scope icon,
+   never an uppercase eyebrow. */
+.ux-nav-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--page-space-sm);
+  margin: 0;
+  padding: var(--page-space-md) var(--page-space-sm) var(--page-space-xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.ux-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ux-nav-entry {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--row-compact);
+  padding: 0 var(--page-space-sm);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  text-align: left;
+  cursor: pointer;
+}
+.ux-nav-entry:hover {
+  background: var(--hover);
+}
+.ux-nav-entry:active,
+.ux-nav-entry--active {
+  background: var(--selected);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .ux-nav-entry:focus-visible {
+  outline-offset: calc(-1 * var(--focus-w));
+}
+
+/* ── Surface: the large modal (Settings) ─────────────────────────── */
+.ux-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--page-backdrop);
+}
+.ux-surface {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-width: 100vw;
+  max-height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--page-shadow-surface);
+  font-size: var(--type-ui);
+}
+.ux-surface:focus {
+  outline: none;
+}
+.ux-surface-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--page-space-md);
+  height: 44px;
+  padding: 0 var(--page-space-md) 0 var(--page-space-lg);
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+}
+.ux-surface-title {
+  margin: 0;
+  font-size: var(--type-body);
+  font-weight: 600;
+}
+.ux-surface-spacer {
+  flex: 1;
+}
+.ux-surface-shortcut {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  color: var(--muted);
+}
+.ux-surface-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.ux-surface-nav {
+  flex: none;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-space-lg);
+  padding: var(--page-space-md) var(--page-space-sm);
+  overflow-y: auto;
+  background: var(--panel-bg);
+  border-right: 1px solid var(--border);
+}
+.ux-surface-nav > * {
+  flex: none;
+}
+.ux-surface-nav .ux-field {
+  background: var(--raised);
+}
+.ux-surface-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The page under the search results: kept mounted, hidden while they show. */
+.ux-surface-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ux-surface-page[hidden] {
+  display: none;
+}
+.ux-surface-resize {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-pane-overlay-top);
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  border-bottom-right-radius: var(--radius-surface);
+  background: linear-gradient(
+    135deg,
+    transparent 55%,
+    var(--border-strong) 55%,
+    var(--border-strong) 62%,
+    transparent 62%,
+    transparent 72%,
+    var(--border-strong) 72%,
+    var(--border-strong) 79%,
+    transparent 79%
+  );
+}
+.ux-surface-resize:focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: calc(-1 * var(--focus-w));
+}
+
+/* ── An entry's count (GH #96: the Library's scope column) ────────────
+   A modifier, not a second `.ux-nav-entry` rule: review 1 found the shipped
+   block above redefined for every NavList, Settings' included. Only an entry
+   that has a count becomes a flex row. */
+.ux-nav-entry--counted {
+  display: flex;
+  align-items: center;
+  gap: var(--page-space-sm);
+}
+.ux-nav-entry--counted .ux-nav-entry-label {
+  flex: 1;
+  min-width: 0;
+}
+.ux-nav-entry-count {
+  flex: none;
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  color: var(--muted);
+}
+
+/* ── Segmented control ───────────────────────────────────────────── */
+.ux-segmented {
+  display: inline-flex;
+  align-items: stretch;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-menu);
+  background: var(--panel-bg);
+  overflow: hidden;
+}
+.ux-segment {
+  height: 26px;
+  padding: 0 var(--page-space-md);
+  /* UX P-A Mac walk 8: "By attention" never cuts to "By". */
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--type-small);
+  cursor: pointer;
+}
+.ux-segment + .ux-segment {
+  border-left: 1px solid var(--border);
+}
+.ux-segment:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.ux-segment--active {
+  background: var(--tab-active-bg);
+  color: var(--fg);
+  font-weight: 600;
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .ux-segment:focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: calc(-1 * var(--focus-w));
+}
+
+/* ── Availability chips: only the CLIs a skill reaches ───────────── */
+.ux-avail {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-xs);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cchip.ux-avail-chip {
+  background: var(--signal-empty-bg);
+  border: 1px solid var(--signal-empty-border);
+  color: var(--muted);
+}
+
+/* ── Transient row states (BOARDS.md §3) ─────────────────────────── */
+/* E4 (owner, 2026-10-28): no edge on the row — the state is the dot and its
+   sentence on the hint's line (.ux-row-signal), in ink. */
+.ux-row--publishing .ux-row-signal,
+.ux-row--waiting .ux-row-signal {
+  color: var(--fg);
+}
+.ux-row--removed {
+  opacity: 0.6;
+}
+.ux-row--removed .ux-row-label-text {
+  text-decoration: line-through;
+}
+/* The state's own words, on the hint's line: a dot and a sentence. */
+.ux-row-signal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-sm);
+}
+.ux-row-signal-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.ux-row-signal--running .ux-row-signal-dot {
+  background: var(--signal-running-fg);
+  animation: ux-pulse 1.4s ease-in-out infinite;
+}
+.ux-row-signal--aborted .ux-row-signal-dot {
+  background: var(--signal-aborted-fg);
+}
+
+/* ── The Library: a centre mode, inner column plus one scroll ────── */
+.ux-library {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: var(--type-ui);
+}
+.ux-library-nav {
+  flex: none;
+  width: 220px;
+  min-width: 0;
+  padding: var(--page-space-lg) var(--page-space-md);
+  overflow-y: auto;
+  background: var(--panel-bg);
+  border-right: 1px solid var(--border);
+}
+.ux-library-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* The narrow centre's controls, under the lede. */
+.ux-library-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--page-space-md);
+  margin: var(--page-space-lg) 0 0;
+}
+.ux-library-filter {
+  margin: var(--page-space-lg) 0 0;
+  /* Group B decision §3: the filter and `New skill…` share the line. */
+  display: flex;
+  align-items: center;
+  gap: var(--page-space-sm);
+}
+.ux-library-filter .ux-field--search {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+/* A section's own line, under its heading: the one-CLI sentence, the
+   read-only note, the "yours alone" line. */
+.ux-section-note {
+  margin: 0 0 var(--page-space-md);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-section-note-action {
+  margin-top: var(--page-space-sm);
+}
+/* 1.174.0 (X3): My library in a Library — its status line, then its one
+   quiet button at the right; they wrap together. */
+.ux-library-mine-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--page-space-sm) var(--page-space-md);
+  margin: 0 0 var(--page-space-md);
+}
+
+/* ── A skill, as its own sub-page ────────────────────────────────── */
+.ux-skill-name {
+  margin: 0;
+  font-family: var(--page-font-mono);
+  font-size: var(--type-title);
+  font-weight: 600;
+  line-height: var(--type-title-lh);
+  overflow-wrap: anywhere;
+}
+/* GH #106 (BOARDS.md §6): a Ply skill's name is "a plain title (not mono)". It
+   is a sentence rather than a directory, and mono would read it as a path. */
+.ux-skill-name--plain {
+  font-family: inherit;
+  overflow-wrap: normal;
+}
+.ux-skill-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--page-space-sm);
+  margin: var(--page-space-md) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* The fact line's own chip (`Reaches Claude only`): empty-state fill and border,
+   the same treatment the row's availability chips carry, one step taller because
+   it sits on a line of 13 px text rather than beside a name (BOARDS.md §4). */
+/* Same shape as the page-tier `.cchip` rule it overrides, or it would lose to
+   it on specificity and sit at 18 px. */
+:is(.ux-page, .ux-surface, .ux-sheet) .cchip.ux-fact-chip {
+  height: 20px;
+}
+/* The one primary action, the ⋯, and the sentence beside them (state D). */
+.ux-skill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--page-space-md);
+  margin: var(--page-space-lg) 0 0;
+}
+.ux-skill-beside {
+  flex: 1 1 260px;
+  min-width: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* The duplicate notice: nothing wins, so it states the fact and offers the
+   comparison (BOARDS.md §4, state B as corrected). */
+.ux-notice {
+  margin: var(--page-space-lg) 0 0;
+  padding: var(--page-space-md) var(--page-space-lg);
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-group);
+}
+.ux-notice-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--page-space-sm);
+}
+.ux-notice-text {
+  margin: var(--page-space-sm) 0 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+}
+.ux-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--page-space-sm);
+  margin-top: var(--page-space-md);
+}
+/* The last line of the rendered text: a personal skill says where it is changed
+   (BOARDS.md §4, state D). */
+.ux-reading-footer {
+  margin: var(--page-space-md) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* Details: one line per fact, then at most one action. */
+.ux-details-line + .ux-details-line {
+  margin-top: var(--page-space-xs);
+}
+.ux-details-action {
+  margin-top: var(--page-space-md);
+}
+
+/* The rendered SKILL.md: reading text, never code. */
+.ux-reading {
+  padding: var(--page-space-xl);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  overflow-wrap: anywhere;
+}
+.ux-reading h1,
+.ux-reading h2 {
+  margin: var(--page-space-lg) 0 var(--page-space-sm);
+  font-size: var(--type-subheading);
+  font-weight: 600;
+}
+.ux-reading h3,
+.ux-reading h4 {
+  margin: var(--page-space-lg) 0 var(--page-space-sm);
+  font-size: var(--type-body);
+  font-weight: 600;
+}
+.ux-reading > :first-child {
+  margin-top: 0;
+}
+.ux-reading p,
+.ux-reading ul,
+.ux-reading ol {
+  margin: 0 0 var(--page-space-md);
+}
+.ux-reading ul,
+.ux-reading ol {
+  padding-left: var(--page-space-xl);
+}
+.ux-reading ol > li::marker {
+  color: var(--muted);
+}
+.ux-reading code {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+}
+.ux-reading pre {
+  margin: 0 0 var(--page-space-md);
+  padding: var(--page-space-md);
+  overflow-x: auto;
+  background: var(--panel-bg);
+  border-radius: var(--radius-control);
+}
+
+/* ── Compare: the two SKILL.md, side by side ─────────────────────── */
+.ux-compare {
+  display: flex;
+  flex-wrap: wrap;
+  /* 24 px, not 16: the stack point is 2 × the basis below + this gap, and the
+     board's number is 760. Review 1 caught the comment claiming 24 while the
+     token was `--page-space-lg` (16), so the groups actually stacked at 752. */
+  gap: var(--page-space-xl);
+}
+.ux-compare-side {
+  /* The two groups stack under 760 px of column (BOARDS.md §4, state E):
+     2 × 368 + the 24 px gap above is exactly 760. */
+  flex: 1 1 368px;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+}
+.ux-compare-head {
+  padding: var(--page-space-sm) var(--page-space-md);
+  background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+.ux-compare-lines {
+  margin: 0;
+  padding: var(--page-space-sm) 0;
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ux-compare-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--page-space-sm);
+  padding: 0 var(--page-space-md);
+}
+.ux-compare-line--diff {
+  background: var(--diff-line-bg);
+}
+/* The other side of a line that exists on one side only (owner, 2026-10-20):
+   a neutral blank that keeps the columns level — no bar, no shading, no mark,
+   so it never reads as a removed line opposite a pure addition. */
+.ux-compare-line--blank {
+  min-height: 20px;
+}
+.ux-compare-no {
+  flex: none;
+  width: 32px;
+  text-align: right;
+  color: var(--muted);
+}
+.ux-compare-mark {
+  flex: none;
+  width: 12px;
+  color: var(--muted);
+}
+.ux-compare-text {
+  flex: 1;
+  min-width: 0;
+}
+.ux-compare-summary {
+  margin: var(--page-space-md) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* One way out per action (BOARDS.md §4): `Keep both` · `Remove from <branch>` ·
+   `Promote this one to Team`. */
+.ux-compare-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--page-space-sm);
+  margin: var(--page-space-lg) 0 0;
+}
+/* Skills hub H4 (R3, mockup 4): the 3-way Compare — before, the library
+   now, here. Three columns in the 880 px flow; they stack as the two do. */
+.ux-compare--three > .ux-compare-side {
+  flex-basis: 240px;
+}
+/* H4 Mac walk: at 1281 px the third column ("This repository") wrapped
+   under the other two at full width, and the 2-way pair stacked under a
+   "side by side" heading. A Compare flow is its own container: its columns
+   stay in one row and stack all together only when the flow itself is
+   narrow, never two over one. */
+.ux-flow--wide {
+  container-type: inline-size;
+}
+.ux-compare--three,
+.ux-compare--pair {
+  flex-wrap: nowrap;
+}
+.ux-compare--three > .ux-compare-side,
+.ux-compare--pair > .ux-compare-side {
+  flex: 1 1 0;
+}
+@container (max-width: 600px) {
+  .ux-compare--three {
+    flex-direction: column;
+  }
+}
+@container (max-width: 480px) {
+  .ux-compare--pair {
+    flex-direction: column;
+  }
+}
+.ux-compare-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--page-space-sm);
+  margin: 0 0 var(--page-space-lg);
+}
+.ux-compare-file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-sm);
+  padding: var(--page-space-xs) var(--page-space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+  background: var(--raised);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+/* The file shown: the neutral selected wash, as a selected row has. */
+.ux-compare-file--on {
+  border-color: var(--border-strong);
+  background: var(--selected);
+}
+.ux-flow.ux-flow--wide {
+  max-width: 880px;
+}
+.ux-flow--wide .ux-compare {
+  margin: 0 0 var(--page-space-lg);
+}
+
+/* ── The improvement proposal (GH #104, BOARDS.md §4 state C) ────── */
+/* The duplicate notice's shape, because it is the same kind of block: something
+   Ply noticed about this file, with the ways out under it. */
+.ux-proposal {
+  margin: var(--page-space-lg) 0 0;
+  padding: var(--page-space-lg);
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-group);
+}
+.ux-proposal-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--page-space-sm);
+}
+.ux-proposal-byline {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* GH #271: which skill the block is about, when it is not on that skill's
+   page — the name opens it. */
+.ux-proposal-target {
+  margin: var(--page-space-sm) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-proposal-target-name {
+  font-family: var(--page-font-mono);
+  color: var(--fg);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn.ux-proposal-target-link {
+  padding: 0 var(--space-xs);
+  font-family: var(--page-font-mono);
+  color: var(--claude-accent);
+}
+.ux-proposal-reason {
+  margin: var(--page-space-md) 0 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+}
+.ux-proposal-words,
+.ux-proposal-nodiff {
+  margin: var(--page-space-sm) 0 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+}
+/* GH #104 walk (C2): where the lesson comes from, under the reason. */
+.ux-proposal-source {
+  margin: var(--page-space-xs) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+/* The diff: a `--panel-bg` group, as the board draws it. */
+.ux-proposal-diff {
+  margin: var(--page-space-md) 0 0;
+  overflow: hidden;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+}
+.ux-proposal-diff-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--page-space-sm);
+  padding: var(--page-space-sm) var(--page-space-md);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+.ux-proposal-diff-lines {
+  margin: 0;
+  padding: var(--page-space-sm) 0;
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ux-proposal-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--page-space-sm);
+  padding: 0 var(--page-space-md);
+}
+/* A changed line: the `--diff-line-bg` wash, exactly as Compare draws one
+   (E4: no edge). Never `--signal-done-bg` — a change is not a run state. */
+.ux-proposal-line--diff {
+  background: var(--diff-line-bg);
+}
+.ux-proposal-line--hunk {
+  color: var(--muted);
+}
+.ux-proposal-no {
+  flex: none;
+  width: 32px;
+  text-align: right;
+  color: var(--muted);
+}
+.ux-proposal-mark {
+  flex: none;
+  width: 12px;
+  color: var(--muted);
+}
+.ux-proposal-text {
+  flex: 1;
+  min-width: 0;
+}
+.ux-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--page-space-sm);
+  margin: var(--page-space-lg) 0 0;
+}
+.ux-proposal-beside {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+
+/* ── The Notes page, until its own card ──────────────────────────── */
+/* ── A flow: a focused surface in the centre, no navigation ──────── */
+.ux-flow {
+  max-width: 720px;
+  padding: var(--page-space-xl);
+  background: var(--panel-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--page-shadow-surface);
+}
+.ux-flow-eyebrow {
+  margin: 0 0 var(--page-space-sm);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.ux-flow-title {
+  margin: 0;
+  font-size: var(--type-title);
+  font-weight: 600;
+  line-height: var(--type-title-lh);
+}
+/* N14 walk F6: whatever `revealElement` lands focus on (a heading, given
+   tabIndex -1) is not a control, so it draws no ring. */
+[data-reveal-target][tabindex="-1"]:focus-visible {
+  outline: none;
+}
+.ux-flow {
+  scroll-margin-top: var(--space-lg);
+}
+.ux-flow .ux-page-lede {
+  margin: var(--page-space-sm) 0 var(--page-space-lg);
+}
+.ux-flow-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--page-space-md);
+  margin-top: var(--page-space-xl);
+}
+
+/* ── A flow's choices: a radio group with a sentence each ─────────── */
+.ux-choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-space-sm);
+}
+.ux-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: var(--page-space-sm);
+  row-gap: var(--page-space-xs);
+  align-items: center;
+  padding: var(--page-space-md) var(--page-space-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+  background: var(--raised);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ux-choice:hover:not(:disabled) {
+  background-image: linear-gradient(var(--hover), var(--hover));
+}
+.ux-choice--on {
+  border-color: var(--claude-accent);
+}
+/* GH #307: the radio dot — a ring, filled when chosen. */
+.ux-choice-radio {
+  grid-row: 1;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+}
+.ux-choice--on > .ux-choice-radio {
+  border-color: var(--claude-accent);
+  background: radial-gradient(circle, var(--claude-accent) 0 3px, transparent 3.5px);
+}
+.ux-choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ux-choice-label {
+  font-size: var(--type-body);
+  font-weight: 600;
+}
+.ux-choice-hint {
+  grid-column: 2;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .ux-choice:focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+}
+
+/* ── A flow's own sections: `What changes on disk` (GH #101) ──────── */
+.ux-flow-section {
+  margin-top: var(--page-space-lg);
+}
+.ux-flow-heading {
+  margin: 0 0 var(--page-space-sm);
+  font-size: var(--type-body);
+  font-weight: 600;
+}
+.ux-flow-disk {
+  list-style: none;
+  margin: 0;
+  padding: var(--page-space-md) var(--page-space-lg);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+}
+.ux-flow-disk-line {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  line-height: 20px;
+  overflow-wrap: anywhere;
+}
+/* The flow's own status line sits away from the section above it. */
+.ux-flow .ux-status {
+  margin-top: var(--page-space-lg);
+}
+/* A row whose detail is the row's own (`On this Mac`'s instruction files): the
+   disclosure is the side, so it takes the side's width rather than sitting as a
+   chip beside the label. */
+.ux-row .ux-details {
+  min-width: 0;
+  max-width: 100%;
+}
+/* GH #270: open, the disclosure takes the row's width, so its body reads
+   under the row rather than squeezed into the side. */
+.ux-row > .ux-row-side:has(.ux-details[open]) {
+  flex-basis: 100%;
+  justify-content: flex-start;
+}
+.ux-row > .ux-row-side:has(.ux-details[open]) :is(.ux-row-fieldset, .ux-row-side-inner) {
+  width: 100%;
+}
+.ux-row-side-inner > .ux-row-cell > .ux-details[open] {
+  flex: 1;
+}
+/* A0: in a table an open disclosure takes the row's width under the label:
+   that row's side leaves the columns and lays out as a row on its own does. */
+.ux-table > .ux-row--cells:has(> .ux-row-side .ux-details[open]) > .ux-row-main {
+  grid-column: 1 / -1;
+  padding-inline-end: 0;
+}
+.ux-table > .ux-row--cells:has(> .ux-row-side .ux-details[open]) > .ux-row-side > .ux-row-fieldset {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: block;
+  width: 100%;
+}
+.ux-table > .ux-row--cells:has(> .ux-row-side .ux-details[open]) > .ux-row-side > .ux-row-fieldset > .ux-row-side-inner {
+  display: flex;
+  width: 100%;
+}
+.ux-table > .ux-row--cells:has(> .ux-row-side .ux-details[open]) .ux-row-cell {
+  display: contents;
+}
+
+/* ── Error block (GH #102; BOARDS.md §5) ─────────────────────────────
+   On the page it concerns, under the header: the aborted border and dot,
+   the title, the three parts, up to two ways out, then Details. */
+.ux-error {
+  margin-top: var(--page-space-lg);
+  padding: var(--page-space-lg);
+  background: var(--raised);
+  /* 1.174.0 (A7, P32): a hairline; the amber is its dot. */
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-group);
+}
+.ux-error-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--page-space-sm);
+  margin: 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  font-weight: 600;
+  color: var(--fg);
+}
+.ux-error-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  transform: translateY(-1px);
+  background: var(--signal-aborted-fg);
+}
+.ux-error-title-text {
+  min-width: 0;
+}
+.ux-error-part {
+  margin-top: var(--page-space-md);
+}
+.ux-error-eyebrow {
+  margin: 0;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.ux-error-sentence {
+  margin: var(--page-space-xs) 0 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+.ux-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--page-space-sm);
+  margin-top: var(--page-space-lg);
+}
+.ux-error-details {
+  margin-top: var(--page-space-lg);
+}
+.ux-error-details-action {
+  margin-top: var(--page-space-md);
+}
+/* The tool's own output: bounded, so a failing test runner's log does not
+   push the page away (GH #102 review 1). `--type-mono` and the mono family
+   come from `.ux-details-body`. */
+.ux-error-output,
+.ux-output {
+  max-height: 280px;
+  overflow: auto;
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ── The dense error block (GH #150; PATTERNS.md §4) ─────────────────
+   The same block on a work surface — the card's Verify failure, the
+   timed-out or stalled run's `What the steps reported`, the Ship step's
+   refusal. PRINCIPLES §4: the card is 13 px, so the block is too. Only the
+   measures change, each to a token the card already draws with: type
+   `--text-md` / `--text-xs` (13 / 11), the card's `--inset-x` (12) inset,
+   one step down the 4 · 8 · 12 · 16 scale — the 12 / 8 / 4 the card's own
+   panels space by — and the 8 px corner of the card's blocks
+   (`--radius-menu`). The inline gap (8), the dot (8) and the bounded
+   output are the page block's. A declared deviation, on no board, until
+   the owner's Tier 4. */
+.ux-error.ux-error--dense {
+  /* The surface's own gap places it (the Verify panel's 8, the Ship step's 12). */
+  margin-top: 0;
+  padding: var(--inset-x);
+  border-radius: var(--radius-menu);
+}
+.ux-error--dense .ux-error-title,
+.ux-error--dense .ux-error-sentence,
+.ux-error-details--dense .ux-error-sentence {
+  font-size: var(--text-md);
+  line-height: var(--type-small-lh);
+}
+.ux-error--dense .ux-error-eyebrow {
+  font-size: var(--type-caption);
+}
+.ux-error--dense .ux-error-part {
+  margin-top: var(--page-space-sm);
+}
+.ux-error--dense .ux-error-actions,
+.ux-error--dense .ux-error-details {
+  margin-top: var(--page-space-md);
+}
+.ux-error--dense .ux-error-details-action,
+.ux-error-details--dense .ux-error-details-action {
+  margin-top: var(--page-space-sm);
+}
+.ux-error--dense .ux-details,
+.ux-error-details--dense .ux-details {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  padding: var(--page-space-sm) var(--inset-x);
+  border-radius: var(--radius-menu);
+}
+/* Outside a block (the timed-out or stalled run), the panel's gap places it. */
+.ux-error-details.ux-error-details--dense {
+  margin-top: 0;
+}
+
+/* ── Back link and footnote (a sub-page, a read-only page) ────────── */
+.ux-back {
+  margin: 0 0 var(--page-space-xl);
+  padding: 0;
+  border: 0;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-sm);
+  font: inherit;
+  font-size: var(--type-ui);
+  color: var(--muted);
+  cursor: pointer;
+}
+.ux-back:hover {
+  color: var(--fg);
+}
+.ux-back-arrow {
+  display: inline-flex;
+}
+.ux-footnote {
+  margin: var(--page-space-lg) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+}
+
+/* A change already saved here and on its way: the mark, no number. */
+.ux-changed-mark--pending {
+  color: var(--muted);
+  border-color: var(--muted);
+}
+
+/* A removed item keeps its place until the change is published. */
+.ux-row--struck .ux-row-label-text {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+/* ── Publish bar (BOARDS.md §2, SHEET.md "PublishBar") ────────────── */
+.ux-publish {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--page-space-xl);
+  padding: var(--page-space-md) var(--page-space-xl);
+  background: var(--raised);
+  border-top: 1px solid var(--border-strong);
+}
+.ux-publish-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.ux-publish-sentence {
+  display: flex;
+  align-items: baseline;
+  gap: var(--page-space-sm);
+  margin: 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--fg);
+}
+.ux-publish-detail {
+  margin: var(--page-space-xs) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+}
+.ux-publish-dot {
+  flex: none;
+  align-self: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+}
+.ux-publish-dot--empty {
+  background: var(--muted);
+}
+.ux-publish-dot--running {
+  background: var(--signal-running-fg);
+  animation: ux-pulse 1.4s ease-in-out infinite;
+}
+.ux-publish-jumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--page-space-sm);
+  margin-top: var(--page-space-sm);
+}
+.ux-publish-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-sm);
+  height: 24px;
+  padding: 0 var(--page-space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--panel-bg);
+  font: inherit;
+  font-size: var(--type-small);
+  color: var(--muted);
+  cursor: pointer;
+}
+.ux-publish-jump:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.ux-publish-jump-n {
+  font-weight: 600;
+  color: var(--fg);
+}
+.ux-publish-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--page-space-sm);
+  margin-left: auto;
+}
+
+/* ── Sheet: review and confirmation ───────────────────────────────── */
+.ux-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  /* Above the Settings surface it is opened from (`.ux-backdrop`). */
+  z-index: var(--z-sheet);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--page-space-xl);
+  background: var(--page-backdrop);
+}
+.ux-sheet {
+  width: 100%;
+  max-width: var(--page-sheet-review);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--page-shadow-surface);
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+}
+/* GH #319: with no initial focus target the surface itself takes focus
+   (tabIndex -1), as an anchor for Tab and Esc — not a control, so no ring.
+   Tab moves on to a control, which draws its own. */
+.ux-sheet[tabindex="-1"]:focus-visible {
+  outline: none;
+}
+.ux-sheet--confirm {
+  max-width: var(--page-sheet-confirm);
+}
+/* UX-10.1: a workbench in a sheet (the independent discussion). */
+.ux-sheet--wide {
+  max-width: var(--page-sheet-wide);
+  height: min(780px, 100%);
+}
+.ux-sheet-head {
+  padding: var(--page-space-xl) var(--page-space-xl) var(--page-space-lg);
+}
+.ux-sheet-title {
+  margin: 0;
+  font-size: var(--type-subheading);
+  line-height: var(--type-subheading-lh);
+  font-weight: 600;
+}
+.ux-sheet-lede {
+  margin: var(--page-space-sm) 0 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* 1.169.1 (R2): a confirm sheet's list (the commits a PR would carry). */
+/* 1.176.1 walk: a confirm sheet's buttons as one row (as before), or one
+   column of the same width with a shared right edge (`stacked`). */
+.ux-confirm-row {
+  display: contents;
+}
+/* 1.176.1 walk 2: the column lines up with the sheet's content — its full
+   width, every button the same — instead of sitting off to the right. */
+.ux-confirm-stack {
+  display: grid;
+  grid-auto-flow: row;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: stretch;
+  gap: var(--page-space-sm);
+  flex: 1 1 100%;
+}
+
+.ux-confirm-items {
+  margin: 0;
+  padding-left: var(--space-lg);
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  overflow-wrap: anywhere;
+}
+/* 1.173.0 (B3): files as rows — the path in code style, an outline chip
+   beside it; no bullets, no tint. */
+.ux-confirm-files {
+  list-style: none;
+  padding-left: 0;
+  display: grid;
+  gap: var(--space-2xs);
+}
+.ux-confirm-files code {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+}
+/* UX-10.1: what a sheet's body says, beside its changes and choices. */
+.ux-sheet-text {
+  margin: 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  overflow-wrap: anywhere;
+}
+.ux-sheet-hint {
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+/* A refusal or a failure in a sheet: amber, never --danger (ADR 0007). */
+.ux-sheet-alert {
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-body-lh);
+  color: var(--warn);
+  overflow-wrap: anywhere;
+}
+/* GH #297: an alert with a sentence and its Details under it. */
+.ux-sheet-alert > p {
+  margin: 0;
+}
+.ux-sheet-alert > .ux-details {
+  margin-top: var(--page-space-xs);
+}
+/* A short form in a sheet (Brainstorm): labelled fields in a column. */
+.ux-sheet-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-space-md);
+}
+.ux-sheet-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-space-xs);
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+.ux-sheet-textarea {
+  width: 100%;
+  padding: var(--page-space-sm);
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  line-height: var(--type-mono-lh);
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-control);
+  resize: vertical;
+}
+/* GH #278: a question or goal typed in words takes the UI font; mono is
+   for commands and paths. */
+.ux-sheet-textarea--prose {
+  font-family: inherit;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+/* A failure said inline, beside the control that failed (amber). */
+.ux-inline-alert {
+  font-size: var(--type-small);
+  color: var(--warn);
+}
+.ux-sheet-check {
+  display: flex;
+  align-items: center;
+  gap: var(--page-space-sm);
+  font-size: var(--type-ui);
+}
+.ux-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-space-md);
+  padding: 0 var(--page-space-xl) var(--page-space-lg);
+}
+.ux-sheet-change {
+  padding: var(--page-space-md) var(--page-space-lg);
+  background: var(--raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+}
+.ux-sheet-change-label {
+  margin: 0;
+  font-size: var(--type-body);
+  font-weight: 600;
+}
+.ux-sheet-change-values {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--page-space-sm);
+  margin: var(--page-space-xs) 0 0;
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+}
+.ux-sheet-was {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.ux-sheet-arrow {
+  color: var(--muted);
+}
+.ux-sheet-now {
+  color: var(--fg);
+}
+.ux-sheet-change-why {
+  margin: var(--page-space-sm) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+}
+.ux-sheet-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--page-space-sm);
+  padding: var(--page-space-lg) var(--page-space-xl);
+  background: var(--panel-bg);
+  border-top: 1px solid var(--border);
+  border-bottom-left-radius: var(--radius-surface);
+  border-bottom-right-radius: var(--radius-surface);
+}
+.ux-sheet-note {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  color: var(--muted);
+}
+.ux-sheet-spacer {
+  flex: 1;
+}
+
+/* ── Accent circles (BOARDS.md §6) ────────────────────────────────── */
+.ux-swatches {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-md);
+}
+.ux-swatch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-sm);
+}
+.ux-swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 13px;
+  cursor: pointer;
+}
+.ux-swatch--violet {
+  color: var(--page-accent-violet);
+  background: currentColor;
+}
+.ux-swatch--cyan {
+  color: var(--page-accent-cyan);
+  background: currentColor;
+}
+.ux-swatch--magenta {
+  color: var(--page-accent-magenta);
+  background: currentColor;
+}
+.ux-swatch--sunset {
+  color: var(--page-accent-sunset);
+  background: currentColor;
+}
+/* GH #275 (BoardSettings): the chosen circle is ringed in its own colour
+   (each circle's `color` is its accent), a gap of the page between. */
+.ux-swatch--chosen {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px currentColor;
+}
+.ux-swatch:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.ux-swatch-name {
+  font-size: var(--type-ui);
+  color: var(--fg);
+}
+
+/* A Details body that holds one line per fact (the commit to be written). */
+.ux-details-line {
+  display: block;
+}
+
+/* A filter above a group, once a list passes twelve rows (PATTERNS §3). */
+.ux-section-filter {
+  margin-bottom: var(--page-space-md);
+}
+
+/* ── Type-or-choose field (SHEET.md "Type-or-choose field") ───────── */
+/* A text field with a caret; the list under it always opens on `CLI
+   default`, and its foot says that anything the CLI accepts can be typed. */
+.ux-choose {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-xs);
+}
+.ux-choose .ux-field--text {
+  width: 180px;
+}
+.ux-choose-caret {
+  flex: none;
+  width: var(--ctl-page);
+  height: var(--ctl-page);
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--panel-bg);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.ux-choose-caret:hover:not(:disabled) {
+  background: var(--hover);
+  color: var(--fg);
+}
+.ux-choose-caret:focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+}
+.ux-choose-caret:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.ux-choose-list {
+  position: absolute;
+  z-index: var(--z-sticky);
+  top: calc(100% + var(--page-space-xs));
+  right: 0;
+  display: flex;
+  width: 260px;
+  flex-direction: column;
+}
+.ux-choose-list .ux-menu {
+  position: static;
+  width: 100%;
+  min-width: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: none;
+}
+.ux-choose-foot {
+  padding: var(--page-space-sm) var(--page-space-md) var(--page-space-md);
+  border: 1px solid var(--border-strong);
+  border-top: 1px solid var(--border);
+  border-bottom-left-radius: var(--radius-menu);
+  border-bottom-right-radius: var(--radius-menu);
+  background: var(--panel-bg);
+  box-shadow: var(--page-shadow-menu);
+  color: var(--muted);
+  font-size: var(--type-small);
+  line-height: 18px;
+}
+
+/* The confirming action of a destructive dialog is the one filled --danger
+   button on the surface (SHEET.md "States", "ConfirmSheet"). */
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--danger.ux-danger-fill,
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn--danger.ux-danger-fill:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-danger);
+}
+
+/* ── A procedure's status word, where a row's action would be ─────── */
+/* `Ready` on a Diagnostics row: the condition is met, so there is nothing to
+   press (BOARDS.md §5). */
+.ux-ready {
+  color: var(--muted);
+  font-size: var(--type-ui);
+}
+
+/* ── Search in Settings (GH #107; BOARDS.md §2, §6) ───────────────── */
+/* The row a search landed on: an ink outline and the words `Found here`
+   beside the label, both gone after two seconds. No colour carries it, and
+   nothing flashes — a row that blinks is harder to read, not easier. */
+/* 1.172.0 (owner, 2026-10-28): a rounded outline drawn around the row,
+   off its words on every side and inside its own height (the row's padding
+   is the gap above and below; the sides reach out), so it touches neither
+   the words nor the section's rule above. Nothing moves when it comes. */
+.ux-row--found::after {
+  content: "";
+  position: absolute;
+  inset: var(--space-2xs) calc(-1 * var(--space-sm));
+  border: 1px solid var(--fg);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+}
+/* A row that is also carrying a state keeps it: since E4 a state is a mark
+   and words, never a box-shadow, so the outline lays over nothing. */
+.ux-row-found {
+  flex: none;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--fg);
+}
+
+/* At a narrow width the field lives in the header beside the navigation
+   menu, so it takes a share of it rather than all of it. */
+.ux-surface-header .ux-field--search {
+  flex: 0 1 220px;
+  width: auto;
+}
+
+/* The results themselves (UX-9.4): in the page area, full width, while the
+   navigation stays beside them — a title, the count, then one group per
+   scope, its results rows under a hairline like a page's own. */
+.ux-results {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ux-results-heading {
+  margin: 0;
+  font-size: var(--type-title);
+  line-height: var(--type-title-lh);
+  font-weight: var(--type-title-weight);
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.ux-results-lede {
+  margin: var(--page-space-sm) 0 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+}
+.ux-results-group {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--page-space-2xl);
+}
+.ux-results-scope {
+  margin: 0 0 var(--page-space-xs);
+  font-size: var(--type-subheading);
+  line-height: var(--type-subheading-lh);
+  font-weight: var(--type-subheading-weight);
+  color: var(--fg);
+}
+.ux-results-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+.ux-results-list > li + li {
+  border-top: 1px solid var(--border);
+}
+.ux-result {
+  display: grid;
+  width: 100%;
+  min-height: var(--row-min);
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0 var(--page-space-md);
+  padding: var(--page-space-sm);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  text-align: left;
+  cursor: pointer;
+}
+.ux-result:hover {
+  background: var(--hover);
+}
+.ux-result:active {
+  background: var(--selected);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .ux-result:focus-visible {
+  outline-offset: calc(-1 * var(--focus-w));
+}
+.ux-result-label {
+  grid-column: 1;
+  min-width: 0;
+}
+/* 1.174.0 (DS8): "· was Integration branch" beside a moved row's name. */
+.ux-result-was {
+  color: var(--muted);
+  font-weight: normal;
+}
+.ux-result-trail,
+.ux-result-why {
+  grid-column: 1;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* The value a setting holds, in mono, after the path it lives at. */
+.ux-result-value {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  color: var(--fg);
+}
+.ux-result-value::before {
+  content: " · ";
+  font-family: inherit;
+  color: var(--muted);
+}
+.ux-result-chevron {
+  grid-column: 2;
+  grid-row: 1 / span 3;
+  font-size: var(--type-body);
+  color: var(--muted);
+}
+
+/* ══ UX-2.3 (ADR 0007): the one-scale primitives ═════════════════════ */
+
+/* ── ScreenHeader: breadcrumb, title, one place for actions ──────── */
+.ux-screen-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.ux-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+.ux-crumb-link {
+  padding: 0 var(--space-2xs);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.ux-crumb-link:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.ux-screen-top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.ux-screen-title {
+  flex: 1;
+  /* UX P-A Mac walk 8: a full row of actions (the List's Group by) never
+     squeezes the title to one letter per line; the actions wrap instead. */
+  min-width: min(8em, 40%);
+  margin: 0;
+  font-size: var(--type-title);
+  line-height: var(--type-title-lh);
+  font-weight: var(--type-title-weight);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.ux-screen-title--display {
+  font-size: var(--type-display);
+  line-height: var(--type-display-lh);
+  font-weight: var(--type-display-weight);
+}
+.ux-screen-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-screen-actions > * {
+  flex: none;
+}
+/* 1.172.1 (F2): one quiet line under the title; it wraps, never widens. */
+.ux-screen-subtitle {
+  margin-top: calc(-1 * var(--space-xs));
+  min-width: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* 1.174.0 (DR5, release.html state 10): How this goes live reads top to
+   bottom — one column per area, never two side by side; the Releases row's
+   words and its one button share a line and wrap together. */
+.ux-go-live .ux-props {
+  grid-template-columns: minmax(0, 1fr);
+}
+.ux-go-live-releases {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+}
+
+/* ── Properties ───────────────────────────────────────────────────── */
+.ux-props {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* GH #263: a tall value (two blockers) grows its own row only. */
+  align-items: start;
+  gap: 0 var(--space-2xl);
+  margin: 0;
+  max-width: var(--page-column);
+}
+.ux-prop {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  /* GH #263: the label stays on the value's first line when it wraps. */
+  align-items: start;
+  min-height: var(--row-compact);
+}
+.ux-prop-label {
+  display: flex;
+  align-items: center;
+  min-height: var(--row-compact);
+  gap: var(--space-sm);
+  font-size: var(--type-ui);
+  color: var(--muted);
+}
+.ux-prop-value {
+  display: flex;
+  align-items: center;
+  min-height: var(--row-compact);
+  gap: var(--space-sm);
+  margin: 0;
+  min-width: 0;
+  font-size: var(--type-ui);
+  overflow-wrap: anywhere;
+}
+
+/* GH #263: a list of cards (Blocked by, Blocks) is a row across both
+   columns — beside a short property it left 100–140 px of empty space. */
+.ux-prop--wide {
+  grid-column: 1 / -1;
+}
+
+/* QoL 1.168 (C1, V-1): the card's facts as one line under its Now box —
+   label and value side by side, wrapping when narrow. 1.174.0 (C2,
+   BCI-11): space between facts, never a "·" — a wrapped line began with
+   one. */
+.ux-props--line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-xl);
+  row-gap: var(--space-xs);
+}
+.ux-props--line .ux-prop {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+/* ── State: a dot and a word ──────────────────────────────────────── */
+.ux-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.ux-state-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--signal-empty-fg);
+}
+.ux-state-dot--running { background: var(--signal-running-fg); }
+.ux-state-dot--done { background: var(--signal-done-fg); }
+.ux-state-dot--aborted { background: var(--signal-aborted-fg); }
+.ux-state-dot--warn { background: var(--warn); }
+/* A5: something new that asks nothing yet (an unseen round of ideas). */
+.ux-state-dot--accent { background: var(--claude-accent); }
+.ux-state-dot--live { animation: ux-pulse var(--dur-pulse) ease-in-out infinite; }
+
+/* ── Callout ──────────────────────────────────────────────────────── */
+.ux-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  max-width: var(--page-column);
+}
+.ux-callout--now { background: var(--raised); border-color: var(--border-strong); }
+.ux-callout--info { background: var(--panel-bg); }
+/* 1.174.0 (A7, P32 · VC-1): warn and danger are calm too — the iconTone look
+   as the default: the raised surface, a hairline, the colour on the icon
+   (mockups/board.html §7). */
+.ux-callout--warn,
+.ux-callout--danger { background: var(--raised); border-color: var(--border-strong); }
+.ux-callout-dot { display: inline-flex; padding-top: calc(var(--space-xs) + var(--space-2xs)); }
+.ux-callout-icon { display: inline-flex; color: var(--claude-accent); }
+.ux-callout--warn .ux-callout-icon { color: var(--warn); }
+.ux-callout-icon--warn { color: var(--warn); }
+.ux-callout--danger .ux-callout-icon { color: var(--danger); }
+.ux-callout-text { flex: 1; min-width: 0; }
+.ux-callout-title {
+  margin: 0;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  font-weight: var(--type-subheading-weight);
+}
+/* GH #303: the card page lands focus on the Now title for a screen reader
+   (tabIndex -1). It is a heading, not a control, so it draws no ring. */
+.ux-callout-title[tabindex="-1"]:focus-visible {
+  outline: none;
+}
+.ux-callout-body {
+  margin: var(--space-2xs) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* 1.171.0 (B1): where the change is — words, the current stop in bold
+   (never colour alone), the next one muted and named "Next:". */
+.ux-delivery-path {
+  margin: var(--space-2xs) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.ux-delivery-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ux-delivery-step--done,
+.ux-delivery-step--next {
+  color: var(--muted);
+}
+.ux-delivery-step--now {
+  font-weight: var(--type-subheading-weight);
+}
+.ux-delivery-arrow {
+  color: var(--muted);
+  margin-right: var(--space-2xs);
+}
+.ux-delivery-helper {
+  margin: var(--space-2xs) 0 0;
+  color: var(--muted);
+}
+.ux-callout-actions {
+  display: flex;
+  align-self: center;
+  gap: var(--space-sm);
+}
+/* 1.176.1 Windows walk: a checked field's offers under its words, the
+   notice's full width, one per line. */
+.ux-callout--below {
+  flex-wrap: wrap;
+  /* Walk 3: brought into view with room under it, never flush with the
+     page's foot. */
+  scroll-margin-block: var(--space-xl);
+}
+.ux-callout--below .ux-callout-text {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.ux-callout--below .ux-callout-actions {
+  flex: 1 1 100%;
+  flex-direction: column;
+  align-items: stretch;
+  align-self: stretch;
+}
+
+/* ── Timeline ─────────────────────────────────────────────────────── */
+.ux-timeline {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: var(--page-column);
+}
+.ux-timeline-event {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: start;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+.ux-timeline-dot { display: inline-flex; justify-content: center; padding-top: calc(var(--space-xs) + var(--space-2xs)); }
+.ux-timeline-text { min-width: 0; overflow-wrap: anywhere; }
+.ux-timeline-event:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 22px;
+  bottom: calc(0px - var(--space-sm));
+  border-left: 1px solid var(--border-strong);
+}
+.ux-timeline-link {
+  margin-left: var(--space-sm);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--type-small);
+  color: var(--claude-accent);
+  cursor: pointer;
+}
+.ux-timeline-link:hover { text-decoration: underline; }
+/* G10: the help mark beside a word defined on hover (GlossaryText). */
+.ux-term-help {
+  margin-left: var(--space-2xs);
+  vertical-align: middle;
+}
+/* G10 Challenger 7: the definition is the help mark's description —
+   visually hidden, shown beside the mark while the keyboard is on it. */
+.ux-term {
+  position: relative;
+}
+.ux-term-def {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ux-term-help:focus-visible + .ux-term-def {
+  left: 0;
+  top: calc(100% + var(--space-2xs));
+  z-index: var(--z-float);
+  width: max-content;
+  max-width: 280px;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  font-size: var(--type-small);
+  font-weight: normal;
+  line-height: 1.4;
+  box-shadow: var(--shadow-popover);
+}
+.ux-timeline-when {
+  font-size: var(--type-small);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Popover ──────────────────────────────────────────────────────── */
+.ux-popover-anchor { position: relative; }
+.ux-popover {
+  position: absolute;
+  z-index: var(--z-popover);
+  top: calc(100% + var(--space-xs));
+  left: 0;
+  width: 280px;
+  padding: var(--space-xs);
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+}
+.ux-popover--lg { width: 360px; }
+/* 1.174.0 (C15): a popover that asks before a press — a title, its
+   choices, short muted lines, then Cancel and the press on the right
+   (Next improvement's Next round). */
+.ux-popover-body {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-xs);
+}
+.ux-popover-title {
+  margin: 0;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  font-weight: var(--type-subheading-weight);
+}
+.ux-popover-hint {
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+/* GH #264: a popover that would pass the window's right edge opens to the
+   left of its trigger's right edge instead. */
+.ux-popover--end { left: auto; right: 0; }
+
+/* ── Flow: the step line in sentence case ─────────────────────────── */
+.ux-flow-step {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+
+/* ── CheckList (GH #277): rows to tick under hairlines ────────────── */
+.ux-check-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+}
+.ux-check-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs) var(--space-sm);
+  min-height: var(--row-compact);
+  padding: var(--space-xs) var(--space-2xs);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+  cursor: pointer;
+}
+/* SL-3: one remembered choice beside its action (CheckLine). */
+.ux-check-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+.ux-check-line-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  cursor: pointer;
+}
+.ux-check-line-label:has(:disabled) { cursor: default; color: var(--muted); }
+.ux-check-line-hint {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-check-row:hover { background: var(--hover); }
+.ux-check-row:has(:disabled) { cursor: default; }
+/* H8 Mac walk: a row that can't be picked reads so in both themes — its
+   box faded and its words muted, no hover. */
+.ux-check-row:has(:disabled):hover { background: transparent; }
+.ux-check-row:has(:disabled) .ux-checkbox { opacity: 0.4; }
+.ux-check-row:has(:disabled) .ux-check-row-text { color: var(--muted); }
+.ux-checkbox {
+  flex: none;
+  margin: 0;
+  accent-color: var(--claude-accent);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .ux-checkbox:focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+}
+.ux-check-row-text {
+  /* F6: the name keeps at least 40% of the row; a long note wraps whole
+     to the next line instead of squeezing the name to a character. */
+  flex: 1 0 40%;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.ux-check-row-note {
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-width: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* 1.174.0 (DR3): a row's words with a muted line under them. */
+.ux-check-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ux-check-row-hint {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* ── 1.174.0 (DR3): the Release sheet (mockups/release.html 2–5) ──── */
+/* Walk fix (DR3 early walk): the foot's line is words, not code. */
+.ux-sheet-note .ux-release-foot {
+  font-family: var(--font-ui);
+  font-size: var(--type-small);
+}
+.ux-release-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.ux-release-heading {
+  margin: var(--space-sm) 0 0;
+  display: flex;
+  gap: var(--space-sm);
+  align-items: baseline;
+  font-size: var(--type-ui);
+  font-weight: 600;
+}
+.ux-release-count {
+  font-weight: 400;
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+.ux-release-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+.ux-release-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--border);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+.ux-release-row-icon {
+  flex: none;
+  display: inline-flex;
+  margin-top: var(--space-2xs);
+  color: var(--muted);
+}
+.ux-release-row-main {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ux-release-row-hint {
+  display: block;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+
+/* ── ListView ─────────────────────────────────────────────────────── */
+/* GH #248: a fixed layout — the columns take their widths from the header
+   (the list-column scale), never from the longest value in them, and the
+   title column takes the rest. */
+.ux-list {
+  width: 100%;
+  max-width: var(--page-column-wide);
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+.ux-list-th {
+  height: var(--row-compact);
+  padding: 0 var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  font-size: var(--type-caption);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ux-list-th--primary { width: auto; }
+.ux-list-col--xs { width: var(--list-col-xs); }
+.ux-list-col--sm { width: var(--list-col-sm); }
+.ux-list-col--md { width: var(--list-col-md); }
+.ux-list-col--lg { width: var(--list-col-lg); }
+.ux-list-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.ux-list-sort:hover { color: var(--fg); }
+.ux-list-th[aria-sort="ascending"] .ux-icon { transform: rotate(180deg); }
+.ux-list-group th {
+  height: 36px;
+  padding: var(--space-sm) var(--space-sm) 0;
+  text-align: left;
+  font-size: var(--type-caption);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.ux-list-td {
+  height: var(--row-compact);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+/* GH #248: the title cell stays a table cell — its column takes the free
+   width, it keeps the row's hairline and baseline, and the row grows to two
+   lines. The two-line clamp is on the span inside it. */
+.ux-list-td--primary {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* A value cell: one line, cut with an ellipsis at its column's width (the
+   whole in its title). A state word's dot or icon stays in line. */
+.ux-list-cell {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ux-list-cell > .ux-state {
+  display: inline;
+}
+.ux-list-cell > .ux-state > :first-child {
+  display: inline-block;
+  margin-right: var(--space-sm);
+  vertical-align: middle;
+}
+.ux-list-clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.ux-list-row:hover .ux-list-td,
+.ux-list-row:hover .ux-list-check { background: var(--hover); }
+.ux-list-row--selected .ux-list-td,
+.ux-list-row--selected .ux-list-check { background: var(--selected); }
+.ux-list-check {
+  width: 28px;
+  padding: 0 var(--space-xs);
+  border-bottom: 1px solid var(--border);
+}
+.ux-list-checkbox {
+  margin: 0;
+  accent-color: var(--claude-accent);
+  opacity: 0;
+}
+.ux-list-row:hover .ux-list-checkbox,
+.ux-list-checkbox:checked,
+.ux-list-checkbox:focus-visible { opacity: 1; }
+.ux-list-open {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ux-list-open:hover { text-decoration: underline; }
+/* GH #298: the selection bar takes the header row's place — same width,
+   same height, no card-in-card box; the header row keeps its box so the
+   columns do not move. */
+.ux-list-frame {
+  position: relative;
+  max-width: var(--page-column-wide);
+}
+.ux-list-frame > .ux-list { max-width: none; }
+.ux-list-head--covered > th { visibility: hidden; }
+.ux-list-bar {
+  position: absolute;
+  z-index: var(--z-lift);
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: calc(var(--row-compact) + 1px);
+  padding: 0 var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+}
+.ux-list-empty {
+  padding: var(--space-xl);
+  color: var(--muted);
+}
+
+/* ── Inbox (UX-4.2): the landing page — a sentence, then groups of
+   comfortable rows under hairlines, one action a row ─────────────── */
+.ux-inbox,
+.ux-history {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+/* 1.173.0 (F1): a section's one action sits at the end of its head. */
+.ux-section-action {
+  margin-left: auto;
+}
+/* 1.173.0 (F1, BI-13): the empty Inbox says so, and where to go. */
+.ux-inbox-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin-top: var(--page-space-lg);
+}
+.ux-inbox-empty-title {
+  margin: 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  font-weight: 600;
+  color: var(--fg);
+}
+.ux-inbox-lede {
+  margin: 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--muted);
+}
+/* A5 (A0 tidy tables): an Inbox row is a ux Row in its section's Group;
+   its label holds the state dot, the workspace chip and the title. */
+.ux-inbox-label {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-inbox-label > .ux-state-dot {
+  align-self: center;
+}
+.ux-inbox-title {
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+/* N19: up to two lines, then clamped — a branch-cleanup ask's sentence was
+   cut to one line mid-word. The full text is the line's tooltip and the
+   row action's description (InboxPanel). */
+.ux-inbox-detail {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+/* CL-3: a serious catch (a P1) is said in weight and ink — never a colour. */
+.ux-inbox-detail--serious {
+  font-weight: 600;
+  color: var(--fg);
+}
+/* Seen: the title steps down to --muted (never opacity on text: AA holds). */
+.ux-row--muted .ux-row-label-text,
+.ux-row--muted .ux-inbox-title {
+  color: var(--muted);
+}
+.ux-inbox-when {
+  flex: none;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ux-inbox-more {
+  margin-top: var(--space-xs);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn.ux-inbox-history {
+  display: flex;
+  width: 100%;
+  margin-top: var(--page-space-2xl);
+  justify-content: flex-start;
+}
+.ux-inbox-history-text {
+  flex: 1;
+  text-align: left;
+}
+
+/* GH #311: the Inbox and History are one column under their title — the
+   body starts where the title does, not centred on its own. The title sits
+   after the header's inset, the sidebar toggle and the gap between them
+   (shell.css .shell-stage-header); with the sidebar hidden the inset is the
+   traffic lights' room. The Library is one column too whenever its own nav
+   is not beside it — a narrow centre, or a Flow open — so its Skills,
+   Instructions and skill detail start there as well. */
+:is(.ux-inbox, .ux-history, .ux-library--single) .ux-page-column {
+  margin: 0;
+  max-width: calc(var(--page-column-wide) + var(--stage-title-start) + var(--page-space-xl));
+  padding-left: var(--stage-title-start);
+}
+.ws-shell-body:not(:has(> .shell-sidebar-slot[data-presentation="docked"]))
+  :is(.ux-inbox, .ux-history, .ux-library--single)
+  .ux-page-column {
+  max-width: calc(var(--page-column-wide) + var(--stage-title-start-bare) + var(--page-space-xl));
+  padding-left: var(--stage-title-start-bare);
+}
+
+/* ── History (UX-4.5): the facts, then the list ─────────────────────── */
+.ux-history-facts {
+  margin-top: var(--page-space-xl);
+}
+.ux-history-list {
+  margin-top: var(--page-space-xl);
+}
+/* QoL 11.1: the workspace and text filter, then the tabs. */
+.ux-history-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--page-space-sm);
+  align-items: center;
+  margin-top: var(--page-space-lg);
+}
+.ux-history-filters .ux-field--search {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.ux-history-tabs {
+  margin-top: var(--page-space-xl);
+  max-width: 100%;
+  overflow-x: auto;
+}
+.history-item-run {
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ══ C6 (the Card board): the card as a page ══════════════════════════
+   Header (ModeHeader, display title), then in the 720 px column:
+   properties, Technical details, the Now callout, the sections a press
+   opens, the brief, the Activity, and the details a link opens below. */
+.ux-card-page {
+  /* 1.172.2 D5: the drop outline sits over the page. */
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+}
+/* 1.172.2 D5: a file dragged over the card page — a quiet outline of the
+   page and one centred line; the page under it is not tinted. */
+.ux-card-page-drop {
+  position: absolute;
+  inset: var(--space-xs);
+  z-index: var(--z-float);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+}
+.ux-card-page-drop-label {
+  padding: var(--space-xs) var(--space-md);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--fg);
+}
+.ux-card-body {
+  display: flex;
+  flex-direction: column;
+}
+/* A section that opens must not add a scrollbar and narrow the column: the
+   terminals inside would be resized (P3-1). */
+.ux-card-page .ux-page {
+  scrollbar-gutter: stable;
+  /* SP-1: the page's own width (not the window's) picks the layout. */
+  container: ply-card-page / inline-size;
+}
+.ux-card-body > * + * {
+  margin-top: var(--space-xl);
+}
+/* A closed section takes no room and adds no gap. */
+.ux-card-body > .ux-card-slot--closed {
+  margin-top: 0;
+}
+/* SP-1 (layout board approved 2026-10-01): above 1200 px of page width the
+   card page is two columns (so column 2, the session, is never under
+   ~560 px). Column 1 keeps the title, Properties, Now (and
+   the Build-with-both cards under it), What you want, Activity and the
+   plan; column 2 holds the one open slot section — the conversation, the
+   session, the result, the diff, the shipping — at the top of the one
+   scroll, never a scroll of its own. CSS only: no section changes parent, so a
+   terminal is the same element in both layouts. Every slot section sits in
+   the same column-2 area: the closed ones keep their laid-out size there,
+   invisible, so a session opened later already has its width. Below the
+   threshold nothing here applies and the page is the one column it was. */
+@container ply-card-page (min-width: 1200px) {
+  .ux-card-page .ux-page-column {
+    max-width: calc(1240px + 2 * var(--page-space-xl));
+  }
+  .ux-card-head {
+    max-width: 560px;
+  }
+  .ux-card-body {
+    display: grid;
+    grid-template-columns: 560px minmax(0, 1fr);
+    /* Column 2 spans every row column 1 can use; what it adds beyond
+       column 1's height goes to the last (flexible) row, never between
+       column 1's parts. */
+    grid-template-rows: repeat(31, auto) minmax(0, 1fr);
+    column-gap: var(--page-space-2xl);
+    align-items: start;
+  }
+  .ux-card-body > * {
+    grid-column: 1;
+    min-width: 0;
+  }
+  .ux-card-body > .ux-card-slot:is(
+      [data-ply-card-section="intake"],
+      [data-ply-card-section="run"],
+      [data-ply-card-section="outcome"],
+      [data-ply-card-section="diff"],
+      [data-ply-card-section="ship"],
+      [data-ply-card-section="chat"]
+    ) {
+    grid-column: 2;
+    grid-row: 1 / span 32;
+    margin-top: 0;
+  }
+  /* SP-1 phase 2: the result and its diff open together — the result on
+     the left, under Now, the diff on the right beside it. What you want,
+     the Activity, the plan and the Details follow the result in column 1
+     (only here; the narrow page keeps the result after the Activity).
+     1.172.0 (C3; CP-8): the Review and the Builder's session open together
+     the same way (`data-ply-card-pair="session"`): the Review moves to
+     column 1, the session stays in column 2 — the same element at the same
+     width it has alone, so its terminal is never resized (P3-1). */
+  .ux-card-body[data-ply-card-pair] > .ux-card-slot[data-ply-card-section="outcome"] {
+    grid-column: 1;
+    grid-row: auto;
+    margin-top: var(--space-xl);
+  }
+  .ux-card-body[data-ply-card-pair]
+    > :is(.ux-card-section, [data-ply-card-section="plan"], .ux-details, .ux-card-brief-folded) {
+    order: 1;
+  }
+  /* The live terminals stay in view while column 1 scrolls — only on a
+     window tall enough that the whole section fits (the Builder's terminal
+     is the window's height less 340 px, never under 480 px): a stuck
+     section taller than the window would hide its own end. The result, the
+     diff and the shipping are never sticky, for the same reason — they can
+     be any length. */
+  @media (min-height: 860px) {
+    .ux-card-body > .ux-card-slot:is(
+        [data-ply-card-section="intake"],
+        [data-ply-card-section="run"]
+      ):not(.ux-card-slot--closed) {
+      position: sticky;
+      top: var(--page-space-lg);
+    }
+  }
+  /* The Release flow reads at the page's measure over the two columns. */
+  .ux-card-page .ux-card-stack .ux-flow {
+    max-width: var(--page-column);
+  }
+}
+.ux-card-body .ux-callout {
+  max-width: none;
+}
+.ux-card-body .ux-error {
+  margin-top: var(--space-lg);
+}
+/* SP-1 walk: on the card page "The diff" is a section of its own, beside
+   the result on a wide page and after it on a narrow one, so its hunks
+   grow with the page — one scroll (PATTERNS.md). CL-6's 320 px hunk box
+   (App.css, `.card-review-hunk-scroll`) stays where the diff is folded
+   inside another surface (the result's "See the diff" disclosure). A long
+   line still scrolls sideways inside its hunk: the page never does. */
+.ux-card-slot[data-ply-card-section="diff"] .card-review-hunk-scroll {
+  max-height: none;
+}
+.ux-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* GH #254: the title and its ⋯ head the page column — the same left edge
+   as the properties, the ⋯ at the column's right edge — right under the
+   crumbs, and the properties follow at the page's section gap. */
+.ux-card-page .ux-page-column {
+  padding-top: var(--space-xs);
+}
+.ux-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+}
+.ux-card-head .ux-more .cicon {
+  width: var(--control-md);
+  height: var(--control-md);
+  margin-top: var(--space-xs);
+  border-color: transparent;
+  border-radius: var(--radius-md);
+}
+
+/* The title, edited in place. */
+.ux-card-title {
+  display: inline;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: text;
+}
+.ux-card-title:hover {
+  background: var(--hover);
+}
+.ux-card-title-input {
+  width: 100%;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  font: inherit;
+  color: var(--fg);
+}
+
+/* Properties' mono value that leads somewhere (the issue). */
+.ux-card-mono-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  color: var(--claude-accent);
+  cursor: pointer;
+}
+.ux-card-mono-link:hover {
+  text-decoration: underline;
+}
+/* N14 (item 4): the pull requests linked to the card's issue, one a line,
+   in words ("Pull request #23 by …"), not mono. */
+.ux-card-linked-prs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--page-space-xs);
+  min-width: 0;
+}
+.ux-card-linked-prs .ux-card-mono-link {
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+}
+.ux-card-mono {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  overflow-wrap: anywhere;
+}
+
+/* Technical details: label and value rows. GH #302: the labels, the
+   prose and the buttons are in the UI face; only the machine text (a
+   branch, a path, a SHA, a model, an id) is mono, in its own <code>. */
+.ux-card-tech {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--fg);
+  white-space: normal;
+}
+.ux-card-tech-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: var(--space-md);
+  align-items: baseline;
+}
+.ux-card-tech-label {
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+.ux-card-tech-value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0;
+  min-width: 0;
+  font-size: var(--type-small);
+}
+.ux-card-tech-grow {
+  flex: 1;
+  min-width: 0;
+}
+/* The worktree's ports: the range, its one-line hint under it. */
+.ux-card-tech-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+.ux-card-tech-hint {
+  color: var(--muted);
+}
+.ux-card-snapshots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+/* The Now callout's host (focusable for the card's keyboard contract). */
+.ux-card-now {
+  position: relative;
+  outline: none;
+}
+.ux-card-now .ux-callout-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* Integrated walk 2026-10-22: with See the changes, Try it and an
+   alternative beside the primary, the actions took the row and squeezed the
+   Now sentence to a word per line. The sentence keeps at least 20rem (or the
+   whole box when narrower); the actions wrap onto their own row beneath it
+   when both don't fit. */
+.ux-card-now > .ux-callout {
+  flex-wrap: wrap;
+}
+.ux-card-now > .ux-callout > .ux-callout-text {
+  flex: 1 1 20rem;
+  min-width: min(20rem, 100%);
+}
+.ux-card-now > .ux-callout > .ux-callout-actions {
+  flex: 0 1 auto;
+  max-width: 100%;
+  margin-left: auto;
+}
+/* 1.175.0 F8: the same while an error leads Now (its group wraps them). */
+.ux-card-now-error > .ux-callout {
+  flex-wrap: wrap;
+}
+.ux-card-now-error > .ux-callout > .ux-callout-text {
+  flex: 1 1 20rem;
+  min-width: min(20rem, 100%);
+}
+.ux-card-now-error > .ux-callout > .ux-callout-actions {
+  flex: 0 1 auto;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+/* Walk 2 of #386: the pull request review's Now box keeps its sentence at
+   the page's width; its presses wrap onto their own row beneath it rather
+   than squeezing the text to a word per line. */
+.ux-card-pr-review > .ux-callout {
+  flex-wrap: wrap;
+}
+.ux-card-pr-review > .ux-callout > .ux-callout-text {
+  flex: 1 1 0;
+  min-width: 12rem;
+}
+.ux-card-pr-review > .ux-callout > .ux-callout-actions {
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+/* Sections and their headings. */
+.ux-card-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.ux-card-heading {
+  margin: 0;
+  font-size: var(--type-subheading);
+  line-height: var(--type-subheading-lh);
+  font-weight: var(--type-subheading-weight);
+}
+.ux-card-subheading {
+  margin: var(--space-md) 0 var(--space-xs);
+  font-size: var(--type-ui);
+  font-weight: 600;
+}
+.ux-card-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+/* Try it TI-4 (TRY_IT_SPEC §3.1): the card's Try it panel — the status as
+   a dot and a word, the preview at 16:10, the typed address. */
+.ux-try-status {
+  margin: 0;
+  font-size: var(--type-ui);
+}
+.ux-try-preview {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-menu);
+}
+.ux-try-preview > * {
+  flex: 1;
+  min-height: 0;
+}
+.ux-try-address {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.ux-card-muted {
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* 1.172.0 (C1): the Brief block — the setup sentence under What you want,
+   the plan the Builder follows (text, Edit opens a field), More detail. */
+.ux-card-brief-setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+.ux-card-brief-plan-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs);
+}
+/* The plan's and More detail's labels are the Brief's h3s. */
+h3.ux-card-field-label {
+  margin: 0;
+}
+.ux-card-brief-plan {
+  max-height: 16em;
+  overflow: auto;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+/* 1.172.0 (A1): "Asked later (n)" under What you want. */
+.ux-card-later-list {
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.ux-card-later-item {
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.ux-card-later-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+.ux-card-plain {
+  margin: 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ux-card-transcript {
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+
+/* The brief: text on the page, a field only when touched. */
+.ux-card-brief {
+  width: 100%;
+  min-height: 96px;
+  padding: var(--space-sm);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font: inherit;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--fg);
+  resize: vertical;
+}
+.ux-card-brief:hover:not(:disabled) {
+  background: var(--hover);
+}
+.ux-card-brief:focus {
+  border-color: var(--border-control);
+  background: var(--panel-bg);
+}
+.ux-card-remainder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+/* A section that is always mounted and shown when opened. Closed, it has
+   no height and its body keeps its full laid-out size, invisible and
+   inert, so a terminal inside keeps its columns and rows. */
+.ux-card-slot {
+  position: relative;
+  min-width: 0;
+}
+.ux-card-slot--closed {
+  height: 0;
+  overflow: hidden;
+}
+.ux-card-slot--closed > .ux-card-slot-body {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.ux-card-slot-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.ux-card-slot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.ux-card-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+/* 1.172.0 D2 (CP-28): the brief's heading with its Files chip. */
+.ux-card-brief-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+/* 1.174.0 (C1, P8): a built card's brief, folded after the Activity —
+   one quiet button like Details' summary: the chevron, What you asked,
+   its first line cut to one line, Show. No box. */
+.ux-card-brief-fold-heading {
+  margin: 0;
+}
+.ux-card-brief-fold {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-xs) 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--type-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.ux-card-brief-fold > .ux-icon {
+  flex: none;
+  color: var(--muted);
+  transition: transform 120ms ease;
+}
+.ux-card-brief-fold[aria-expanded="false"] > .ux-icon {
+  transform: rotate(-90deg);
+}
+.ux-card-brief-fold-title {
+  flex: none;
+  font-weight: var(--type-subheading-weight);
+}
+.ux-card-brief-fold-line {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+.ux-card-brief-fold-press {
+  flex: none;
+  margin-left: auto;
+  color: var(--muted);
+}
+.ux-card-brief-fold:hover .ux-card-brief-fold-press {
+  color: var(--fg);
+}
+.ux-card-brief-folded > [id] {
+  margin-top: var(--space-sm);
+}
+/* 1.172.0 (C3 follow-up): "Go to the Review" — off screen until it has
+   focus, then a quiet link under Now. */
+.ux-skip-link {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.ux-skip-link:focus,
+.ux-skip-link:focus-visible {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+  align-self: flex-start;
+  color: var(--fg);
+  text-decoration: underline;
+  font-family: var(--font-ui);
+  font-size: var(--type-ui);
+}
+/* 1.172.0 D2: the facts line's last press (Change…), after every fact. */
+.ux-prop--trailing {
+  align-self: center;
+}
+/* 1.172.0 D2 (CP-25): the card's pickers, under the facts line once
+   Change… is pressed. */
+.ux-card-pickers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.ux-card-pickers-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  min-width: 0;
+}
+.ux-card-pickers-row > .ux-card-field-label {
+  min-width: 6.5rem;
+}
+/* 1.172.0 D2 (CP-28): the card's one Details — Files, History of runs,
+   then Technical, in the UI face (a Details body is mono by default). */
+.ux-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  font-family: var(--font-ui);
+  white-space: normal;
+}
+/* GH #255: the card's files and runs — words in the UI face on the page's
+   scale (a Details body is mono by default, for raw output). */
+.ux-card-more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  font-family: var(--font-ui);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+  white-space: normal;
+}
+.ux-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.ux-card-field-label {
+  font-size: var(--type-ui);
+  font-weight: 600;
+}
+.ux-card-field-note {
+  margin-left: var(--space-xs);
+  font-weight: 400;
+  color: var(--muted);
+}
+.ux-card-textarea {
+  width: 100%;
+  padding: var(--space-sm);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  font: inherit;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+  resize: vertical;
+}
+.ux-card-textarea--mono {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+}
+.ux-card-textarea:disabled {
+  color: var(--muted);
+}
+.ux-card-files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.ux-card-files-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.ux-card-files-drop {
+  padding: var(--space-md);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+}
+.ux-card-files-drop--over {
+  border-color: var(--claude-accent);
+  background: var(--hover);
+}
+.ux-card-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ux-card-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--row-compact);
+  min-width: 0;
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn.ux-card-file-thumb {
+  width: var(--control-md);
+  height: var(--control-md);
+  padding: 0;
+  overflow: hidden;
+}
+.ux-card-file-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ux-card-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ux-card-file-size {
+  flex: none;
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+
+/* GH #259: the Builder session — a line of state words, notes with one
+   quiet action each, the terminal, then the section's quiet actions. */
+.ux-card-session {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-card-session-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs) var(--space-md);
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-card-session-line .ux-state {
+  color: var(--fg);
+}
+.ux-card-session-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.ux-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--type-ui);
+}
+
+/* SP-4: Build with both's two sessions, one shown at a time. The other is
+   laid out at full width, invisible and inert, taking no room — as a closed
+   card section (`.ux-card-slot--closed`), never display: none, so its
+   terminal keeps its PTY's columns and rows. */
+.ux-both-lanes {
+  min-width: 0;
+}
+.ux-both-lane {
+  position: relative;
+  min-width: 0;
+}
+.ux-both-lane--hidden {
+  height: 0;
+  overflow: hidden;
+}
+.ux-both-lane--hidden > .ux-both-lane-body {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* CL-8: Build with both — the two builds side by side in the card
+   column, each a card with its own Pick; stacked when the column itself is
+   narrow (a container query, not the viewport). SP-1: below 520 px, so the
+   560 px column 1 of a wide card page keeps them side by side. */
+.ux-both-builds {
+  container-type: inline-size;
+  min-width: 0;
+}
+.ux-both-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+@container (max-width: 520px) {
+  .ux-both-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.ux-both-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+  background: var(--panel-bg);
+}
+.ux-both-card--recommended {
+  border-color: var(--border-strong);
+}
+.ux-both-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs) var(--space-sm);
+  margin: 0;
+}
+.ux-both-card-title {
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  font-weight: 600;
+  color: var(--fg);
+}
+.ux-both-recommended,
+.ux-both-label {
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.ux-both-label {
+  margin: 0;
+}
+.ux-both-summary {
+  margin: 0;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+}
+.ux-both-findings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.ux-both-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: auto;
+}
+
+/* GH #260: the result, the Shipping and the swarm run sections — lines of
+   state words at the UI size, notes in small muted type; the bodies of
+   their Details (the diff, the ship history) are page UI, not raw text. */
+.ux-card-outcome,
+.ux-card-outcome-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-card-outcome {
+  gap: var(--space-md);
+}
+.ux-card-outcome .ux-status {
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+}
+.ux-card-outcome-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  font-family: var(--font-ui);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+  white-space: normal;
+}
+.ux-card-critique {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* SP-6: the review round switch above the card's diff. */
+.ux-round-switch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-sm) 0;
+}
+
+/* SP-6: a Challenger's inline markdown (`<InlineMd>`) — code in mono,
+   bold at the weight ceiling, an http(s) link underlined in the ink. */
+.ux-md-code {
+  font-family: var(--page-font-mono);
+  font-size: 0.92em;
+  padding: 0 var(--space-2xs);
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  overflow-wrap: anywhere;
+}
+.ux-md-bold {
+  font-weight: 600;
+}
+.ux-md-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.ux-md-link:focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+  border-radius: var(--radius-sm);
+}
+.ux-card-report {
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  overflow-wrap: anywhere;
+}
+.ux-card-report > :first-child {
+  margin-top: 0;
+}
+.ux-card-report > :last-child {
+  margin-bottom: 0;
+}
+.ux-card-report :is(h1, h2, h3, h4) {
+  margin: var(--space-md) 0 var(--space-xs);
+  font-size: var(--type-subheading);
+  line-height: var(--type-subheading-lh);
+  font-weight: var(--type-subheading-weight);
+}
+.ux-card-report :is(h3, h4) {
+  font-size: var(--type-ui);
+}
+.ux-card-report p {
+  margin: var(--space-xs) 0;
+}
+.ux-card-report :is(ul, ol) {
+  margin: var(--space-xs) 0;
+  padding-left: var(--space-xl);
+}
+.ux-card-report code {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+}
+.ux-card-report pre {
+  margin: var(--space-sm) 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+.ux-card-report blockquote {
+  margin: var(--space-sm) 0;
+  /* E4: a quote is an indent with muted text, no edge. */
+  padding-left: var(--space-lg);
+  color: var(--muted);
+}
+
+.ux-card-proposal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  margin: 0;
+  font-size: var(--type-ui);
+}
+.ux-card-accent-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--claude-accent);
+}
+.ux-card-ships {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ux-card-ship {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: var(--row-compact);
+  font-size: var(--type-ui);
+  color: var(--fg);
+}
+.ux-card-role {
+  min-width: 96px;
+  font-weight: 500;
+}
+.ux-card-ship-when {
+  margin-left: auto;
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+
+/* The Challenger's findings: each a disclosure with its body. */
+.ux-card-findings,
+.ux-card-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-ui);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+  white-space: normal;
+}
+.ux-card-checklist {
+  padding-left: var(--space-lg);
+  list-style: disc;
+}
+.ux-card-finding {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+.ux-card-finding-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.ux-card-finding-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  list-style: none;
+  cursor: pointer;
+}
+.ux-card-finding-summary::-webkit-details-marker {
+  display: none;
+}
+.ux-card-finding-summary > .ux-icon {
+  flex: none;
+  margin-top: var(--space-2xs);
+  color: var(--muted);
+  transition: transform 120ms ease;
+}
+.ux-card-finding-details:not([open]) > .ux-card-finding-summary > .ux-icon {
+  transform: rotate(-90deg);
+}
+.ux-card-finding-details > p {
+  padding-left: var(--space-lg);
+}
+/* Findings filter: "Not a real issue" asks for its one-line reason inline. */
+.ux-card-finding-dismiss {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* GH #258: the Plan challenge once a discussion exists — a subheading with
+   its state word and one quiet action, then words; no filled box. */
+.ux-card-challenge {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+.ux-card-challenge-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.ux-card-challenge-head > .ux-card-subheading {
+  margin: 0;
+}
+.ux-card-challenge-head > .cbtn {
+  margin-left: auto;
+}
+.ux-card-challenge-synthesis,
+.ux-card-challenge-ledger,
+.ux-card-challenge-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.ux-card-challenge-ledger {
+  gap: var(--space-md);
+}
+.ux-card-challenge-agreements {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--type-ui);
+}
+.ux-card-challenge-agreements > li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+.ux-card-challenge-agreements .ux-icon {
+  flex: none;
+  margin-top: var(--space-2xs);
+  color: var(--signal-done-fg);
+}
+.ux-card-challenge-count,
+.ux-card-challenge-statement {
+  margin: 0;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+.ux-card-challenge-count {
+  font-weight: 600;
+}
+/* QoL 14.2 (G27): Copy findings sits at the end of the findings' first line. */
+.ux-card-copy-findings {
+  display: flex;
+  justify-content: flex-end;
+}
+.ux-card-muted-inline {
+  color: var(--muted);
+}
+/* CL-2: "Followed" and the skills' chips — neutral, never a run state. */
+.ux-card-followed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.ux-card-followed-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+/* A long skill name wraps inside its chip instead of running off the card. */
+:is(.ux-page, .ux-surface, .ux-sheet) .ux-card-followed-chips .cchip {
+  max-width: 100%;
+  height: auto;
+  min-height: 18px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ux-card-followed-notes {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.ux-card-followed-notes dt {
+  font-weight: 600;
+}
+.ux-card-followed-notes dd {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+}
+/* 1.173.0 (B3): the card's Area fact — its area, or "Which area is this?"
+   with the areas to choose from — wrapping in a narrow column. */
+.ux-card-area {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs) var(--space-sm);
+  min-width: 0;
+}
+/* 1.174.0 (C2): the area's words keep together, so a wrapped facts line
+   never starts with "·". */
+.ux-card-area-name {
+  white-space: nowrap;
+}
+/* 1.174.0 (C3, §2f): New card's Area on All areas — the word, the
+   choice, why it starts there; wrapping together in a narrow column. */
+.ux-new-card-area {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  min-width: 0;
+}
+/* 1.175.0 (B3): Now's second line on an issue written outside the
+   repository — its icon, then the sentence. No tint, no bar. */
+.ux-now-outside {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+.ux-now-outside > .ux-icon {
+  flex: none;
+  margin-top: var(--space-2xs);
+  color: var(--muted);
+}
+/* 1.175.0 (B3): beside "What you want" — whose text the brief is. */
+.ux-card-brief-by {
+  margin-left: auto;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  white-space: nowrap;
+}
+/* 1.175.0 (B3): the parts of an issue's text GitHub hides, under the
+   brief. A dashed outline around each, no fill. */
+.ux-card-hidden {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0 0;
+}
+.ux-card-hidden-part {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-control);
+  padding: var(--space-xs) var(--space-md) var(--space-sm);
+}
+.ux-card-hidden-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-2xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: 600;
+  color: var(--muted);
+}
+.ux-card-hidden-part code {
+  display: block;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+}
+/* 1.175.0 (D3): a part of the card's issue changed on GitHub while it was
+   changed here — the question, above the part. A plain outline, no tint,
+   no bar; the two versions use the B2 pair below. */
+.ux-edit-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0;
+  padding: var(--space-sm) var(--space-md) var(--space-md);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+}
+.ux-edit-conflict-title {
+  margin: 0;
+  font-weight: 600;
+}
+/* The two versions are shown whole (mockup 3.1): no cap, no scroll of
+   their own — the page scrolls, as `settingsNav.test.ts` holds. */
+.ux-edit-conflict-text {
+  font-family: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ux-versions--rows {
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+}
+.ux-edit-conflict-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+.ux-edit-conflict-actions > .cbtn {
+  flex: 0 1 140px;
+  justify-content: center;
+}
+/* 1.174.0 (C3, §2): Now's question — the areas and where the files are. */
+.ux-now-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  margin-top: var(--space-sm);
+}
+/* 1.175.0 (B2): two versions of the same thing, side by side — what this
+   Mac allowed and what the repository has now. Calm: a border, no tint; the
+   line that differs is bold and underlined, never coloured. One column in a
+   narrow panel. */
+.ux-versions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-sm);
+}
+.ux-versions > div {
+  min-width: 0;
+}
+.ux-versions-key {
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: var(--space-2xs);
+}
+.ux-versions-value {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--raised);
+  font-family: var(--font-mono);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  overflow-wrap: anywhere;
+  color: var(--fg);
+}
+.ux-versions-value--was {
+  color: var(--muted);
+  background: transparent;
+  border-color: var(--border);
+}
+.ux-versions-value mark {
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+.ux-versions-note {
+  display: block;
+  margin-top: var(--space-sm);
+}
+/* 1.175.0 (D5): a sheet's short lists ("What you lose", "What stays") —
+   a quiet heading and plain bullets, no box. */
+.ux-sheet-list-title {
+  margin: var(--space-sm) 0 var(--space-2xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: 600;
+  color: var(--muted);
+}
+.ux-sheet-list {
+  margin: 0;
+  padding-left: var(--space-lg);
+}
+.ux-sheet-list li + li {
+  margin-top: var(--space-2xs);
+}
+/* 1.175.0 (F1): Setup's one "Connect GitHub" sheet — what it will do,
+   numbered: each thing's name, and under it how. */
+.ux-setup-sheet-list li > b {
+  display: block;
+}
+.ux-setup-sheet-list li > span {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* 1.175.0 (B1): "What it asks to be allowed to do" on the skill's sheet —
+   a quiet list, a line per ask, its commands in a bordered box. No tint, no
+   coloured bar; the strongest ask comes first by order, not by colour. */
+.ux-asks {
+  margin-bottom: var(--space-md);
+}
+.ux-asks-heading {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: 600;
+  color: var(--muted);
+}
+/* Round 3: several asking texts, each list led by its file's path. */
+.ux-asks-text + .ux-asks-text {
+  margin-top: var(--space-md);
+}
+.ux-asks-path {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+}
+.ux-asks-unreadable {
+  margin: 0 0 var(--space-sm);
+}
+.ux-asks-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-group);
+  background: var(--raised);
+}
+.ux-asks-list > li {
+  display: grid;
+  gap: var(--space-2xs);
+  padding: var(--space-sm) var(--space-md);
+  min-width: 0;
+}
+.ux-asks-list > li + li {
+  border-top: 1px solid var(--border);
+}
+.ux-asks-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.ux-asks-title b {
+  font-weight: 600;
+}
+.ux-asks-detail {
+  color: var(--muted);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.ux-asks-box {
+  display: block;
+  margin-top: var(--space-2xs);
+}
+.ux-asks-line {
+  display: block;
+}
+.ux-asks .ux-versions > span {
+  display: block;
+  min-width: 0;
+}
+.ux-asks .ux-versions-key {
+  display: block;
+}
+/* C1: "Its area label hasn't reached GitHub yet." — quiet words, no box. */
+.ux-card-area-note {
+  color: var(--muted);
+}
+/* The Builder property before a build: the vendor field and a quiet
+   "not started", wrapping under it in a narrow column. */
+.ux-card-builder-pick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs) var(--space-sm);
+  min-width: 0;
+}
+
+/* 1.168.1 (E2/E3): a role's model on the card's facts line, pressed to
+   choose one for this card; the menu it opens. */
+.ux-card-model-chip,
+.ux-card-model-value {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  color: var(--muted);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The chip's popover anchor shrinks with the facts line, so the chip
+   truncates (900 px) instead of pushing the line wider. */
+.ux-card-builder-pick > .ux-popover-anchor {
+  min-width: 0;
+  max-width: 100%;
+}
+.ux-card-model-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: var(--space-2xs);
+}
+.ux-card-model-title {
+  margin: 0;
+  font-weight: var(--type-caption-weight);
+}
+.ux-card-model-line {
+  margin: 0;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  color: var(--muted);
+}
+
+/* UX-6.6: the split button — one primary, a chevron with its variants. */
+.ux-split {
+  display: inline-flex;
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn.ux-split-main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn.ux-split-toggle {
+  padding: 0 var(--space-sm);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left-color: var(--border-strong);
+}
+/* UX-6.7: the card page's stack (1.174.0 DR3: the Release flow over the
+   card moved to the Release sheet). */
+.ux-card-stack {
+  position: relative;
+}
+
+/* ── C7 (UX-7.3): Blocked by and Blocks on the card page ────────────── */
+/* GH #263: one blocker per line, each wrapping inside the value column;
+   the row grows and its neighbours keep their natural height. */
+.ux-card-deps {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2xs);
+  min-width: 0;
+  max-width: 100%;
+}
+.ux-card-deps-none {
+  color: var(--muted);
+}
+.ux-card-deps-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--row-compact);
+}
+.ux-card-dep {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--row-compact);
+}
+.ux-card-dep > .ux-state {
+  align-items: flex-start;
+  min-width: 0;
+}
+.ux-card-dep .ux-state-dot {
+  margin-top: calc(var(--space-xs) + var(--space-2xs));
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn.ux-card-dep-link {
+  height: auto;
+  min-height: 0;
+  padding: 0 var(--space-xs);
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: var(--type-ui-lh);
+  color: var(--claude-accent);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn.ux-card-dep-remove {
+  padding: 0 var(--space-xs);
+}
+.ux-card-picker {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-xs);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .cbtn.ux-card-picker-item {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+  text-align: left;
+  color: var(--fg);
+}
+.ux-card-picker-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ux-card-picker-empty {
+  margin: 0;
+  padding: var(--space-sm);
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+
+/* ── ⌘K's "In files" scope: the search panel fills the palette (UX-3.6) ── */
+.ux-palette-text {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ux-palette-text > .search-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Code's CODEOWNERS ribbon, over the editor (C8; UX-10.2) ─────── */
+.ux-codeowners-ribbon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--type-small);
+  color: var(--fg);
+  /* 1.174.0 (A7, P32): calm; the amber is its icon. */
+  background: var(--raised);
+  border-bottom: 1px solid var(--border);
+}
+.ux-codeowners-ribbon-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--warn);
+}
+
+/* 1.174.0 (A7, BCI-15 · P32): the sync line's "Behind main" / "Conflict
+   ahead" under Now — words in the text colour after an amber dot
+   (mockups/card-done.html §1). */
+.ux-target-sync-lead {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--page-space-xs);
+  color: var(--fg);
+  font-weight: 500;
+}
+.ux-target-sync-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--signal-aborted-fg);
+}
+
+/* ── Overlapping edits, on the card's result (UX-10.2) ────────────── */
+/* 1.174.0 (A7, P32 · VC-1): a neutral outline; the amber is its icon
+   (mockups/board.html §7b). */
+.ux-conflict {
+  margin: var(--space-sm) 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-strong);
+  background: var(--raised);
+  color: var(--fg);
+  border-radius: var(--radius-md);
+  font-size: var(--type-small);
+}
+.ux-conflict-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-weight: 600;
+}
+.ux-conflict-head > .ux-icon {
+  color: var(--warn);
+}
+.ux-conflict-sub {
+  margin: var(--space-2xs) 0 var(--space-xs);
+}
+.ux-conflict-list {
+  margin: 0;
+  padding-left: var(--space-lg);
+}
+.ux-conflict-list li {
+  margin: var(--space-2xs) 0;
+}
+.ux-conflict-list code {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+}
+
+/* 1.172.0 (C2; CP-19): the overlap chip under Now, beside Ship it — one
+   line. 1.174.0 (A7, P32): an outline chip with an amber dot, as wide as its
+   words (mockups/board.html §7b). */
+.ux-overlap-chip {
+  display: inline-flex;
+  align-items: flex-start;
+  align-self: flex-start;
+  gap: var(--space-xs);
+  margin: var(--space-xs) 0 0;
+  padding: var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--fg);
+  border-radius: var(--radius-md);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.ux-overlap-chip-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal-aborted-fg);
+  /* centred on the first line (18 px): (18 − 6) / 2 */
+  margin-top: calc(var(--page-space-xs) + var(--space-2xs));
+}
+
+/* ── GH #289: the workspace's "Icon and colour" popover ───────────────── */
+/* A `ux-popover` placed by its opener (fixed, beside the switcher). */
+.ux-icon-picker {
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--fg);
+}
+.ux-icon-picker:focus {
+  outline: none;
+}
+.ux-icon-picker-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.ux-icon-picker-caption {
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.ux-icon-picker-emoji {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-2xs);
+}
+.ux-icon-picker-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.ux-icon-picker-preview {
+  width: var(--control-md);
+  height: var(--control-md);
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+.ux-icon-picker-hint {
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-icon-picker-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+
+/* ── OB-4: Setup (ONBOARDING_SPEC §3.1) ───────────────────────────────
+   A full-window surface over the shell: a drag strip (the Mac), the header
+   (title, sentence, step line, level link, Close setup), the progress bar,
+   then the numbered step list beside the 720 px step column with its
+   footer. Below 900 px the list collapses to the header's step line. Above
+   the Settings shell and the sheets; a toast sits over it (--z-toast-setup,
+   App.css) but under its sheets. */
+.ux-setup {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-setup);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  outline: none;
+}
+.ux-setup :focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+}
+.ux-setup-drag {
+  flex: none;
+  height: 28px;
+}
+:root[data-platform="windows"] .ux-setup-drag {
+  height: 0;
+}
+.ux-setup-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-xl) var(--space-md);
+}
+.ux-setup-heading {
+  min-width: 0;
+}
+.ux-setup-title {
+  margin: 0;
+  font-size: var(--type-heading);
+  line-height: var(--type-heading-lh);
+  font-weight: var(--type-heading-weight);
+  color: var(--fg);
+}
+.ux-setup-sentence {
+  margin: var(--space-2xs) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-setup-headside {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.ux-setup-stepline {
+  font-size: var(--type-small);
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ux-setup-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.ux-setup-nav {
+  flex: none;
+  width: 240px;
+  overflow-y: auto;
+  padding: var(--space-lg) var(--space-sm);
+  border-right: 1px solid var(--border);
+}
+@media (max-width: 899px) {
+  .ux-setup-nav {
+    display: none;
+  }
+}
+.ux-setup-steptitle {
+  margin: 0;
+  font-size: var(--type-title);
+  line-height: var(--type-title-lh);
+  font-weight: var(--type-title-weight);
+  color: var(--fg);
+  outline: none;
+}
+.ux-setup-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  margin-top: var(--space-xl);
+}
+.ux-setup-text {
+  margin: 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--fg);
+}
+.ux-setup-note {
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+/* OB-5: a line of quiet links under the AI step's rows (Get Claude · Get
+   ChatGPT; Look again; Sign in with a code instead). */
+.ux-setup-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+/* 1.175.0 F2: "Joining a team? Add the team step" under the step list. */
+.ux-setup-nav .ux-setup-links {
+  margin-top: var(--space-md);
+  padding: 0 var(--space-sm);
+}
+.ux-setup-firstcard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+}
+.ux-setup-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  max-width: calc(var(--page-column) + 2 * var(--page-space-xl));
+  margin: 0 auto;
+  padding: var(--space-md) var(--page-space-xl);
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.ux-page-footer:has(> .ux-setup-foot) {
+  background: var(--bg);
+}
+.ux-setup-spacer {
+  flex: 1;
+}
+/* The global confirm sheet answers above Setup (App wraps its host). */
+.ux-setup-above .ux-sheet-backdrop {
+  z-index: var(--z-setup-sheet);
+}
+.ux-setup-above {
+  display: contents;
+}
+
+/* ── OB-4: StepList and ProgressBar ───────────────────────────────── */
+.ux-steps {
+  display: block;
+}
+.ux-steps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+.ux-step {
+  display: flex;
+  /* 1.168.1 (C2): a long name wraps; the number and the state stay on its
+     first line, and a one-line row is as tall and centred as before. */
+  align-items: baseline;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: var(--row-compact);
+  padding: calc((var(--row-compact) - var(--type-ui-lh)) / 2) var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  text-align: left;
+  cursor: pointer;
+}
+.ux-step:hover {
+  background: var(--hover);
+}
+.ux-step--current {
+  background: var(--selected);
+  font-weight: 600;
+}
+.ux-step:focus-visible {
+  outline-offset: calc(-1 * var(--focus-w));
+}
+.ux-step-num {
+  flex: none;
+  min-width: 2ch;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.ux-step-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ux-step-state {
+  flex: none;
+  font-size: var(--type-small);
+  font-weight: 400;
+  color: var(--muted);
+}
+.ux-progress {
+  flex: none;
+  height: 3px;
+  margin: 0 var(--space-xl);
+  border-radius: var(--radius-pill);
+  background: var(--hover);
+  overflow: hidden;
+}
+/* SP-7: Setup's bar with its count in words beside it. */
+.ux-setup-progress {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-md);
+  margin: 0 var(--space-xl);
+}
+.ux-setup-progress > .ux-progress {
+  flex: 1;
+  margin: 0;
+}
+.ux-setup-progress-caption {
+  flex: none;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.ux-progress-fill {
+  display: block;
+  height: 100%;
+  background: var(--claude-accent);
+  transition: width var(--dur-base) var(--ease-out);
+}
+/* OB-3: Setup's guided terminal — Plyloft's words and Stop on one line, a
+   one-time code shown big, the run's terminal, and Details once it ended
+   (its last lines in the layer's `ux-output`). */
+.ux-setup-terminal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-setup-terminal-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+/* N14 walk F1: the Plyloft sign-in code (Setup step 2 and the Plan
+   page; F17: also the GitHub CLI's code in Setup's terminal) — centred, large and spaced, with room above and below; its two
+   buttons a row under it, the page to type it on as the primary. The status
+   line after it sits a clear gap lower. */
+.ux-signin-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xl);
+  margin: var(--space-md) 0 0;
+  padding: var(--space-xl) 0;
+  text-align: center;
+}
+.ux-signin-code-value {
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--page-font-mono);
+  font-size: calc(var(--type-display) * 4 / 3);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  overflow-wrap: anywhere;
+  color: var(--fg);
+  user-select: all;
+}
+.ux-signin-code-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-md);
+}
+:is(.ux-page, .ux-surface, .ux-sheet) .ux-signin-code-actions .cbtn {
+  height: var(--row-compact);
+  min-height: var(--row-compact);
+  padding: 0 var(--space-lg);
+  font-size: var(--type-body);
+}
+/* N14 walk F16: a GitHub read that failed for want of a sign-in — one
+   plain line, its one way out under it, the tools' words in Details. */
+.ux-gh-trouble {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-gh-trouble .ux-details {
+  align-self: stretch;
+}
+.ux-setup-terminal-pane {
+  height: 16rem;
+  min-width: 0;
+  padding: var(--space-xs);
+  background: var(--term-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+
+/* Card chat (part 2): the card's Chat tab — a conversation with Claude or
+   Codex about the card. Its log scrolls on its own so the composer stays
+   in reach; the page is still the one scroll around it. */
+.ux-card-head .cbtn.ux-card-chat-toggle {
+  margin-top: var(--space-xs);
+  margin-left: auto;
+}
+.ux-chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+/* Plan with two AIs: the Chat tab's Plan mode. */
+.ux-plan,
+.ux-plan-form,
+.ux-plan-decision {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-plan-files {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.ux-plan-file {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+  font-size: var(--type-small);
+}
+.ux-plan-lineup,
+.ux-plan-blocker,
+.ux-plan-heading {
+  margin: 0;
+}
+/* 2026-10-16 walk: the ask's label sits above its box (a column, never
+   the 30 px control box of .ux-field), and every line wraps at any width. */
+.ux-plan-field {
+  width: 100%;
+}
+.ux-plan-field .ux-card-field-label,
+.ux-plan-lineup,
+.ux-plan-blocker {
+  overflow-wrap: anywhere;
+}
+.ux-plan-blocker {
+  color: var(--muted);
+}
+.ux-plan-heading {
+  font-weight: 600;
+}
+.ux-plan-turn {
+  list-style: none;
+  margin-top: var(--space-sm);
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--border);
+}
+.ux-plan-earlier {
+  margin: 0;
+  padding-left: var(--space-md);
+}
+.ux-chat-scope,
+.ux-chat-tokens,
+.ux-chat-hint,
+.ux-chat-meta,
+.ux-chat-terminal-rights,
+.ux-chat-terminal-note {
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-chat-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+}
+.ux-chat-state {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  max-height: min(60vh, 640px);
+  min-height: 120px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  list-style: none;
+}
+.ux-chat-empty {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+}
+.ux-chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+}
+.ux-chat-msg--user {
+  align-self: flex-end;
+  max-width: 85%;
+  background: var(--hover);
+}
+.ux-chat-msg--assistant {
+  background: var(--panel-bg);
+}
+.ux-chat-msg--unsent {
+  border: 1px dashed var(--danger);
+}
+/* 1.174.0 (A7, P32): calm; the amber is the dot before who ran it. */
+.ux-chat-msg--shell {
+  border: 1px solid var(--border-strong);
+  background: var(--raised);
+}
+.ux-chat-msg--shell .ux-chat-who::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: var(--space-xs);
+  border-radius: 50%;
+  background: var(--warn);
+  vertical-align: 0.1em;
+}
+.ux-chat-who {
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.ux-chat-msg--shell .ux-chat-who {
+  color: var(--fg);
+}
+.ux-chat-text {
+  margin: 0;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ux-chat-flag {
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--danger);
+}
+.ux-chat-line {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.ux-chat-line--warn {
+  color: var(--warn);
+}
+.ux-chat-code {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-mono);
+  color: var(--fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ux-chat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+}
+.ux-chat-composer--over {
+  border-color: var(--claude-accent);
+  background: var(--hover);
+}
+.ux-chat-input {
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-sm);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  font: inherit;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--fg);
+  resize: vertical;
+}
+.ux-chat-input:disabled {
+  color: var(--muted);
+}
+.ux-chat-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.ux-chat-chips,
+.ux-chat-refusals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The UI face, also inside "Files in this chat": `.ux-details-body` sets
+   the mono family for tool output, which a file name is not. */
+.ux-chat-chip {
+  font-family: var(--font-ui);
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2xs) var(--space-sm);
+  max-width: 100%;
+  min-height: var(--row-compact);
+  padding: var(--space-2xs) var(--space-xs) var(--space-2xs) var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.ux-chat-chip--busy {
+  opacity: 0.7;
+}
+.ux-chat-chip--sent {
+  padding-right: var(--space-sm);
+}
+.ux-chat-chip-name {
+  min-width: 0;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+.ux-chat-chip-facts,
+.ux-chat-chip-note {
+  color: var(--muted);
+}
+/* The Remove ×: a bordered button in the text colour, so it reads as a
+   control on every chip; its border and × turn red on hover/focus, over the
+   neutral wash (1.174.0 A7, P32). Scoped like the page
+   rule `:is(.ux-page, …) .cicon` (transparent border, muted colour), which
+   it has to outrank. */
+.cicon.ux-chat-chip-remove,
+:is(.ux-page, .ux-surface, .ux-sheet) .cicon.ux-chat-chip-remove {
+  color: var(--fg);
+  border-color: var(--border-control);
+  background: var(--bg);
+}
+.cicon.ux-chat-chip-remove:hover:not(:disabled),
+.cicon.ux-chat-chip-remove:focus-visible,
+:is(.ux-page, .ux-surface, .ux-sheet) .cicon.ux-chat-chip-remove:hover:not(:disabled),
+:is(.ux-page, .ux-surface, .ux-sheet) .cicon.ux-chat-chip-remove:focus-visible {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: var(--hover);
+}
+.ux-chat-refusal {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--danger);
+}
+.ux-chat-refusal > span {
+  flex: 1;
+  min-width: 0;
+}
+.ux-chat-error {
+  margin: 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--danger);
+}
+.ux-chat-terminal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+/* Claude's terminal at its own 120 × 40 (never fitted to the view: a
+   resize makes Claude repaint, Mac walk F2) — the pane scrolls both ways. */
+.ux-chat-terminal-scroll {
+  height: min(70vh, 640px);
+  min-width: 0;
+  overflow: auto;
+  padding: var(--space-xs);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.ux-chat-terminal-pane {
+  width: max-content;
+}
+
+/* ── All skills (Skills hub H7, R4) ─────────────────────────────────
+   App-level, drawn over the per-workspace hosts. The list is virtualised
+   over the page's one scroll: each item is placed at its offset, with the
+   heights `lib/allSkills.ts` ITEM_HEIGHT gives (52 / 64 / 40 px). */
+.ux-hub-host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+/* The Workspaces filter's key wrapper: no box of its own. */
+.ux-hub-popover {
+  display: contents;
+}
+.ux-hub-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--page-space-sm);
+  margin: var(--page-space-md) 0 var(--page-space-sm);
+}
+.ux-hub-list {
+  position: relative;
+  margin-top: var(--page-space-md);
+}
+.ux-page .ux-hub-list:focus-visible {
+  outline: none;
+}
+.ux-hub-item {
+  position: absolute;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+}
+.ux-hub-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--page-space-lg);
+  padding-bottom: var(--page-space-sm);
+  border-bottom: 1px solid var(--border);
+}
+.ux-hub-more {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--border);
+}
+.ux-page .ux-hub-row {
+  height: 100%;
+  flex-wrap: nowrap;
+  align-items: center;
+  padding-left: var(--page-space-sm);
+  padding-right: var(--page-space-sm);
+  border-top: 1px solid var(--border);
+}
+.ux-hub-row .ux-row-label {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+.ux-hub-row .ux-row-chips {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.ux-hub-hint {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ux-hub-row--active {
+  background: var(--hover);
+}
+.ux-hub-list:focus .ux-hub-row--active {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: calc(-1 * var(--focus-w));
+}
+/* A folder not found: kept, quiet, never struck through (it isn't gone). */
+.ux-hub-row--missing .ux-row-label-text {
+  color: var(--muted);
+}
+.ux-hub-actions {
+  display: flex;
+  gap: var(--page-space-sm);
+  margin: var(--page-space-md) 0 var(--page-space-lg);
+}
+/* Skills hub H8: Copy to… on a row, beside its chevron; it never shrinks
+   the row's words to nothing. */
+.ux-hub-row-copy {
+  flex: none;
+  margin-left: var(--page-space-sm);
+}
+/* Copy to… takes the keyboard on its host (Tab goes on to its list); the
+   host itself draws no ring. */
+.ux-hub-host:focus {
+  outline: none;
+}
+
+/* ── Getting started (TUTORIAL_SPEC §3.1, §3.2, TU-4) ─────────────────
+   The Guide panel and the coach-mark. Neither is a modal:
+   the page around them stays usable, nothing is dimmed, and the lookup of
+   an anchor (`findTourAnchor`) never treats them as covering anything. They
+   sit above the page and below every menu (--z-menu), popover (--z-popover),
+   the toasts (--z-toast), the sidebar overlay (--z-modal) and every sheet —
+   except a coach-mark on a row of the floating sidebar, drawn just above it
+   (--z-modal-coach), and so above the toasts too. */
+.ux-tour {
+  position: fixed;
+  right: var(--space-lg);
+  bottom: var(--space-lg);
+  z-index: var(--z-float);
+  background: var(--raised);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-popover);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+}
+/* The step's control sits where the panel docks: the panel docks at the
+   centre's bottom left instead (its left edge set by the layer). */
+.ux-tour--aside { right: auto; }
+/* Code's status bar (28 px, code.css `.editor-statusbar`, its Wrap at the
+   right end) runs along the window's bottom: in Code the panel docks
+   above it (TU-4 Mac walk). */
+.ux-tour--lift { bottom: calc(var(--space-lg) + 28px); }
+/* Toasts are drawn bottom centre (App.css), above the panel. In a window
+   too narrow for both side by side, they keep to the left of the docked
+   panel instead of covering it. */
+@media (max-width: 1160px) {
+  .app-shell:has(.ux-tour:not(.ux-tour--aside)) .toast-stack {
+    left: auto;
+    right: calc(320px + var(--space-lg) * 2);
+    transform: none;
+    width: min(480px, calc(100vw - 320px - var(--space-lg) * 3));
+  }
+}
+.ux-tour {
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  /* `--ux-tour-cap`: set by the layer so the panel ends below a field it
+     would cover (TU-5 Mac walk, `panelCap`). */
+  max-height: min(var(--ux-tour-cap, 100vh), calc(100vh - var(--space-3xl) * 2));
+  border-radius: var(--radius-lg);
+}
+/* TU-6 (§6.4): a Quick tour mark whose control is not on screen, docked
+   where the panel sits, drawn like a coach-mark. */
+.ux-tour.ux-tour--quick {
+  gap: var(--space-sm);
+  width: 300px;
+  box-sizing: border-box;
+  padding: var(--space-md) var(--space-lg);
+  animation: ux-tour-fade var(--dur-base) ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ux-tour.ux-tour--quick { animation: none; }
+}
+.ux-tour-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--row-comfortable);
+  padding: 0 var(--space-sm) 0 var(--space-lg);
+  border-bottom: 1px solid var(--border);
+}
+.ux-tour-title {
+  margin: 0;
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  font-weight: var(--type-subheading-weight);
+}
+.ux-tour-title:focus-visible { outline: none; }
+.ux-tour-progress {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+  color: var(--muted);
+}
+.ux-tour-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-md) var(--space-sm);
+  /* TU-4 Windows walk: the list's scrollbar was light in the dark theme
+     (the app's own theme, not the system's): it follows the tokens. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+/* An older WebView2 without `scrollbar-color`: the same, the old way. The
+   Mac keeps its own overlay scrollbar (WebKit reads only these rules). */
+:root[data-platform="windows"] .ux-tour-body::-webkit-scrollbar { width: 10px; }
+:root[data-platform="windows"] .ux-tour-body::-webkit-scrollbar-track { background: transparent; }
+:root[data-platform="windows"] .ux-tour-body::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+/* A short window (TU-4 Mac walk, 661 px): the panel stays compact — at most
+   half the window, its list scrolling on its own with the current step kept
+   in view — so it never covers most of the card page. After `.ux-tour` and
+   `.ux-tour-body`, which it overrides. */
+@media (max-height: 820px) {
+  .ux-tour { max-height: min(var(--ux-tour-cap, 100vh), 50vh); }
+  .ux-tour-body { padding: var(--space-sm) var(--space-sm); }
+}
+.ux-tour-chapter {
+  margin: 0;
+  padding: 0 var(--space-sm) var(--space-xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-subheading-weight);
+  color: var(--muted);
+}
+.ux-tour-note {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0 0 var(--space-xs);
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  background: var(--panel-bg);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+/* 1.174.0 (A7, P32 · VC-1): every tour note is a calm box; the colour is
+   its dot (mockups/board.html §7b). */
+.ux-tour-note--live,
+.ux-tour-note--ask,
+.ux-tour-note--paused {
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+}
+.ux-tour-note--ask > .ux-tour-note-title::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--claude-accent);
+}
+.ux-tour-note-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0;
+  font-weight: var(--type-subheading-weight);
+}
+.ux-tour-note-body { margin: 0; color: var(--muted); }
+.ux-tour-live-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--signal-running-fg);
+}
+.ux-tour-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ux-tour-step {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-md);
+}
+.ux-tour-step--current { background: var(--hover); }
+.ux-tour-step-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: var(--control-md);
+}
+.ux-tour-step-label { flex: 1; min-width: 0; }
+.ux-tour-step--current .ux-tour-step-label { font-weight: var(--type-subheading-weight); }
+.ux-tour-step--done .ux-tour-step-label,
+.ux-tour-step--skipped .ux-tour-step-label { color: var(--muted); }
+.ux-tour-step-word {
+  font-size: var(--type-caption);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ux-tour-step--done .ux-tour-step-word { color: var(--ok); }
+/* The mark: a filled dot with a check when done, the accent dot on the
+   current step, a hollow ring to do. Each also has its word or weight, so
+   colour is never the only cue. */
+.ux-tour-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--border-strong);
+  box-sizing: border-box;
+}
+.ux-tour-mark--done { border-color: var(--ok); background: var(--ok); color: var(--bg); }
+.ux-tour-mark--current { border-color: var(--claude-accent); background: var(--claude-accent); }
+.ux-tour-mark--skipped { border-style: dashed; }
+.ux-tour-mark .ux-icon { width: 12px; height: 12px; }
+.ux-tour-step-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-2xs) 0 var(--space-sm) var(--space-xl);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.ux-tour-step-text { margin: 0; }
+/* Why? is the longer, quieter text: one step below the body it follows,
+   muted — the panel's step text is --type-small, the coach-mark's --type-ui
+   (TU-4 Mac walk: at --type-body it was larger than the step). */
+.ux-tour-why {
+  margin: 0;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-ui-weight);
+  color: var(--muted);
+}
+.ux-tour-coach .ux-tour-why {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.ux-tour-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+/* TU-5 Mac re-walk: a long label (Continue with "Describe this project in
+   the README") wraps inside the panel instead of running off its edge; a
+   beginner reads it whole. Short labels stay on one line. */
+.ux-tour-actions > .cbtn {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+/* The coach-mark: the popover's surface beside the real control, its arrow
+   touching the ring. The ring is the one accent outline on screen. */
+.ux-tour-ring {
+  position: fixed;
+  z-index: var(--z-float-top);
+  border: 2px solid var(--claude-accent);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+}
+.ux-tour-coach {
+  position: fixed;
+  z-index: var(--z-float-top);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  width: 300px;
+  box-sizing: border-box;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--raised);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-popover);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  animation: ux-tour-fade var(--dur-base) ease-out;
+}
+/* A row of the sidebar floating over the stage (narrow window, z 60, its
+   scrim 59): the coach-mark and its ring go above it, not under the scrim. */
+.ux-tour-coach.ux-tour-coach--top,
+.ux-tour-ring.ux-tour-ring--top { z-index: var(--z-modal-coach); }
+@keyframes ux-tour-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ux-tour-coach { animation: none; }
+}
+.ux-tour-coach-arrow {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  transform: rotate(45deg);
+}
+.ux-tour-coach--right .ux-tour-coach-arrow { left: -7px; border-top-color: transparent; border-right-color: transparent; }
+.ux-tour-coach--left .ux-tour-coach-arrow { right: -7px; border-bottom-color: transparent; border-left-color: transparent; }
+.ux-tour-coach--below .ux-tour-coach-arrow { top: -7px; border-right-color: transparent; border-bottom-color: transparent; }
+.ux-tour-coach--above .ux-tour-coach-arrow { bottom: -7px; border-top-color: transparent; border-left-color: transparent; }
+.ux-tour-coach-step {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  color: var(--muted);
+}
+.ux-tour-coach-title { margin: 0; font-weight: var(--type-subheading-weight); }
+.ux-tour-coach-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+}
+.ux-tour-coach-text { margin: 0; }
+/* TU-5: B3's starter titles (D25) and B5's note under the button. */
+.ux-tour-examples {
+  margin: 0;
+  padding-left: var(--space-lg);
+}
+.ux-tour-step-note {
+  margin: 0;
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  color: var(--muted);
+}
+.ux-tour-coach .ux-tour-step-note {
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+/* TU-5 (§11): the usage limit's live line — paused, not running (its
+   amber dot; the box is calm, above). */
+.ux-tour-live-dot--paused { background: var(--signal-aborted-fg); }
+/* TU-5 (B9, §6.3): how to try it when Try it can't start the app. */
+.ux-tour-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.ux-tour-step > .ux-tour-fallback {
+  padding: 0 0 var(--space-sm) var(--space-xl);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+/* TU-5 (B11, D24): the second card's checklist, the panel's own list. */
+.ux-tour-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+/* 1.175.0 F4: the tour's permissions question — two rows, two bordered
+   buttons of the same width, the right edge shared (tidy tables). */
+.ux-tour-choice-rows {
+  list-style: none;
+  margin: var(--space-2xs) 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2xs);
+}
+.ux-tour-choice {
+  display: grid;
+  grid-template-columns: 1fr 96px;
+  gap: var(--space-2xs);
+  align-items: start;
+}
+.ux-tour-choice-text { min-width: 0; }
+.ux-tour-choice-name {
+  margin: 0;
+  font-weight: 600;
+}
+.ux-tour-choice-mark {
+  font-weight: 400;
+  color: var(--muted);
+}
+.ux-tour-choice-button {
+  width: 96px;
+  justify-content: center;
+}
+
+.ux-tour-checklist-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ux-tour-check { display: flex; flex-direction: column; }
+.ux-tour-check--done .ux-tour-step-label { color: var(--muted); }
+.ux-tour-check--done .ux-tour-step-word { color: var(--ok); }
+.ux-tour-coach-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.ux-tour-coach-foot .ux-tour-spacer { flex: 1; }
+
+/* Getting started TU-7 (§3.1): the other chapters, under "More, when
+   you're ready" — one quiet row each, its length or progress at the end. */
+.ux-tour-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+.ux-tour-chapter-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ux-tour-chapter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  min-height: var(--control-md);
+  padding: 0 var(--space-sm);
+  text-align: left;
+}
+.ux-tour-chapter-row--done .ux-tour-step-label { color: var(--muted); }
+.ux-tour-chapter-row--done .ux-tour-step-word { color: var(--ok); }
+
+/* Terminals block P5: History › Sessions' inline message (a file gone). */
+.ux-history-sessions-message {
+  margin: var(--space-sm) 0;
+  color: var(--fg);
+}
+
+/* QoL 1.168 block 8 (A2): Inbox ⋯ › Recent messages — the last ten toasts. */
+.ux-recent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.ux-recent-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+}
+.ux-recent-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted);
+}
+.ux-recent-row--warn .ux-recent-icon { color: var(--warn); }
+.ux-recent-row--error .ux-recent-icon { color: var(--danger); }
+.ux-recent-text {
+  min-width: 0;
+  flex: 1;
+}
+.ux-recent-line,
+.ux-recent-empty {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ux-recent-when {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--type-small);
+}
+
+/* 1.173.0 (C3): a shared setting both sides changed — only the difference,
+   as label / value rows; no tint, no bar. */
+.ux-conflict-diff {
+  margin: 0;
+  display: grid;
+  gap: var(--page-space-sm);
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+}
+.ux-conflict-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: var(--page-space-md);
+}
+.ux-conflict-row dt {
+  color: var(--muted);
+}
+.ux-conflict-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ux-conflict-item:not(:last-child)::after {
+  content: " · ";
+}
+
+/* ── The Board's notes slot (1.174.0, A4) ─────────────────────────────
+   One box above the columns, inset as they are (mockups/board.html §1–3):
+   the first note whole, then one line naming the others with Show, or all
+   of them with Show fewer. The notes inside draw no box of their own
+   (board.css); a hairline sits between them. Colour only on an icon. */
+.ux-notes {
+  margin: 0 var(--board-inset) var(--space-md);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-group);
+  background: var(--raised);
+}
+.ux-notes-item + .ux-notes-item {
+  border-top: 1px solid var(--border);
+}
+.ux-notes-more {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  min-height: var(--ctl-page);
+  padding: var(--space-xs) var(--space-lg);
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.ux-notes-more-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+.ux-notes:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* 1.176.0 R6: the Repair sheet — what Plyloft found, what it will do, and
+   what it has done. Plain lists on the sheet's own surface: no boxes, no
+   bars; colour only on the status dots. */
+.ux-repair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+.ux-repair-head {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  font-weight: var(--type-caption-weight);
+  color: var(--muted);
+}
+.ux-repair-list {
+  margin: 0;
+  padding: 0 0 0 var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+  color: var(--fg);
+}
+.ux-repair-list--plain {
+  list-style: none;
+  padding-left: 0;
+}
+.ux-repair-who,
+.ux-repair-state {
+  color: var(--muted);
+  font-size: var(--type-small);
+}
+.ux-repair-removes {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.ux-repair-command {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.ux-repair-command-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+.ux-repair-command code {
+  font-family: var(--page-font-mono);
+  font-size: var(--type-small);
+  overflow-wrap: anywhere;
+}
+
+/* 1.176.0 R7: a Claude or Codex tile whose CLI didn't start — the words on
+   the tile's own ground, colour on the dot only, Repair beside them. */
+.ux-tile-start-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.ux-tile-start-failed-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+}
+
+/* 1.176.0 walk: the looking line's room stays while it is hidden, so the
+   sheet doesn't jump when it appears. */
+.ux-repair-looking {
+  min-height: var(--row-compact);
+}
+
+/* ── The relay bar (1.177.0 Compare) ───────────────────────────────────
+   One line under the Terminals tile grid; at rest the sentence on the left
+   and a fixed right group (Swap, the count, the pass button, its hint); a
+   reason has its own muted row under it. Open, at most three short rows,
+   never more than 45% of the grid. A hairline above, no tinted box, no
+   coloured bar: colour only on the kind glyph. */
+.ux-relay {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-2xl);
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  font-size: var(--type-small);
+}
+@media (max-width: 1000px) {
+  .ux-relay {
+    padding: var(--space-sm) var(--space-lg);
+  }
+}
+.ux-relay--open {
+  min-height: 0;
+}
+.ux-relay kbd,
+.ux-relay-keys {
+  font-family: var(--font-ui);
+  font-size: var(--type-caption);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-xs);
+}
+.ux-relay-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-relay-line--note {
+  align-items: stretch;
+}
+.ux-relay-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-relay-left {
+  flex: 1 1 240px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-relay-right {
+  margin-left: auto;
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+.ux-relay-live {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+.ux-relay-who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+/* An explicit width, not a flex-basis alone: WebKit measures the inline-flex
+   sentence's intrinsic width from the glyph's content when the basis comes
+   from a custom property, and squeezes the text into a wrapped column. */
+.ux-relay-glyph {
+  flex: 0 0 auto;
+  width: var(--space-lg);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.ux-relay-glyph--claude {
+  color: var(--claude-accent);
+}
+.ux-relay-glyph--codex {
+  color: var(--codex-accent);
+}
+.ux-relay-muted {
+  color: var(--muted);
+}
+.ux-relay-spacer {
+  flex: 1 1 auto;
+}
+.ux-relay-reason {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.ux-relay-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+.ux-relay-note {
+  flex: 1 1 240px;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  resize: none;
+  overflow-y: auto;
+}
+.ux-relay-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+}
+.ux-relay-buttons .cbtn-wrap,
+.ux-relay-buttons .cbtn {
+  width: 100%;
+}
+.ux-relay-buttons .cbtn {
+  justify-content: center;
+}
+.ux-relay-buttons .cbtn--accent kbd {
+  color: inherit;
+  border-color: transparent;
+  opacity: 0.7;
+  margin-left: var(--space-xs);
+}
+/* The preview of an answer, and of an opened pass: it scrolls inside, and
+   single line breaks stay visible (the pasted text itself is unchanged). */
+.ux-relay-answer {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--raised);
+}
+.ux-relay-answer p,
+.ux-relay-answer li {
+  white-space: pre-line;
+}
+.ux-relay-error {
+  margin: 0;
+  color: var(--fg);
+}
+/* 1.177.1 (item 17): the bar sits at the window's bottom with its buttons at
+   the right edge, so a disabled button's reason opens above the button,
+   right-aligned to it, never wider than the window: on hover it stays in the
+   window however narrow. */
+.ux-relay .cbtn-reason {
+  top: 0;
+  bottom: auto;
+}
+.ux-relay .cbtn-wrap:hover > .cbtn:disabled ~ .cbtn-reason[data-reason]::after,
+.ux-relay .cbtn-reason[data-reason]:focus-visible::after {
+  top: auto;
+  bottom: 4px;
+  left: auto;
+  right: 0;
+  max-width: min(260px, calc(100vw - 2 * var(--space-lg)));
+}
+/* Round 5 (final walk, step 14): the composer's buttons sit in a column at
+   the right, under Cancel: their reason opens to the button's left, over the
+   note field, so it never covers Cancel. */
+.ux-relay-buttons .cbtn-reason {
+  top: 0;
+  bottom: 0;
+  height: auto;
+}
+.ux-relay-buttons .cbtn-wrap:hover > .cbtn:disabled ~ .cbtn-reason[data-reason]::after,
+.ux-relay-buttons .cbtn-reason[data-reason]:focus-visible::after {
+  top: 0;
+  bottom: auto;
+  right: calc(100% + var(--space-xs));
+}
+/* The composer's reason line keeps its row when empty (review H1): a reason
+   that comes and goes never changes the grid's height, so no tile refits. */
+.ux-relay-reason-slot {
+  min-height: 1.5em;
+  min-height: 1lh;
+}
+.ux-relay-history {
+  position: absolute;
+  right: var(--space-2xl);
+  bottom: 100%;
+  width: min(430px, calc(100% - 2 * var(--space-lg)));
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-xs) 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--raised);
+  box-shadow: var(--shadow-popover);
+  z-index: var(--z-popover);
+}
+.ux-relay-pass.cbtn {
+  justify-content: flex-start;
+  gap: var(--space-md);
+  height: auto;
+  min-height: var(--row-compact);
+  border-radius: 0;
+  font-weight: 400;
+}
+.ux-relay-pass-n {
+  width: var(--space-lg);
+  color: var(--muted);
+}
+.ux-relay-pass-time {
+  margin-left: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ux-relay-pass-text {
+  padding: var(--space-xs) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.ux-relay-text {
+  min-width: 0;
+}

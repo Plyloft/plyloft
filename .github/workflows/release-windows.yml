@@ -1,0 +1,209 @@
+name: release-windows
+
+# Builds the Windows NSIS installer for a version the Mac release already
+# published, signs it for the updater and adds it to that release's
+# latest.json. Manual only: never runs on push. See
+# docs/windows/RELEASING_WINDOWS.md for the order of operations.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag the Mac release published, vX.Y.Z (only tags that contain the Windows port build)"
+        required: true
+      releases_repo:
+        description: "Public updater feed repo (scripts/release.sh RELEASES_REPO)"
+        required: true
+        default: "MatteoB-adv/ply-releases"
+      publish:
+        description: "Upload to the release and merge latest.json (off: build and keep the artifacts only)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    env:
+      TAG: ${{ inputs.tag }}
+      RELEASES_REPO: ${{ inputs.releases_repo }}
+      TARGET: x86_64-pc-windows-msvc
+    steps:
+      # The tag is this repo's source tag, pushed by scripts/release.sh after
+      # the Mac release publishes (the feed repo's tag of the same name holds
+      # only the Mac artifacts). Say so plainly instead of failing in checkout.
+      - name: Check the tag exists in this repo
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "✗ tag must look like vX.Y.Z, got '$TAG'"
+            exit 1
+          fi
+          if ! out="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" 2>&1)"; then
+            echo "$out"
+            echo "✗ $TAG does not exist in $GITHUB_REPOSITORY."
+            echo "  Fix: run scripts/release.sh (it pushes the tag after publishing the Mac release),"
+            echo "  or push $TAG to this repo on the release commit:"
+            echo "    git tag -a $TAG -m \"Plyloft ${TAG#v}\" <release commit> && git push origin refs/tags/$TAG"
+            exit 1
+          fi
+          echo "✓ $TAG exists in $GITHUB_REPOSITORY"
+
+      - name: Checkout the tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Check the tag can build for Windows and matches the app version
+        run: |
+          set -euo pipefail
+          if [ ! -f scripts/build-sidecar.mjs ]; then
+            echo "✗ $TAG predates the Windows port (no scripts/build-sidecar.mjs): it can't build for Windows"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          CONF_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          if [ "$VERSION" != "$CONF_VERSION" ] || [ "$VERSION" != "$PKG_VERSION" ]; then
+            echo "✗ $TAG does not match tauri.conf.json ($CONF_VERSION) and package.json ($PKG_VERSION)"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: release-windows
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      # OPTIONAL — Authenticode code signing. Out of scope for v1: the secrets
+      # below don't exist today, so this step does nothing and the installer
+      # ships unsigned (SmartScreen warns on first run). To turn it on, add
+      # WINDOWS_CERTIFICATE (base64 .pfx) and WINDOWS_CERTIFICATE_PASSWORD; the
+      # build step then passes the thumbprint to Tauri
+      # (bundle.windows.certificateThumbprint).
+      - name: Import Authenticode certificate (optional, absent today)
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE) {
+            Write-Host "No WINDOWS_CERTIFICATE secret: the installer is not Authenticode-signed."
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP "cert.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          Remove-Item $pfx
+          "WINDOWS_CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      # beforeBuildCommand (node scripts/build-sidecar.mjs) builds the ply-mcp
+      # sidecar with Git Bash, then the frontend. tauri.release.conf.json turns
+      # on createUpdaterArtifacts and the updater, as for the Mac; its macOS
+      # keys are ignored here.
+      # Launch A2 (D1): never a release that can't sign anyone in to Plyloft.
+      - name: Check the Plyloft sign-in configuration
+        shell: bash
+        run: ./scripts/check-account-config.sh
+
+      - name: Build the NSIS installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          extra=()
+          if [ -n "${WINDOWS_CERT_THUMBPRINT:-}" ]; then
+            extra=(--config "{\"bundle\":{\"windows\":{\"certificateThumbprint\":\"$WINDOWS_CERT_THUMBPRINT\",\"digestAlgorithm\":\"sha256\",\"timestampUrl\":\"http://timestamp.digicert.com\"}}}")
+          fi
+          npm run tauri build -- --target "$TARGET" --bundles nsis \
+            --config src-tauri/tauri.release.conf.json "${extra[@]}"
+
+      # The dev-only test bridge (docs/app-tester/DESIGN.md) never ships: the
+      # same source, frontend and binary check release.sh runs on the Mac.
+      - name: No test bridge in the release
+        run: |
+          set -euo pipefail
+          ./scripts/app-tester/check-no-release.sh --dist dist \
+            --binary "src-tauri/target/$TARGET/release/atelier.exe"
+
+      - name: Collect the installer and its updater signature
+        run: |
+          set -euo pipefail
+          NSIS_DIR="src-tauri/target/$TARGET/release/bundle/nsis"
+          SETUP="$NSIS_DIR/Plyloft_${VERSION}_x64-setup.exe"
+          for f in "$SETUP" "$SETUP.sig"; do
+            if [ ! -f "$f" ]; then
+              echo "✗ missing $f"
+              ls -la "$NSIS_DIR" || true
+              exit 1
+            fi
+          done
+          mkdir -p dist-windows
+          cp "$SETUP" "$SETUP.sig" dist-windows/
+          ls -la dist-windows
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ply-${{ inputs.tag }}-windows
+          path: dist-windows/
+
+      # latest.json is written by scripts/release.sh on the Mac with only the
+      # darwin-aarch64 entry. This adds windows-x86_64 beside it, keeping every
+      # other key, and refuses a latest.json of another version.
+      - name: Merge windows-x86_64 into latest.json and upload
+        if: ${{ inputs.publish }}
+        env:
+          GH_TOKEN: ${{ secrets.PLY_RELEASES_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "✗ PLY_RELEASES_TOKEN secret is required to publish to $RELEASES_REPO"
+            exit 1
+          fi
+          SETUP_NAME="Plyloft_${VERSION}_x64-setup.exe"
+          # The updater reads releases/latest only: a merge into an older
+          # release reaches no one.
+          LATEST_TAG="$(gh release view --repo "$RELEASES_REPO" --json tagName -q .tagName)"
+          if [ "$LATEST_TAG" != "$TAG" ]; then
+            echo "::warning::$TAG is not $RELEASES_REPO's latest release ($LATEST_TAG): the updater won't offer this Windows build"
+          fi
+          gh release download "$TAG" --repo "$RELEASES_REPO" --pattern latest.json --dir feed
+          FEED_VERSION="$(jq -r .version feed/latest.json)"
+          if [ "$FEED_VERSION" != "$VERSION" ]; then
+            echo "✗ $RELEASES_REPO $TAG latest.json is version $FEED_VERSION, not $VERSION"
+            exit 1
+          fi
+          jq \
+            --arg sig "$(cat "dist-windows/$SETUP_NAME.sig")" \
+            --arg url "https://github.com/$RELEASES_REPO/releases/download/$TAG/$SETUP_NAME" \
+            '.platforms["windows-x86_64"] = {signature: $sig, url: $url}' \
+            feed/latest.json > dist-windows/latest.json
+          jq . dist-windows/latest.json
+          # --clobber deletes latest.json before uploading the new one: an
+          # update check in those seconds gets a 404 and simply tries later.
+          gh release upload "$TAG" --repo "$RELEASES_REPO" --clobber \
+            "dist-windows/$SETUP_NAME" "dist-windows/$SETUP_NAME.sig" dist-windows/latest.json

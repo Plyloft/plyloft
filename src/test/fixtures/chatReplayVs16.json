@@ -1,0 +1,7 @@
+{
+  "cols": 12,
+  "comment": "Written by chat_screen::tests::the_replay_fixture_is_vt100s_own_output: a 4x12 grid's state_formatted() after `live` (vendored vt100).",
+  "live": "╭──────────╮\r\n│⚠️X       │\r\n╰──────────╯\u001b[2;12H│",
+  "replay": "\u001b[?25h\u001b[m\u001b[H\u001b[J╭──────────╮\r\n│⚠️X       │\r\n╰──────────╯\u001b[2;12H│\u001b>\u001b[?1l\u001b[?2004l",
+  "rows": 4
+}

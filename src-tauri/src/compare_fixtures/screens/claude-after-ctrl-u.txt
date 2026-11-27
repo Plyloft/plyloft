@@ -1,0 +1,14 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 9, after Ctrl+U (the ctrl+y row under the footer); rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: ready
+# cells: dim
+# ----
+
+──────────────────────────────────────────── walk-pair ─
+❯ Say BLUE in one word.
+────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle)
+                          ctrl+y to paste deleted text

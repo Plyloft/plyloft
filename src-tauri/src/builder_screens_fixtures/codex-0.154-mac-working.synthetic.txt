@@ -1,0 +1,28 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: running
+# truth: working: Working line with its timer
+# vendor: codex
+# source: synthetic, ported from src/lib/tileHeaderStatus.test.ts CODEX_WORKING (codex-cli 0.154.0); not a grid capture (the real ones sit beside it)
+# exited: false
+# last-output-ago-ms: 100
+# content-changed-ago-ms: 0
+# ----
+
+╭───────────────────────────────────────────╮
+│ >_ OpenAI Codex (v0.154.0)                │
+│                                           │
+│ model:     gpt-6-astra   /model to change │
+│ directory: ~/code/atelier                 │
+╰───────────────────────────────────────────╯
+
+  Tip: Try the Desktop app. Run 'codex app' or visit https://chatgpt.com/codex
+
+› count slowly from 1 to 40
+
+• Working (2s • esc to interrupt)
+
+
+› Ask Codex to do anything
+
+  gpt-6-astra default · ~/code/atelier · renaming... ⠇

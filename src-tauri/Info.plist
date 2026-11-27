@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+      Merged by Tauri 2 into Plyloft.app/Contents/Info.plist at bundle time,
+      and embedded into the `tauri dev` binary's __info_plist section by
+      tauri-codegen. Keep it to keys Tauri does not generate itself.
+    -->
+
+    <!-- `claude` runs as a PTY child, so macOS attributes its microphone
+         request (Claude Code's /voice dictation) to Plyloft. Without this
+         key the request is refused before any prompt appears. -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Plyloft lets Claude Code and Plyloft's own dictation hear you.</string>
+
+    <!-- Explicit, not load-bearing: `productName` (tauri.conf.json) is
+         "Plyloft" too (Card B: Ply.app → Plyloft.app), so Tauri already
+         generates CFBundleName/CFBundleDisplayName = "Plyloft" on its own.
+         Kept here so the display name stays pinned even if productName ever
+         diverges from it again, and because checkFrozenTokens
+         (scripts/product-name-check.mjs) asserts this key directly. -->
+    <key>CFBundleName</key>
+    <string>Plyloft</string>
+    <key>CFBundleDisplayName</key>
+    <string>Plyloft</string>
+</dict>
+</plist>

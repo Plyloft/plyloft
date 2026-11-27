@@ -1,0 +1,19 @@
+# plyloft compare screen v1
+# vendor: claude
+# cli: Claude Code 2.1.332
+# platform: macos
+# source: real capture, Mac capture walk 2026-11-26 (app-walks/2026-11-26-092923, Plyloft Test 1.177.1 build, read with ui_terminal), step 1, cap 1-A; rows verbatim (Claude's blank rows "", Codex's " ")
+# verdict: ready
+# cells: dim
+# turn: none
+# ----
+ ▐▛███▛█   Claude Code v2.1.332
+▝▜██████▀  Fable 5.2 · Claude Ultra
+ ▝▝   ▝▝   ~/…/app-tester/sandboxes/compare-1177/app
+
+
+────────────────────────────────────────────────────────
+❯ Try "how do I log an error?"
+────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents
+                                    ◐ medium · /effort

@@ -1,0 +1,83 @@
+{
+  "verdict": "CHANGES_REQUESTED",
+  "findings": [
+    {
+      "severity": "P2",
+      "preExisting": false,
+      "sweepSaw": false,
+      "path": "scripts/ux-check.mjs",
+      "line": 211,
+      "title": "Condition bindings are incorrectly treated as class names",
+      "body": "For `const active = mode === \"advanced\";` followed by `className={active ? \"ux-row\" : \"\"}`, the new binding traversal collects \"advanced\" and rejects it as an off-catalogue class. Neither branch can produce that class, so a valid migrated component now fails the required check.",
+      "fix": "Distinguish condition expressions from expressions that supply class values, and add a regression test for a locally bound condition containing a string comparison."
+    }
+  ],
+  "nonBlocking": [],
+  "checklist": [
+    {
+      "class": "A",
+      "result": "The targeted shell and badge fixes are present; the expanded checker introduces a false rejection."
+    },
+    {
+      "class": "B",
+      "result": "Mutation updates serialize the reported resize/preference pair, but a remaining snapshot-based settings writer leaves F1 partially unresolved."
+    },
+    {
+      "class": "C",
+      "result": "Queue commits follow successful persistence; rejected writes leave committed state intact. No persisted schema changes in these fixes."
+    },
+    {
+      "class": "D",
+      "result": "A failed queued write rejects its caller and does not block subsequent writes."
+    },
+    {
+      "class": "E",
+      "result": "Added event listeners and observers have cleanup; no process lifecycle changes."
+    },
+    {
+      "class": "F",
+      "result": "Settings IPC shapes remain unchanged; the dynamic scope uses workspace-keyed adoption status."
+    },
+    {
+      "class": "G",
+      "result": "The remaining whole-object save can still overwrite fields committed by an earlier queued mutation."
+    },
+    {
+      "class": "H",
+      "result": "Queue tests cover mutation ordering and rejection, but omit the remaining replacement writer; checker tests omit locally bound string-comparison conditions."
+    },
+    {
+      "class": "I",
+      "result": "Shared dialog-stack integration handles the reported nested editor; Build & release receives its dynamic scope badge."
+    },
+    {
+      "class": "J",
+      "result": "No branch discovery changes."
+    },
+    {
+      "class": "K",
+      "result": "No shared-definition parsing or writing changes."
+    }
+  ],
+  "earlierFindings": [
+    {
+      "id": "F1",
+      "state": "open",
+      "reason": "Resize and draft updates now merge correctly, but DiscussionModal.tsx:266 still passes a captured whole settings object to save(), whose queued replacement at settingsStore.ts:261 can overwrite an in-flight resize or preference update; migrate this remaining writer to update()."
+    },
+    {
+      "id": "F6",
+      "state": "closed",
+      "reason": "Settings, SwarmTemplateEditorModal and AgentForm now use useDialogFocus, which traps Tab and gives the top visible dialog ownership of Escape."
+    },
+    {
+      "id": "F8",
+      "state": "closed",
+      "reason": "SettingsOverlay passes entryScope(shown, ctx) into the page header, selecting Repository for Build & release when the active workspace's adoption status reports a shared definition."
+    }
+  ],
+  "verificationGaps": [
+    "Tests, builds and PPVP were not run, as requested; conclusions are based on source inspection.",
+    "Interactive focus, resize persistence, Row measurements and theme rendering were not verified in the running app."
+  ]
+}

@@ -1,0 +1,231 @@
+{
+  "note": "1.174.0 A2 (P7): sent is not landed. `delivery` is cardLifecycle.ts::cardDelivery and kanban.rs::card_delivery; `shippedOrPrOpen` is cardShippedOrPrOpen / card_shipped_or_pr_open (the rule before 1.174.0, which the Free slot keeps). A card is done, offers Follow up, and stops holding the cards that wait for it only when `delivery` is landed. `followUp` (default: landed) is followUp.ts::followUpOffered (state archived) and kanban.rs::follow_up_allowed — a GitHub Issues card in Complete offers it too, but never while its pull request is open. Held by cardLifecycle.test.ts, followUp.test.ts and kanban.rs.",
+  "cases": [
+    {
+      "name": "never shipped",
+      "card": {},
+      "delivery": "not-sent",
+      "shippedOrPrOpen": false
+    },
+    {
+      "name": "built, waiting to ship",
+      "card": {
+        "reviewStatus": "pending"
+      },
+      "delivery": "not-sent",
+      "shippedOrPrOpen": false
+    },
+    {
+      "name": "changes requested",
+      "card": {
+        "reviewStatus": "changes_requested"
+      },
+      "delivery": "not-sent",
+      "shippedOrPrOpen": false
+    },
+    {
+      "name": "shipped on this Mac",
+      "card": {
+        "shipStatus": "shipped"
+      },
+      "delivery": "landed",
+      "shippedOrPrOpen": true
+    },
+    {
+      "name": "shipped in a Release, reviewed",
+      "card": {
+        "shipStatus": "shipped",
+        "reviewStatus": "merged"
+      },
+      "delivery": "landed",
+      "shippedOrPrOpen": true
+    },
+    {
+      "name": "pull request just opened",
+      "card": {
+        "reviewStatus": "merged",
+        "prUrl": "https://github.com/o/r/pull/138",
+        "pr": {
+          "number": 138,
+          "state": "open"
+        }
+      },
+      "delivery": "sent",
+      "shippedOrPrOpen": true
+    },
+    {
+      "name": "pull request open, review loop cleared the mark",
+      "card": {
+        "reviewStatus": null,
+        "prUrl": "https://github.com/o/r/pull/138",
+        "pr": {
+          "number": 138,
+          "state": "open"
+        }
+      },
+      "delivery": "sent",
+      "shippedOrPrOpen": false
+    },
+    {
+      "name": "pull request merged",
+      "card": {
+        "shipStatus": "shipped",
+        "reviewStatus": "merged",
+        "prUrl": "https://github.com/o/r/pull/138",
+        "pr": {
+          "number": 138,
+          "state": "merged"
+        }
+      },
+      "delivery": "landed",
+      "shippedOrPrOpen": true
+    },
+    {
+      "name": "pull request merged, not yet marked shipped",
+      "card": {
+        "reviewStatus": "merged",
+        "prUrl": "https://github.com/o/r/pull/138",
+        "pr": {
+          "number": 138,
+          "state": "merged"
+        }
+      },
+      "delivery": "landed",
+      "shippedOrPrOpen": true
+    },
+    {
+      "name": "pull request closed without merging",
+      "card": {
+        "reviewStatus": "pending",
+        "prUrl": "https://github.com/o/r/pull/138",
+        "pr": {
+          "number": 138,
+          "state": "closed"
+        }
+      },
+      "delivery": "sent",
+      "shippedOrPrOpen": false
+    },
+    {
+      "name": "pull request closed, review status cleared",
+      "card": {
+        "prUrl": "https://github.com/o/r/pull/138",
+        "pr": {
+          "number": 138,
+          "state": "closed"
+        }
+      },
+      "delivery": "sent",
+      "shippedOrPrOpen": false
+    },
+    {
+      "name": "pull request reopened after a close",
+      "card": {
+        "reviewStatus": "merged",
+        "prUrl": "https://github.com/o/r/pull/138",
+        "pr": {
+          "number": 138,
+          "state": "closed"
+        }
+      },
+      "delivery": "sent",
+      "shippedOrPrOpen": true
+    },
+    {
+      "name": "pull request shipped before Plyloft read pull requests (no read)",
+      "card": {
+        "reviewStatus": "merged",
+        "prUrl": "https://github.com/o/r/pull/138"
+      },
+      "delivery": "landed",
+      "shippedOrPrOpen": true
+    },
+    {
+      "name": "merged in review on this Mac before 1.31 (no pull request)",
+      "card": {
+        "reviewStatus": "merged"
+      },
+      "delivery": "landed",
+      "shippedOrPrOpen": true
+    },
+    {
+      "name": "a read with no link is not a pull request",
+      "card": {
+        "reviewStatus": "merged",
+        "pr": {
+          "number": 138,
+          "state": "open"
+        }
+      },
+      "delivery": "landed",
+      "shippedOrPrOpen": true
+    },
+    {
+      "name": "closed read, no link",
+      "card": {
+        "pr": {
+          "number": 138,
+          "state": "closed"
+        }
+      },
+      "delivery": "not-sent",
+      "shippedOrPrOpen": false
+    },
+    {
+      "name": "shipped on this Mac after its pull request closed",
+      "card": {
+        "shipStatus": "shipped",
+        "prUrl": "https://github.com/o/r/pull/138",
+        "pr": {
+          "number": 138,
+          "state": "closed"
+        }
+      },
+      "delivery": "landed",
+      "shippedOrPrOpen": true
+    },
+    {
+      "name": "GitHub Issues board: issue Complete, its pull request still open",
+      "card": {
+        "ghIssueNumber": 7,
+        "columnId": "complete",
+        "reviewStatus": "merged",
+        "prUrl": "https://github.com/o/r/pull/138",
+        "pr": {
+          "number": 138,
+          "state": "open"
+        }
+      },
+      "delivery": "sent",
+      "shippedOrPrOpen": true,
+      "followUp": false
+    },
+    {
+      "name": "GitHub Issues board: issue Complete, a teammate shipped it",
+      "card": {
+        "ghIssueNumber": 7,
+        "columnId": "complete"
+      },
+      "delivery": "not-sent",
+      "shippedOrPrOpen": false,
+      "followUp": true
+    },
+    {
+      "name": "GitHub Issues board: issue Complete, its pull request merged",
+      "card": {
+        "ghIssueNumber": 7,
+        "columnId": "complete",
+        "shipStatus": "shipped",
+        "reviewStatus": "merged",
+        "prUrl": "https://github.com/o/r/pull/138",
+        "pr": {
+          "number": 138,
+          "state": "merged"
+        }
+      },
+      "delivery": "landed",
+      "shippedOrPrOpen": true,
+      "followUp": true
+    }
+  ]
+}

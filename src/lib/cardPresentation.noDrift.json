@@ -1,0 +1,1282 @@
+{
+  "archived card": {
+    "page": {
+      "headline": "Archived",
+      "sentence": "It is archived.",
+      "action": "view-history",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Archived",
+      "column": null,
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Archived",
+      "dot": "empty",
+      "stage": null
+    }
+  },
+  "reviews a member's pull request": {
+    "page": {
+      "headline": "Review is out of date",
+      "sentence": "The branch moved after this review ran.",
+      "action": "rerun-review",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Not reviewed yet",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Not reviewed yet",
+      "dot": "done",
+      "stage": "in-review"
+    }
+  },
+  "held by a blocker": {
+    "page": {
+      "headline": "Blocked",
+      "sentence": "Starts when “blocker” ships.",
+      "action": "start-build",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Blocked by “blocker”",
+      "column": "waiting",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Blocked by “blocker”",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  },
+  "someone else holds its issue": {
+    "page": {
+      "headline": "Claimed by ana",
+      "sentence": "The brief is written and nothing has started.",
+      "action": "start-build",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Claimed by ana",
+      "column": "waiting",
+      "dot": "empty",
+      "fact": "#12"
+    },
+    "list": {
+      "status": "Ready to start",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  },
+  "its area is not chosen yet": {
+    "page": {
+      "headline": "Ready to start",
+      "sentence": "The brief is written and nothing has started.",
+      "action": "start-build",
+      "column": "not-started",
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Ready to start",
+      "column": "not-started",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to start",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  },
+  "a two-AI plan waits for the person": {
+    "page": {
+      "headline": "Plan ready to review",
+      "sentence": "Claude and Codex finished this card's plan after 2 rounds; the build waits for your decision.",
+      "action": "open-plan",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Plan ready to review",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": null
+    },
+    "list": {
+      "status": "Plan ready to review",
+      "dot": "aborted",
+      "stage": "to-do"
+    }
+  },
+  "a two-AI plan runs": {
+    "page": {
+      "headline": "Two AIs are planning",
+      "sentence": "Claude and Codex are writing and critiquing this card's plan; the build waits for it.",
+      "action": "open-plan",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Two AIs are planning",
+      "column": "needs-you",
+      "dot": "running",
+      "fact": null
+    },
+    "list": {
+      "status": "Two AIs are planning",
+      "dot": "running",
+      "stage": "to-do"
+    }
+  },
+  "its setup failed": {
+    "page": {
+      "headline": "Setup failed",
+      "sentence": "npm ci failed. Nothing has started.",
+      "action": "start-build",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Setup failed",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": null
+    },
+    "list": {
+      "status": "Setup failed",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  },
+  "its setup runs": {
+    "page": {
+      "headline": "Setting up the card",
+      "sentence": "npm ci is running; the Builder waits for it.",
+      "action": "start-build",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Setting up the card",
+      "column": "needs-you",
+      "dot": "running",
+      "fact": null
+    },
+    "list": {
+      "status": "Setting up the card",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  },
+  "its intake conversation ended": {
+    "page": {
+      "headline": "Planning with Claude stopped",
+      "sentence": "The conversation with Claude ended, or couldn't go on.",
+      "action": "plan-again",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Planning with Claude stopped",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": null
+    },
+    "list": {
+      "status": "Planning with Claude stopped",
+      "dot": "aborted",
+      "stage": "to-do"
+    }
+  },
+  "its intake asks to trust the folder": {
+    "page": {
+      "headline": "Needs you",
+      "sentence": "Claude asks this once for this project: the folder is your project. Choose “Yes, I trust this folder” in the terminal.",
+      "action": "open-conversation",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Asks to trust the folder",
+      "column": "needs-you",
+      "dot": "running",
+      "fact": null
+    },
+    "list": {
+      "status": "Asks to trust the folder",
+      "dot": "running",
+      "stage": "to-do"
+    }
+  },
+  "its Builder asks to trust the folder": {
+    "page": {
+      "headline": "Needs you",
+      "sentence": "Claude asks this once for this project: the folder is your project's copy for this card. Choose “Yes, I trust this folder” in the session.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Asks to trust the folder",
+      "column": "needs-you",
+      "dot": "running",
+      "fact": "1m"
+    },
+    "list": {
+      "status": "Asks to trust the folder",
+      "dot": "running",
+      "stage": "in-progress"
+    }
+  },
+  "its Codex Builder asks to trust the folder": {
+    "page": {
+      "headline": "Asks to trust the folder",
+      "sentence": "Codex asks whether to trust this folder. Answer it in the session.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Asks to trust the folder",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": "1m"
+    },
+    "list": {
+      "status": "Asks to trust the folder",
+      "dot": "aborted",
+      "stage": "in-progress"
+    }
+  },
+  "its Builder stopped": {
+    "page": {
+      "headline": "Working",
+      "sentence": "It is running now.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Working",
+      "column": "working",
+      "dot": "running",
+      "fact": "1m"
+    },
+    "list": {
+      "status": "Working",
+      "dot": "running",
+      "stage": "in-progress"
+    }
+  },
+  "its Builder asks a question": {
+    "page": {
+      "headline": "Working",
+      "sentence": "It is running now.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Working",
+      "column": "working",
+      "dot": "running",
+      "fact": "1m"
+    },
+    "list": {
+      "status": "Working",
+      "dot": "running",
+      "stage": "in-progress"
+    }
+  },
+  "its Builder went quiet": {
+    "page": {
+      "headline": "Working",
+      "sentence": "It is running now.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Working",
+      "column": "working",
+      "dot": "running",
+      "fact": "1m"
+    },
+    "list": {
+      "status": "Working",
+      "dot": "running",
+      "stage": "in-progress"
+    }
+  },
+  "built by both, a build waits": {
+    "page": {
+      "headline": "Building with both",
+      "sentence": "Claude · working. Codex · working.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Building with both",
+      "column": "working",
+      "dot": "running",
+      "fact": null
+    },
+    "list": {
+      "status": "Building with both",
+      "dot": "running",
+      "stage": "in-progress"
+    }
+  },
+  "built by both, both working": {
+    "page": {
+      "headline": "Building with both",
+      "sentence": "Claude · working. Codex · working.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Working",
+      "column": "working",
+      "dot": "running",
+      "fact": null
+    },
+    "list": {
+      "status": "Working",
+      "dot": "running",
+      "stage": "in-progress"
+    }
+  },
+  "changes sent to the Builder": {
+    "page": {
+      "headline": "Changes sent to the Builder",
+      "sentence": "The Builder has them in its session. When it has addressed them, press Build done there; Ship waits until then.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Result ready",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Result ready",
+      "dot": "done",
+      "stage": "in-review"
+    }
+  },
+  "a request for changes the Builder never received": {
+    "page": {
+      "headline": "Review of snapshot 2 failed — snapshot 1's review asked for changes: F1 still open",
+      "sentence": "The Builder has not received these findings: the review that was to re-check them gave no verdict. Back to the Builder sends them into its session. Ship is not blocked; it says they were not re-checked.",
+      "action": "send-handed-over",
+      "column": null,
+      "dot": "done"
+    },
+    "board": {
+      "headline": "The last commit was not reviewed",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "The last commit was not reviewed",
+      "dot": "done",
+      "stage": "in-review"
+    }
+  },
+  "changes requested, verdict not delivered": {
+    "page": {
+      "headline": "Snapshot 1's requested changes have not reached the Builder",
+      "sentence": "The Builder has not received them. Build done in the session snapshots the fixes and starts the next review.",
+      "action": "send-handed-over",
+      "column": null,
+      "dot": "aborted"
+    },
+    "board": {
+      "headline": "Reviewer requests changes",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": null
+    },
+    "list": {
+      "status": "Reviewer requests changes",
+      "dot": "aborted",
+      "stage": "in-review"
+    }
+  },
+  "review failed on a ready card": {
+    "page": {
+      "headline": "The last commit was not reviewed",
+      "sentence": "The Reviewer could not finish the review.",
+      "action": "ship",
+      "column": null,
+      "dot": "done"
+    },
+    "board": {
+      "headline": "The last commit was not reviewed",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "The last commit was not reviewed",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "a runner is chosen": {
+    "page": {
+      "headline": "Ready to start",
+      "sentence": "A runner is chosen and nothing has started.",
+      "action": "start-work",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Ready to start",
+      "column": "needs-you",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to start",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  },
+  "its pull request is open": {
+    "page": {
+      "headline": "Pull request open",
+      "sentence": "It shipped.",
+      "action": "inspect-ship",
+      "column": null,
+      "dot": "done"
+    },
+    "board": {
+      "headline": "Pull request open",
+      "column": "waiting",
+      "dot": "done",
+      "fact": "#5"
+    },
+    "list": {
+      "status": "Pull request open",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "its pull request is ready to merge": {
+    "page": {
+      "headline": "Ready to merge on GitHub",
+      "sentence": "It shipped.",
+      "action": "pr-merge",
+      "column": null,
+      "dot": "done"
+    },
+    "board": {
+      "headline": "Ready to merge on GitHub",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": "#5"
+    },
+    "list": {
+      "status": "Ready to merge on GitHub",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "its pull request has no checks": {
+    "page": {
+      "headline": "Ready to merge on GitHub",
+      "sentence": "It shipped.",
+      "action": "pr-merge",
+      "column": null,
+      "dot": "done"
+    },
+    "board": {
+      "headline": "Ready to merge on GitHub",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": "#5"
+    },
+    "list": {
+      "status": "Ready to merge on GitHub",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "its pull request waits for a review": {
+    "page": {
+      "headline": "Waiting for a review on GitHub",
+      "sentence": "It shipped.",
+      "action": "pr-open-github",
+      "column": null,
+      "dot": "done"
+    },
+    "board": {
+      "headline": "Waiting for a review on GitHub",
+      "column": "waiting",
+      "dot": "done",
+      "fact": "#5"
+    },
+    "list": {
+      "status": "Waiting for a review on GitHub",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "its pull request was closed": {
+    "page": {
+      "headline": "Pull request closed",
+      "sentence": "Pull request #5 was closed without merging. Ship as a PR opens a new pull request.",
+      "action": "ship",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Pull request closed",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Pull request closed",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "merged as a pull request": {
+    "page": {
+      "headline": "Merged",
+      "sentence": "It shipped.",
+      "action": "inspect-ship",
+      "column": null,
+      "dot": "done"
+    },
+    "board": {
+      "headline": "Merged",
+      "column": "done",
+      "dot": "done",
+      "fact": "#5"
+    },
+    "list": {
+      "status": "Merged",
+      "dot": "done",
+      "stage": "finished"
+    }
+  },
+  "its Builder session closed": {
+    "page": {
+      "headline": "Session closed",
+      "sentence": "Nothing is running this build, and its worktree is intact.",
+      "action": "resume-session",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Session closed",
+      "column": "needs-you",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Session closed",
+      "dot": "empty",
+      "stage": "in-progress"
+    }
+  },
+  "a local ship stopped on a conflict": {
+    "page": {
+      "headline": "Preparing the result",
+      "sentence": "The last ship stopped on a conflict.",
+      "action": "ship",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Result ready",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Result ready",
+      "dot": "done",
+      "stage": "in-review"
+    }
+  },
+  "a skill card behind its team library": {
+    "page": {
+      "headline": "The team changed this skill again",
+      "sentence": "The team library has a newer version of this skill than the card carries. Refresh card puts that version in the card; then ship it.",
+      "action": "refresh-skill",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Ready to ship",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to ship",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "a skill card behind its team library, a changed script shown first": {
+    "page": {
+      "headline": "The team changed this skill again",
+      "sentence": "The team library's newer version of this skill brings a new or changed script, so Plyloft won't put it in this card without showing it to you. Delete this card, then press Update in the Library: it shows every file first.",
+      "action": "delete-skill-card",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "The team changed this skill again",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "The team changed this skill again",
+      "dot": "done",
+      "stage": "in-review"
+    }
+  },
+  "a ship press failed": {
+    "page": {
+      "headline": "Ship didn't go through",
+      "sentence": "The last ship stopped before it finished, and the card's work is kept.",
+      "action": "ship",
+      "column": null,
+      "dot": "done"
+    },
+    "board": {
+      "headline": "Ready to ship",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to ship",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "a release through a pull request on its way": {
+    "page": {
+      "headline": "Releasing through a pull request",
+      "sentence": "v1.0.1: Merging the release #119.",
+      "action": "release-open-github",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Releasing through a pull request",
+      "column": "working",
+      "dot": "running",
+      "fact": null
+    },
+    "list": {
+      "status": "Releasing through a pull request",
+      "dot": "running",
+      "stage": "ready-to-ship"
+    }
+  },
+  "draft": {
+    "page": {
+      "headline": "Draft",
+      "sentence": "Nothing is written about what this card should do yet.",
+      "action": "plan",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Draft",
+      "column": "needs-you",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Draft",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  },
+  "planning with Claude": {
+    "page": {
+      "headline": "Planning with Claude",
+      "sentence": "Claude is asking what you want, to sharpen the task.",
+      "action": "open-conversation",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Planning with Claude",
+      "column": "working",
+      "dot": "running",
+      "fact": null
+    },
+    "list": {
+      "status": "Planning with Claude",
+      "dot": "running",
+      "stage": "to-do"
+    }
+  },
+  "closed with no run": {
+    "page": {
+      "headline": "Closed",
+      "sentence": "It finished with no run on record.",
+      "action": "view-history",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Closed",
+      "column": "done",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Closed",
+      "dot": "empty",
+      "stage": "finished"
+    }
+  },
+  "ready to start": {
+    "page": {
+      "headline": "Ready to start",
+      "sentence": "The brief is written and nothing has started.",
+      "action": "start-build",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Ready to start",
+      "column": "needs-you",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to start",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  },
+  "in line for a swarm slot": {
+    "page": {
+      "headline": "In line",
+      "sentence": "It is waiting for a free slot.",
+      "action": "see-queue",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "In line",
+      "column": "waiting",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "In line",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  },
+  "an agent run is working": {
+    "page": {
+      "headline": "Working",
+      "sentence": "It is running now.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Working",
+      "column": "working",
+      "dot": "running",
+      "fact": null
+    },
+    "list": {
+      "status": "Working",
+      "dot": "running",
+      "stage": "in-progress"
+    }
+  },
+  "paused swarm": {
+    "page": {
+      "headline": "Paused",
+      "sentence": "It stopped part-way, and the finished work is kept.",
+      "action": "resume-work",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Paused",
+      "column": "waiting",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Paused",
+      "dot": "empty",
+      "stage": "in-progress"
+    }
+  },
+  "Reviewing": {
+    "page": {
+      "headline": "Reviewing",
+      "sentence": "The other vendor is reading the latest build, read-only.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Running checks",
+      "column": "working",
+      "dot": "running",
+      "fact": null
+    },
+    "list": {
+      "status": "Running checks",
+      "dot": "running",
+      "stage": "in-review"
+    }
+  },
+  "Reviewer requests changes (delivered)": {
+    "page": {
+      "headline": "Reviewer requests changes",
+      "sentence": "Build done in the session snapshots the fixes and starts the next review.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "aborted"
+    },
+    "board": {
+      "headline": "Reviewer requests changes",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": null
+    },
+    "list": {
+      "status": "Reviewer requests changes",
+      "dot": "aborted",
+      "stage": "in-review"
+    }
+  },
+  "changes requested, its Builder asks a question": {
+    "page": {
+      "headline": "Reviewer requests changes",
+      "sentence": "Build done in the session snapshots the fixes and starts the next review.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "aborted"
+    },
+    "board": {
+      "headline": "Reviewer requests changes",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": null
+    },
+    "list": {
+      "status": "Reviewer requests changes",
+      "dot": "aborted",
+      "stage": "in-review"
+    }
+  },
+  "running checks": {
+    "page": {
+      "headline": "Running checks",
+      "sentence": "Plyloft is running the checks.",
+      "action": "inspect-checks",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Running checks",
+      "column": "working",
+      "dot": "running",
+      "fact": null
+    },
+    "list": {
+      "status": "Running checks",
+      "dot": "running",
+      "stage": "in-review"
+    }
+  },
+  "checks failed": {
+    "page": {
+      "headline": "Checks failed",
+      "sentence": "The checks failed.",
+      "action": "inspect-checks",
+      "column": null,
+      "dot": "aborted"
+    },
+    "board": {
+      "headline": "Checks failed",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": null
+    },
+    "list": {
+      "status": "Checks failed",
+      "dot": "aborted",
+      "stage": "in-review"
+    }
+  },
+  "the run failed": {
+    "page": {
+      "headline": "Stopped",
+      "sentence": "The run stopped before it finished.",
+      "action": "retry-work",
+      "column": null,
+      "dot": "aborted"
+    },
+    "board": {
+      "headline": "Stopped",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": null
+    },
+    "list": {
+      "status": "Stopped",
+      "dot": "aborted",
+      "stage": "in-progress"
+    }
+  },
+  "the review is out of date": {
+    "page": {
+      "headline": "Review is out of date",
+      "sentence": "The branch moved after this review ran.",
+      "action": "rerun-review",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Ready to ship",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to ship",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "nothing changed": {
+    "page": {
+      "headline": "Nothing changed",
+      "sentence": "The run finished without a change to land.",
+      "action": "inspect-outcome",
+      "column": null,
+      "dot": "aborted"
+    },
+    "board": {
+      "headline": "Ready to ship",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to ship",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "ready to ship (result read)": {
+    "page": {
+      "headline": "Ready to ship",
+      "sentence": "It is built and ready to ship.",
+      "action": "ship",
+      "column": null,
+      "dot": "done"
+    },
+    "board": {
+      "headline": "Ready to ship",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to ship",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "ready to ship (result not read yet)": {
+    "page": {
+      "headline": "Preparing the result",
+      "sentence": "Plyloft is reading the result from the card's copy of the repo.",
+      "action": "inspect-outcome",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Ready to ship",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to ship",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "the result is loading": {
+    "page": {
+      "headline": "Preparing the result",
+      "sentence": "Plyloft is reading the result from the card's copy of the repo.",
+      "action": "inspect-outcome",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Ready to ship",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to ship",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "result ready, not verified": {
+    "page": {
+      "headline": "Preparing the result",
+      "sentence": "Plyloft is reading the result from the card's copy of the repo.",
+      "action": "inspect-outcome",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Result ready",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Result ready",
+      "dot": "done",
+      "stage": "in-review"
+    }
+  },
+  "shipping": {
+    "page": {
+      "headline": "Shipping",
+      "sentence": "It is shipping now.",
+      "action": "inspect-ship",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Ready to ship",
+      "column": "needs-you",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Ready to ship",
+      "dot": "done",
+      "stage": "ready-to-ship"
+    }
+  },
+  "shipped in a release": {
+    "page": {
+      "headline": "Shipped",
+      "sentence": "It shipped.",
+      "action": "inspect-ship",
+      "column": null,
+      "dot": "done"
+    },
+    "board": {
+      "headline": "Shipped",
+      "column": "done",
+      "dot": "done",
+      "fact": "v1.2.0"
+    },
+    "list": {
+      "status": "Shipped",
+      "dot": "done",
+      "stage": "finished"
+    }
+  },
+  "changes requested, its Builder fixes them": {
+    "page": {
+      "headline": "Reviewer requests changes",
+      "sentence": "Finish and check in the session saves the fixes and starts the next review.",
+      "action": "inspect-run",
+      "column": "needs-you",
+      "dot": "aborted"
+    },
+    "board": {
+      "headline": "Reviewer requests changes",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": null
+    },
+    "list": {
+      "status": "Reviewer requests changes",
+      "dot": "aborted",
+      "stage": "in-review"
+    }
+  },
+  "changes requested, its Builder finished the fixes": {
+    "page": {
+      "headline": "Reviewer requests changes",
+      "sentence": "Finish and check in the session saves the fixes and starts the next review.",
+      "action": "inspect-run",
+      "column": "needs-you",
+      "dot": "aborted"
+    },
+    "board": {
+      "headline": "Reviewer requests changes",
+      "column": "needs-you",
+      "dot": "aborted",
+      "fact": null
+    },
+    "list": {
+      "status": "Reviewer requests changes",
+      "dot": "aborted",
+      "stage": "in-review"
+    }
+  },
+  "changes sent, its Builder works on them": {
+    "page": {
+      "headline": "Changes sent to the Builder",
+      "sentence": "The Builder has them in its session. When it has addressed them, press Finish and check there; Ship waits until then.",
+      "action": "inspect-run",
+      "column": "working",
+      "dot": "done"
+    },
+    "board": {
+      "headline": "Changes sent to the Builder",
+      "column": "working",
+      "dot": "done",
+      "fact": null
+    },
+    "list": {
+      "status": "Changes sent to the Builder",
+      "dot": "done",
+      "stage": "in-review"
+    }
+  },
+  "Finish and check pressed, its Builder re-reads its work": {
+    "page": {
+      "headline": "Working",
+      "sentence": "It is running now.",
+      "action": "inspect-run",
+      "column": null,
+      "dot": "running"
+    },
+    "board": {
+      "headline": "Working",
+      "column": "working",
+      "dot": "running",
+      "fact": "1m"
+    },
+    "list": {
+      "status": "Working",
+      "dot": "running",
+      "stage": "in-progress"
+    }
+  },
+  "Plyloft quit during the self-check": {
+    "page": {
+      "headline": "Session ended",
+      "sentence": "Nothing is running this build, and its copy is safe.",
+      "action": "resume-session",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Session ended",
+      "column": "needs-you",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Session ended",
+      "dot": "empty",
+      "stage": "in-progress"
+    }
+  },
+  "the checks wait for this Mac's OK": {
+    "page": {
+      "headline": "Session closed",
+      "sentence": "Nothing is running this build, and its copy is safe.",
+      "action": "resume-session",
+      "column": null,
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Session closed",
+      "column": "needs-you",
+      "dot": "empty",
+      "fact": null
+    },
+    "list": {
+      "status": "Session closed",
+      "dot": "empty",
+      "stage": "in-progress"
+    }
+  },
+  "ready, its brief changed on GitHub and here": {
+    "page": {
+      "headline": "Ready to start",
+      "sentence": "The brief is written and nothing has started.",
+      "action": "start-build",
+      "column": "not-started",
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Ready to start",
+      "column": "not-started",
+      "dot": "empty",
+      "fact": "#70"
+    },
+    "list": {
+      "status": "Ready to start",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  },
+  "a teammate's, its title changed on GitHub and here": {
+    "page": {
+      "headline": "Claimed by ana",
+      "sentence": "The brief is written and nothing has started.",
+      "action": "start-build",
+      "column": "waiting",
+      "dot": "empty"
+    },
+    "board": {
+      "headline": "Claimed by ana",
+      "column": "waiting",
+      "dot": "empty",
+      "fact": "#71"
+    },
+    "list": {
+      "status": "Claimed by ana",
+      "dot": "empty",
+      "stage": "to-do"
+    }
+  }
+}

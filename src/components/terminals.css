@@ -1,0 +1,1334 @@
+/* UX-8.2 / UX-8.3 (the Terminals board): a tile's header on the one scale.
+   28 px: the mono kind glyph, the label, the status on the right (a dot and
+   words), and expand/restore and close as icon buttons that appear on hover
+   or focus. Every colour is a token. */
+
+.tile-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  height: 28px;
+  flex: 0 0 28px;
+  padding: 0 var(--space-xs) 0 var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-bg);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--fg);
+  user-select: none;
+  min-width: 0;
+  position: relative;
+}
+
+.tile-kind-icon {
+  flex: 0 0 14px;
+  width: 14px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--muted);
+}
+.tile-kind-icon.kind-shell {
+  color: var(--shell-accent);
+}
+.tile-kind-icon.kind-claude {
+  color: var(--claude-accent);
+}
+.tile-kind-icon.kind-codex,
+.tile-kind-icon.kind-codex-chat {
+  color: var(--codex-accent);
+}
+.tile-kind-icon.kind-agent-run {
+  color: var(--ok);
+}
+
+/* GH #290: the label is what gives way — down to a few characters — never
+   the status beside it. */
+.tile-label {
+  flex: 1 1 auto;
+  min-width: 4ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Expand/restore, close and rename: 22 px icon buttons. */
+.tile-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.tile-icon-btn:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+
+/* They appear on hover, and stay while anything in the tile has focus —
+   a keyboard user always sees them. GH #290: at rest they take no room —
+   out of the row, not merely transparent (their ~76 px clipped the label
+   and the status) — yet still in the tab order: focusing one is focus
+   within the tile, which brings them back. */
+.tile-on-hover {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  opacity: 0;
+}
+.tile:hover .tile-on-hover,
+.tile:focus-within .tile-on-hover,
+.tile.expanded .tile-on-hover {
+  position: static;
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+  clip-path: none;
+  opacity: 1;
+}
+
+/* 1.174.0 E4 (P21): Expand and Close never give way — the chips and the
+   label do — so on hover they always have their room, after the status. */
+.tile-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  flex: 0 0 auto;
+  order: 2;
+}
+
+/* UX-0.1: Restart on an ended tile — a quiet button with its words. */
+.tile-restart {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: 22px;
+  padding: 0 var(--space-sm);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.tile-restart:hover {
+  background: var(--hover);
+}
+/* QoL 1.168 (block 4, D2): Start fresh, the second way beside Continue. */
+.tile-restart--quiet {
+  color: var(--muted);
+}
+.tile-restart--quiet:hover {
+  color: var(--fg);
+}
+/* GH #290: in a narrow tile Restart is its icon (named by aria-label), so
+   the outcome beside it keeps its words. */
+@container tile (max-width: 320px) {
+  .tile-restart-word {
+    display: none;
+  }
+  .tile-restart {
+    padding: 0 var(--space-xs);
+  }
+}
+
+/* The status: words, with a dot for running, done and failed. GH #290: it
+   is the tile's outcome, so it never shrinks — the label gives way. */
+.tile-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+  order: 1;
+  margin-left: auto;
+  white-space: nowrap;
+  color: var(--fg);
+}
+/* 1.174.0 E4 (P21, mockup terminals.html §1): a question's short form
+   ("Asks: trust") shows in a tile of 480 px or less; the full words stay
+   the tooltip and what a screen reader reads. */
+.tile-status-short {
+  display: none;
+}
+.tile-status-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--signal-empty-fg);
+}
+.tile-status-dot--live {
+  animation: ux-pulse var(--dur-pulse) ease-in-out infinite;
+}
+.tile-status--running .tile-status-dot {
+  background: var(--signal-running-fg);
+}
+.tile-status--done .tile-status-dot {
+  background: var(--signal-done-fg);
+}
+.tile-status--failed .tile-status-dot {
+  background: var(--signal-aborted-fg);
+}
+/* QoL 1.168 (block 10, A6): a real crash (no exit code, or Claude or Codex
+   ending abnormally) is red — words and a filled dot — so a dead tile is not
+   read as a slow one or one that asks. A shell's error stays amber. */
+.tile-status--crashed {
+  color: var(--signal-crashed-fg);
+}
+.tile-status--crashed .tile-status-dot {
+  background: var(--signal-crashed-fg);
+}
+/* UX-8.4: working with no output for 10 minutes — amber words and a
+   hollow ring (A6: the shape differs from a question's filled dot). */
+.tile-status--quiet {
+  color: var(--signal-stalled-fg);
+}
+.tile-status--quiet .tile-status-dot {
+  box-sizing: border-box;
+  background: transparent;
+  border: 2px solid var(--signal-stalled-fg);
+}
+/* Terminals block P3: the session waits on the member — amber words and a
+   filled dot, and the tile's border, so it is seen among others. */
+.tile-status--asks {
+  color: var(--signal-asks-fg);
+  font-weight: var(--type-subheading-weight);
+}
+.tile-status--asks .tile-status-dot {
+  background: var(--signal-asks-fg);
+}
+.tile.tile--asks {
+  border-color: var(--signal-asks-fg);
+}
+.tile-status--pending,
+.tile-status--exited,
+.tile-status--ended {
+  color: var(--muted);
+}
+
+/* Swarm and overlap: quiet chips with words. */
+/* 1.174.0 E4 (P21): chips give way before the status — they shrink, and
+   their words end in an ellipsis (.tile-chip-text, .tile-chip-full,
+   .tile-chip-short). */
+.tile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 20px;
+  padding: 0 var(--space-sm);
+  border-radius: var(--radius-sm);
+  background: var(--hover);
+  color: var(--muted);
+  font-size: var(--type-caption);
+  font-weight: var(--type-caption-weight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tile-chip-text,
+.tile-chip-full,
+.tile-chip-short {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tile-chip-short {
+  display: none;
+}
+/* 1.174.0 (A7, T15 · P32): "Skill updated" — an outline and an amber dot
+   (.tile-chip-dot), like Same folder below; no tinted fill. */
+.tile-chip--warn {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--fg);
+}
+
+/* 1.173.0 (A4): "Same folder as …" — a real button, calm: an outline and
+   a dot carry the warning, no tinted fill. */
+.tile-chip--folder {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  cursor: pointer;
+}
+.tile-chip--folder:hover {
+  background: var(--hover);
+}
+.tile-chip--folder:focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+}
+.tile-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal-aborted-fg);
+  flex: 0 0 auto;
+}
+/* 1.174.0 E4 (P21, mockup terminals.html §1). At 480 px or less "Same
+   folder as codex 2" reads "Same folder" and a question its short form; at
+   320 px or less the folder chip is its dot (still a real button, with its
+   full name). The header's other parts give way before the status. */
+@container tile (max-width: 480px) {
+  .tile-chip-full {
+    display: none;
+  }
+  .tile-chip-short {
+    display: block;
+  }
+  /* Out of sight, still read: the status is a live region, and its short
+     form is aria-hidden. */
+  .tile-status-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .tile-status-short {
+    display: inline;
+  }
+}
+@container tile (max-width: 320px) {
+  .tile-header {
+    gap: var(--space-xs);
+  }
+  .tile-chip--folder .tile-chip-full,
+  .tile-chip--folder .tile-chip-short {
+    display: none;
+  }
+  .tile-chip--folder {
+    flex: 0 0 22px;
+    width: 22px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+/* "Copy · <name>" leaves a very narrow tile (mockup §1, under 260 px); the
+   label's tooltip still names the folder, the copy's path. */
+@container tile (max-width: 260px) {
+  .tile-copy-mark {
+    display: none;
+  }
+}
+.tile-folder-pop {
+  padding: var(--space-md);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+  color: var(--fg);
+}
+/* The popover's two lines (bare paragraphs, Challenger E4); the hint keeps
+   its own margin. */
+.tile-folder-pop > p:not(.tile-folder-pop-hint) {
+  margin: 0 0 var(--space-sm);
+}
+.tile-folder-pop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.tile-folder-pop-hint {
+  margin: var(--space-sm) 0 0;
+  color: var(--muted);
+}
+
+/* #47: dictation in a Codex or shell tile — "Listening" with a dot. */
+.tile-dictation {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+  color: var(--fg);
+  white-space: nowrap;
+}
+.tile-dictation-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--danger);
+  animation: ux-pulse var(--dur-pulse) ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile-status-dot--live,
+  .tile-dictation-dot {
+    animation: none;
+  }
+}
+
+.tile-edit-input {
+  min-width: 60px;
+  max-width: 40%;
+  height: 22px;
+  padding: 0 var(--space-xs);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  outline: none;
+}
+.tile-edit-input:focus {
+  border-color: var(--claude-accent);
+}
+.tile-edit-input.has-error,
+.tile-edit-input.has-error:focus {
+  border-color: var(--warn);
+}
+.tile-edit-hint {
+  color: var(--warn);
+  font-size: var(--type-caption);
+  white-space: nowrap;
+}
+
+/* ── The grid (GH #291) ──────────────────────────────────────────────
+   The page's margins, as the Board's columns: 32 px at the sides, 8 px
+   between tiles, a margin under the last row. 16 px at the sides in a
+   narrow window, so the tiles keep their width. */
+.tile-grid {
+  flex: 1;
+  display: grid;
+  gap: var(--space-sm);
+  padding: 0 var(--space-2xl) var(--space-lg);
+  background: var(--bg);
+  min-height: 0;
+}
+@media (max-width: 1000px) {
+  .tile-grid {
+    padding: 0 var(--space-lg) var(--space-lg);
+  }
+}
+
+/* ── The empty page (GH #292) ─────────────────────────────────────────
+   One line and two quiet ways to start, in the page's margins; the
+   header's New is the page's one primary. */
+.tile-grid-empty {
+  flex: 1;
+  min-height: 0;
+  padding: 0 var(--space-2xl) var(--space-2xl);
+  background: var(--bg);
+}
+.tile-grid-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+/* SP-7: the card sessions an empty page points to, one link per card. */
+.tile-grid-empty-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-xs) var(--space-sm);
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.tile-grid-empty-actions kbd,
+.tile-grid-empty-links kbd {
+  font-family: inherit;
+  font-size: var(--type-caption);
+  color: var(--muted);
+}
+/* 1.174.0 E7 (T6, G16): the other ways to start, one quiet line under the
+   page's one strong button (or under the Reopen offer). */
+.tile-grid-empty-actions {
+  flex-direction: column;
+  align-items: center;
+}
+.tile-grid-empty-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0 var(--space-xs);
+  margin: var(--space-sm) 0 0;
+  color: var(--muted);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.tile-grid-empty-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+/* ── The tile (UX-8.3) ─────────────────────────────────────────────── */
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  container: tile / inline-size;
+  background: var(--term-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+.tile:focus-within {
+  border-color: var(--claude-accent);
+}
+.tile.pending-close {
+  opacity: 0.55;
+}
+/* D4 (1.172.2): the accent border alone; the label inside says the rest
+   (the inset ring is gone: a coloured box around the words fought them). */
+.tile.tile-drop-active {
+  border-color: var(--claude-accent);
+}
+
+/* ── The terminal pane (UX-8.3): the one --term-bg, no literal ─────── */
+
+.terminal-pane-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: var(--term-bg);
+}
+
+.terminal-pane {
+  flex: 1;
+  min-height: 0;
+  background: var(--term-bg);
+  padding: 0;
+  overflow: hidden;
+}
+/* 1.177.0 (walk, F5; review L2): the insets are the xterm element's own
+   padding, as a shell tile's gutter already is. The fit addon counts rows and
+   columns from the pane's computed size — its border box under the app's
+   `box-sizing: border-box`, padding included — and subtracts only `.xterm`'s
+   padding: an inset on the pane made the last row overhang the pane by up to
+   that inset, cut at the tile's bottom edge (and the last column likewise). */
+.terminal-pane .xterm {
+  padding: var(--space-xs) 0 0 var(--space-sm);
+}
+
+/* 1.169.0 (B1): xterm 6 paints the theme background on its scrollable
+   element only, and leaves `.xterm-viewport` (absolute, the whole `.xterm`
+   box, padding included) at xterm.css's #000 — a black strip in the shell
+   tile's gutter and under the last row in every host. xterm 5 painted it the
+   theme background; `--term-bg` is that background in every theme
+   (lib/xtermTheme.ts). */
+.xterm .xterm-viewport {
+  background-color: var(--term-bg);
+}
+
+/* A shell tile: its left inset is the xterm element's own padding, the gutter
+   the command-block marks draw in (below). On `.xterm` itself because the fit
+   addon subtracts that element's padding before counting columns, so the PTY
+   gets the columns the text area really has; the pane's own left padding
+   goes, so the text starts --command-block-gutter in. Always on for a shell
+   tile (the marks draw whenever the shell prints OSC 133, whatever the
+   setting; a gutter that came and went would resize the PTY). */
+.terminal-pane.is-shell {
+  --command-block-gutter: var(--space-lg);
+  padding-left: 0;
+}
+.terminal-pane.is-shell .xterm {
+  padding-left: var(--command-block-gutter);
+}
+
+/* Search (⌘F inside a terminal), pinned top-right. */
+/* D4 (1.172.2): what a drop will do, centred over the terminal while a file
+   is dragged over it — plain words on the raised surface, no tint. */
+.terminal-drop-hint {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-pane-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.terminal-drop-hint > span {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--fg);
+  font-size: var(--type-body);
+  box-shadow: var(--shadow-popover);
+}
+
+/* 1.174.0 E6 (P23): a Codex chat takes no files and says where they go —
+   the same raised words, an amber dot beside them, the tile outlined (no
+   fill, no tint). */
+.tile.tile-drop-refusing {
+  outline: 2px dashed var(--border-strong);
+  outline-offset: -4px;
+}
+.tile-drop-refusal > span {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  max-width: min(340px, 85%);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.tile-drop-refusal-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--warn);
+}
+
+/* D4: "Adding <name>…" from the drop until the path is typed. */
+.terminal-drop-adding {
+  position: absolute;
+  right: var(--space-sm);
+  bottom: var(--space-xs);
+  z-index: var(--z-pane-overlay);
+  max-width: 70%;
+  padding: 0 var(--space-xs);
+  background: var(--term-bg);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-size: var(--type-caption);
+  pointer-events: none;
+}
+
+.terminal-search {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-sm);
+  z-index: var(--z-pane-overlay-top);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+}
+.terminal-search input {
+  width: 160px;
+  height: 24px;
+  padding: 0 var(--space-sm);
+  font: inherit;
+  font-size: var(--type-caption);
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-sm);
+  outline: none;
+}
+.terminal-search input:focus {
+  border-color: var(--claude-accent);
+}
+.terminal-search button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--space-xs);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: var(--type-caption);
+  cursor: pointer;
+}
+.terminal-search button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.terminal-search button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Command blocks (OSC 133): a quiet badge bottom-right, on the theme's own
+   raised surface — not a dark pill in the light theme. */
+.terminal-blocks {
+  position: absolute;
+  bottom: var(--space-xs);
+  right: var(--space-sm);
+  z-index: var(--z-pane-overlay);
+}
+.terminal-blocks-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  height: 20px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--raised);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+  cursor: pointer;
+}
+.terminal-blocks-badge:hover {
+  background: var(--panel-bg);
+}
+.terminal-blocks-ok { color: var(--signal-done-fg); }
+.terminal-blocks-fail { color: var(--signal-aborted-fg); }
+
+.terminal-blocks-popover {
+  position: absolute;
+  bottom: 28px;
+  right: 0;
+  width: 240px;
+  max-height: 320px;
+  background: var(--raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.terminal-blocks-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-xs) var(--space-xs) var(--space-md);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--type-small);
+  color: var(--muted);
+}
+.terminal-blocks-popover-head button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.terminal-blocks-popover-head button:hover {
+  background: var(--hover);
+  color: var(--fg);
+}
+.terminal-blocks-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-xs) 0;
+  overflow-y: auto;
+  flex: 1;
+}
+.terminal-blocks-item {
+  list-style: none;
+}
+.terminal-blocks-item-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  width: 100%;
+  font-size: var(--type-caption);
+  font-family: var(--font-mono);
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.terminal-blocks-item-button:hover:not(:disabled) {
+  background: var(--hover);
+}
+.terminal-blocks-item-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.terminal-blocks-dot {
+  flex-shrink: 0;
+  min-width: 32px;
+  font-weight: 600;
+}
+.terminal-blocks-dot.ok { color: var(--signal-done-fg); }
+.terminal-blocks-dot.fail { color: var(--signal-aborted-fg); }
+.terminal-blocks-time {
+  flex: 1;
+  color: var(--muted);
+}
+.terminal-blocks-when {
+  color: var(--muted);
+}
+
+/* Command Blocks v2: a per-block glyph beside the first row of the command's
+   output, in the shell tile's gutter (the 2026-10-20 walks: at column 0 it
+   covered that row's first character). xterm places the decoration at x 0
+   with an inline cell width; this moves it left of column 0 and sizes it to
+   the gutter, so it never covers text. */
+.command-block-marker {
+  left: calc(-1 * var(--command-block-gutter, var(--space-lg))) !important;
+  width: var(--command-block-gutter, var(--space-lg)) !important;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+  font-weight: 700;
+  pointer-events: none;
+}
+/* 1.174.0 (A7, P32): the pass/fail mark in the gutter — a filled 8 px dot
+   when it passed, an empty ring when it failed (shape, not only colour; its
+   title and label say which); no tinted cell. */
+.command-block-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.command-block-marker::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.command-block-marker.ok {
+  color: var(--signal-done-fg);
+}
+.command-block-marker.fail {
+  color: var(--signal-aborted-fg);
+}
+.command-block-marker.fail::before {
+  box-sizing: border-box;
+  background: transparent;
+  border: 1.5px solid currentColor;
+}
+
+/* ── The Codex chat tile (GH #294) ─────────────────────────────────────
+   On the one scale: nothing under 12 px, radii and spacing from tokens,
+   fields on --border-control, the placeholder muted. The tile header says
+   the state; the toolbar only what the header cannot. Approval requests
+   are regular DOM so their scope and persistence stay inspectable. */
+.codex-session {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+
+.codex-session-toolbar,
+.codex-composer,
+.codex-approval-actions,
+.codex-rule {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.codex-session-toolbar {
+  justify-content: space-between;
+  min-height: 32px;
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  font-size: var(--type-caption);
+}
+.codex-session-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-left: auto;
+}
+.codex-session-state {
+  color: var(--muted);
+}
+
+.codex-rules-panel {
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  background: var(--raised);
+  font-size: var(--type-caption);
+}
+.codex-rule {
+  justify-content: space-between;
+  margin-bottom: var(--space-xs);
+}
+.codex-rule code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.codex-rules-panel p {
+  margin: var(--space-sm) 0 0;
+  color: var(--muted);
+}
+
+.codex-transcript {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-md);
+}
+.codex-welcome {
+  max-width: 560px;
+  margin: var(--space-lg) auto;
+  color: var(--muted);
+}
+
+.codex-entry {
+  max-width: 88%;
+  margin-bottom: var(--space-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.codex-entry-user {
+  margin-left: auto;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+.codex-entry-activity {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+}
+.codex-entry-error {
+  color: var(--warn);
+}
+
+/* v1.103.0: assistant markdown. `white-space: pre-wrap` on .codex-entry is
+ * right for streamed plain text but would double every block gap once the
+ * message is parsed, so the rendered subtree opts out. */
+.codex-markdown {
+  white-space: normal;
+}
+.codex-markdown > :first-child {
+  margin-top: 0;
+}
+.codex-markdown > :last-child {
+  margin-bottom: 0;
+}
+.codex-markdown p,
+.codex-markdown ul,
+.codex-markdown ol,
+.codex-markdown pre {
+  margin: 0 0 var(--space-sm);
+}
+.codex-markdown ul,
+.codex-markdown ol {
+  padding-left: var(--space-lg);
+}
+.codex-markdown code {
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+}
+.codex-markdown pre {
+  overflow-x: auto;
+  padding: var(--space-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+.codex-markdown pre code {
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+}
+
+/* An approval: a raised surface with a hairline, an amber dot and the
+   question — no coloured frame. */
+.codex-approval-card {
+  margin: 0 var(--space-sm) var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+}
+.codex-approval-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.codex-approval-title strong {
+  font-weight: 600;
+}
+.codex-approval-dot {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--warn);
+}
+.codex-approval-card pre {
+  max-height: 110px;
+  margin: var(--space-sm) 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+  color: var(--fg);
+}
+.codex-approval-actions {
+  flex-wrap: wrap;
+}
+
+/* v1.103.0 (D5): the turn's changes, one row above the composer. Collapsed
+ * it costs a single line; expanded it takes a bounded, scrollable slice of a
+ * ~400px tile instead of a share of it. */
+.codex-changes {
+  border-top: 1px solid var(--border);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+}
+.codex-changes-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.codex-changes-bar:hover {
+  background: var(--hover);
+}
+/* GH #211: the bar's empty state after a turn that ran shell commands —
+ * one muted line in the bar's own place and measures, not a button. */
+.codex-changes-hint {
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--muted);
+}
+.codex-changes-caret {
+  color: var(--muted);
+}
+.codex-changes-label {
+  flex: 1;
+  min-width: 0;
+}
+.codex-changes-added {
+  color: var(--ok);
+}
+.codex-changes-removed {
+  color: var(--warn);
+}
+.codex-changes-panel {
+  max-height: 220px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  background: var(--raised);
+}
+.codex-changes-file + .codex-changes-file {
+  border-top: 1px solid var(--border);
+}
+.codex-changes-path {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--muted);
+}
+.codex-changes-path code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.codex-changes-panel pre {
+  margin: 0;
+  padding: 0 0 var(--space-xs);
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--type-caption);
+  line-height: var(--type-caption-lh);
+}
+.codex-diff-line {
+  display: block;
+  padding: 0 var(--space-sm);
+  white-space: pre;
+}
+.codex-diff-add {
+  color: var(--ok);
+}
+.codex-diff-del {
+  color: var(--warn);
+}
+.codex-diff-hunk,
+.codex-diff-meta {
+  color: var(--muted);
+}
+
+/* The composer: a field on --border-control with a muted placeholder, and
+   Send, the one primary, filled once there is something to send. */
+.codex-composer {
+  align-items: flex-end;
+  padding: var(--space-sm);
+  border-top: 1px solid var(--border);
+}
+.codex-composer textarea {
+  flex: 1;
+  min-height: 38px;
+  max-height: 130px;
+  resize: vertical;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--fg);
+  padding: var(--space-sm);
+  font: inherit;
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.codex-composer textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.codex-composer textarea:focus,
+.codex-composer textarea:focus-visible {
+  outline: none;
+  border-color: var(--claude-accent);
+}
+
+/* Terminals block P4: New › Resume…'s list of conversations. */
+.resume-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.resume-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font: inherit;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.resume-row:hover {
+  background: var(--hover);
+}
+.resume-row.selected {
+  background: var(--selected);
+  border-color: var(--border-strong);
+}
+.resume-row:focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+}
+.resume-row-title {
+  overflow-wrap: anywhere;
+}
+.resume-row-meta,
+.resume-list-note {
+  color: var(--muted);
+}
+/* QoL 1.168 (block 4): how a conversation of a shared name began. */
+.resume-row-detail {
+  color: var(--muted);
+  font-size: var(--type-caption);
+  overflow-wrap: anywhere;
+}
+/* 1.174.0 E9 (T9): the door to every project's sessions, under the list. */
+.resume-list-foot {
+  margin: var(--space-sm) 0 0;
+}
+.resume-list-message {
+  margin: var(--space-sm) 0 0;
+  color: var(--fg);
+}
+
+/* QoL 1.168 (block 4, D11): the offer to reopen what was open at quit.
+   F3 (1.172.1): one calm line — muted words, the names in normal ink, a
+   bordered button and a quiet Not now; no fill, no tint, no coloured edge. */
+.tile-reopen {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+.tile-reopen-line {
+  margin: 0;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.tile-reopen-name {
+  color: var(--fg);
+}
+.tile-reopen--bar {
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+}
+/* E7: on the empty page the line, then its two buttons under it. */
+.tile-reopen--inline {
+  flex-direction: column;
+  justify-content: center;
+}
+.tile-reopen--inline .tile-reopen-line {
+  text-align: center;
+  font-size: var(--type-body);
+  line-height: var(--type-body-lh);
+}
+.tile-reopen-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* 1.168.1 (#6, Windows): a Claude tile started in the other light/dark
+   says so, with Restart (ThemeRestartLine). */
+/* 1.174.0 E2 (P19): a copy tile's trust question, explained — muted words
+   on the tile's own ground, no tint. */
+.tile-copy-trust {
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+.tile-theme-restart {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--type-small);
+  line-height: var(--type-small-lh);
+}
+
+/* 1.173.0 (A3): a terminal in a copy — plain words in the head, no fill. */
+.tile-copy-mark {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: var(--type-caption);
+}
+.tile-copy-setup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--type-caption);
+  white-space: nowrap;
+}
+.tile-copy-retry {
+  height: 20px;
+  padding: 0 var(--space-sm);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+}
+.tile-copy-retry:hover {
+  background: var(--hover);
+}
+.tile-copy-retry:focus-visible {
+  outline: var(--focus-w) solid var(--claude-accent);
+  outline-offset: var(--focus-offset);
+}
+
+/* 1.173.0 (A3): the New terminal in a copy sheet. */
+.copy-sheet-field {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.copy-sheet-label {
+  color: var(--muted);
+  font-size: var(--type-small);
+}
+.copy-sheet-value {
+  font-size: var(--type-small);
+}
+.copy-sheet-hint {
+  margin: var(--space-sm) 0 0;
+  color: var(--muted);
+  font-size: var(--type-small);
+}
+.copy-sheet-failure {
+  color: var(--fg);
+}
+
+/* 1.173.0 (A3): Terminals › Copies, over the grid (which stays mounted,
+   hidden, so no terminal is unmounted). */
+.tile-grid-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tile-grid-body > .tile-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.tile-grid--behind {
+  visibility: hidden;
+  pointer-events: none;
+}
+.copies-view {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  background: var(--bg);
+}
+/* 1.174.0 E3: the lede alone heads the list (the mode header has the title). */
+.copies-lede {
+  margin-top: 0;
+}
+
+/* The relay bar's scrolling is the Terminals page's own, not the layer's (the
+   layer caps four things only): the open bar takes at most 45% of the grid,
+   its answer preview 140 px, and the passes list 320 px; each scrolls inside. */
+.ux-relay--open {
+  max-height: 45%;
+  overflow: auto;
+}
+.ux-relay-answer {
+  max-height: 140px;
+  overflow: auto;
+}
+.ux-relay-history {
+  max-height: 320px;
+  overflow: auto;
+}

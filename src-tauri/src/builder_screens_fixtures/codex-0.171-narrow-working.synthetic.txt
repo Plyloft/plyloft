@@ -1,0 +1,18 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: idle
+# truth: working: a 40-column terminal cuts the Working line before 'esc to interrupt'
+# vendor: codex
+# source: synthetic, phase 2 review (REV-offscreen-p2 MF2); not a grid capture
+# exited: false
+# last-output-ago-ms: 60000
+# content-changed-ago-ms: 60000
+# ----
+• Ran npm test
+  └ 412 passed
+
+• Working (4m 02s • esc to
+
+› Ask Codex to do anything
+
+  ? for shortcuts

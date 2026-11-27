@@ -1,0 +1,17 @@
+# plyloft builder screen frame v1
+# expect: working
+# screen: running
+# truth: working: a tool running (the ported screen's own state)
+# vendor: claude
+# source: synthetic, ported from src/lib/attention.test.ts R3_TOOL_RUNNING (re-walk R3, 2026-09-29, Claude 2.1, macOS xterm rows); not a grid capture (the real ones sit beside it)
+# exited: false
+# last-output-ago-ms: 200
+# content-changed-ago-ms: 0
+# ----
+● Bash(node -e "setTimeout(()=>console.log('ok'),50000)")
+  ⎿  Running… (6s · timeout 1m 30s)
+
+────────────────────────────────────────────────────────────
+❯
+────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents

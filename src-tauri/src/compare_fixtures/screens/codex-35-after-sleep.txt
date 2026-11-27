@@ -1,0 +1,27 @@
+# plyloft compare screen v1
+# vendor: codex
+# cli: Codex 0.172.0
+# platform: macos
+# source: real capture, narrow-tile Mac walk 2026-11-26 (app-walks/2026-11-26-122139, Plyloft Test 1.177.1 build 35bb0818, layout Six (2x3), Claude's rule 35 columns, read with ui_terminal), step 4, after the turn; rows verbatim
+# verdict: ready
+# cells: plain
+# ----
+› Run the shell command: sleep 20
+ 
+ 
+• I’ll run sleep 20 and wait for it
+  to finish.
+ 
+• Ran sleep 20
+  └ (no output)
+ 
+• sleep 20 completed successfully.
+ 
+  Worked for 25s • 12:24           
+ 
+ 
+› Ask Codex to do anything
+ 
+  GPT-6.2-Sol default · ~/Library/
+  Application Support/…
+  ← for agents · ? for shortcuts

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "local create stays free without a key",
+    "mode": "local",
+    "teamAllowed": false,
+    "touchesGithubOwnedField": true,
+    "blocked": false
+  },
+  {
+    "name": "GitHub create refuses without a key",
+    "mode": "githubIssues",
+    "teamAllowed": false,
+    "touchesGithubOwnedField": true,
+    "blocked": true
+  },
+  {
+    "name": "GitHub create remains admitted in grace or valid",
+    "mode": "githubIssues",
+    "teamAllowed": true,
+    "touchesGithubOwnedField": true,
+    "blocked": false
+  },
+  {
+    "name": "local-only GitHub patch stays usable while lapsed",
+    "mode": "githubIssues",
+    "teamAllowed": false,
+    "touchesGithubOwnedField": false,
+    "blocked": false
+  },
+  {
+    "name": "GitHub-owned patch refuses while lapsed",
+    "mode": "githubIssues",
+    "teamAllowed": false,
+    "touchesGithubOwnedField": true,
+    "blocked": true
+  },
+  {
+    "name": "GitHub-owned patch remains admitted in grace or valid",
+    "mode": "githubIssues",
+    "teamAllowed": true,
+    "touchesGithubOwnedField": true,
+    "blocked": false
+  }
+]
