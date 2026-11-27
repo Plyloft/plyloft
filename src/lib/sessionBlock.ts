@@ -24,12 +24,28 @@ export type SessionBlockKind = "bypass" | "usageLimit";
  *  `TrustAsking`'s). */
 export type SessionBlocks = Record<
   string,
-  { workspaceId: string; vendor: Vendor; kind: SessionBlockKind; resetsAt: string | null }
+  {
+    workspaceId: string;
+    vendor: Vendor;
+    kind: SessionBlockKind;
+    resetsAt: string | null;
+    /** 1.179.0 (C2): the Claude account the stopped session runs on;
+     *  absent: Main. */
+    account?: string;
+  }
 >;
 
 /** The backend's list (`builder_session_blocks`), its non-trust kinds. */
 export function sessionBlocksFrom(
-  list: readonly { key: string; workspaceId: string; vendor: string; kind?: string; resetsAt?: string | null; intake?: boolean }[],
+  list: readonly {
+    key: string;
+    workspaceId: string;
+    vendor: string;
+    kind?: string;
+    resetsAt?: string | null;
+    intake?: boolean;
+    account?: string | null;
+  }[],
 ): SessionBlocks {
   const out: SessionBlocks = {};
   for (const b of list) {
@@ -39,6 +55,7 @@ export function sessionBlocksFrom(
       vendor: b.vendor === "codex" ? "codex" : "claude",
       kind: b.kind,
       resetsAt: b.resetsAt?.trim() ? b.resetsAt.trim() : null,
+      ...(b.account ? { account: b.account } : {}),
     };
   }
   return out;
@@ -53,7 +70,8 @@ export function sameSessionBlocks(a: SessionBlocks, b: SessionBlocks): boolean {
       b[k].vendor === a[k].vendor &&
       b[k].workspaceId === a[k].workspaceId &&
       b[k].kind === a[k].kind &&
-      b[k].resetsAt === a[k].resetsAt,
+      b[k].resetsAt === a[k].resetsAt &&
+      b[k].account === a[k].account,
   );
 }
 

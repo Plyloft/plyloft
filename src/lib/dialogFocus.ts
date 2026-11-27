@@ -101,9 +101,13 @@ export function useDialogFocus({
       if (!container) return;
       // 1.174.0 X1: focus moved inside the dialog since it opened (its list
       // taking focus once loaded, a press the person made) is kept; the
-      // first frame doesn't take it back.
+      // first frame doesn't take it back. 1.179.0: neither is a field of the
+      // dialog that took focus as it was drawn (`autoFocus`, which this
+      // effect then reads as the opener), unless the dialog names what takes
+      // focus: a dialog whose choice is only its own surface names nothing.
       const now = document.activeElement;
-      if (now instanceof HTMLElement && now !== opener && container.contains(now)) return;
+      const named = initialFocusRef?.current;
+      if (now instanceof HTMLElement && container.contains(now) && (now !== opener || !named || named === container)) return;
       const initial = initialFocusRef?.current ?? focusableElements(container)[0];
       (initial ?? container).focus({ preventScroll: true });
     });

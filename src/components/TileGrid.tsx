@@ -41,6 +41,8 @@ import { listenForFolderChanges } from "../store/folderChanges";
 import { pushToast } from "../store/toastStore";
 import { COPIES_TITLE, NEW_COPY_MENU, NEW_COPY_MENU_HINT } from "../lib/copyWords";
 import { listenForCopies, useCopies, useWorkspaceCopies } from "../store/copiesStore";
+import { useClaudeAccountRows } from "../store/claudeAccountsStore";
+import { newSessionChoices } from "../lib/claudeAccountNames";
 
 /** 1.174.0 E6 (T11, P23): what New › Codex chat lacks, under its name. The
  *  rest (Throw away doesn't wait for it, the Inbox doesn't reopen it) is in
@@ -171,6 +173,8 @@ export function TileGrid({ env, workspace }: Props) {
   // Terminals block P4: New › Resume….
   const [resumeOpen, setResumeOpen] = useState(false);
   const canResume = Boolean(env?.claudePath || env?.codexPath);
+  // 1.179.0 (C2): New's "Claude on {name}" entries.
+  const accountRows = useClaudeAccountRows();
   // QoL 1.168 (D3): ⌘T's hint sits beside the kind it opens.
   const defaultKind = useDefaultNewTileKind(env);
   // 1.173.0 A3: New › In a new copy… (and A4's "Same folder" popover) opens
@@ -385,6 +389,15 @@ export function TileGrid({ env, workspace }: Props) {
       shortcut: keysHere(defaultKind === "claude" ? "newShell" : "newClaude"),
       onSelect: onAddClaude,
     });
+    // 1.179.0 (C2): with more than one Claude account, one entry per
+    // account; plain Claude keeps starting on the account for new sessions.
+    for (const choice of newSessionChoices(accountRows)) {
+      newItems.push({
+        label: choice.label,
+        onSelect: () =>
+          showNewTile(useTiles.getState().addClaudeTile(ws.id, ws.cwd, choice.account ? { account: choice.account } : undefined)),
+      });
+    }
   }
   if (env?.codexPath) {
     newItems.push({

@@ -7,6 +7,8 @@ import { resumeConversation } from "../store/resumeConversation";
 import { useWorkspaces } from "../store/workspaceStore";
 import { textMatches, type HistoryFilter } from "../lib/historyView";
 import { CBtn, ListView, StateWord, type ListColumn } from "./ux";
+import { useClaudeAccountRows } from "../store/claudeAccountsStore";
+import { resumeNoteFor, shownAccountName, tileAccountWords } from "../lib/claudeAccountNames";
 
 /**
  * Terminals block P5 (owner, 2026-10-21): History › Sessions — the Claude
@@ -43,6 +45,14 @@ export function HistorySessions({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [anywayFor, setAnywayFor] = useState<SessionHistoryRow | null>(null);
   const reasonId = useId();
+  // 1.179.0 (C2): with more than one Claude account, a row names its own.
+  const accountRows = useClaudeAccountRows();
+  const kindCell = (r: SessionHistoryRow): string => {
+    const name = r.kind === "claude" ? shownAccountName(accountRows, r.account) : null;
+    return name ? r.kindWord.replace(/^Claude/, tileAccountWords(name)) : r.kindWord;
+  };
+  const resumeNote = (r: SessionHistoryRow): string | undefined =>
+    (r.kind === "claude" && r.action.kind === "resume" ? resumeNoteFor(accountRows, r.account) : null) ?? undefined;
 
   // Challenger round 1: one call for every workspace.
   const load = useCallback(async () => {
@@ -96,6 +106,7 @@ export function HistorySessions({
           title: r.title,
           titleSource: r.titleSource,
           livePtyId: r.action.kind === "show" ? r.ptyId : null,
+          account: r.account,
         },
         env,
         { anyway },
@@ -111,7 +122,7 @@ export function HistorySessions({
 
   const columns: ListColumn<SessionHistoryRow>[] = [
     { key: "title", label: "Title", primary: true, cell: (r) => r.title },
-    { key: "kind", label: "Kind", width: "sm", cell: (r) => r.kindWord },
+    { key: "kind", label: "Kind", width: "sm", cell: kindCell },
     // 1.168.1 (A2): the workspace gives its 48 px to the action, so the
     // table is no wider at the 900 px minimum window than before.
     { key: "workspace", label: "Workspace", width: "sm", tooltip: (r) => r.workspaceName, cell: (r) => r.workspaceName },
@@ -144,7 +155,7 @@ export function HistorySessions({
           <CBtn
             size="sm"
             disabled={r.action.kind === "none" || busyId === r.id}
-            title={r.action.kind === "none" ? r.action.reason : undefined}
+            title={r.action.kind === "none" ? r.action.reason : resumeNote(r)}
             aria-label={`${r.action.kind === "show" ? "Open session" : "Resume"} ${r.title}`}
             aria-describedby={r.action.kind === "none" ? `${reasonId}-${r.id}` : undefined}
             onClick={() => void act(r)}

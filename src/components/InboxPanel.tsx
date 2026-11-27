@@ -69,6 +69,8 @@ import { MERGE_STILL_RUNNING, pressOnce, prMergePressKey, sayStillRunning } from
 import { pushErrorToast } from "../lib/errorToast";
 import { ReadAgainButton } from "./ReadAgainButton";
 import { READ_IT_AGAIN } from "../lib/errorButtons";
+import { useClaudeAccountRows } from "../store/claudeAccountsStore";
+import { shownAccountName } from "../lib/claudeAccountNames";
 
 /**
  * UX-4.2 (the Inbox board, ADR 0007): the Inbox is a page — the landing
@@ -162,8 +164,8 @@ function dotOf(ev: InboxEvent): InboxItem["dot"] {
   return "empty";
 }
 
-function waitingItem(s: WaitingSession, workspaceName: string): InboxItem {
-  const words = waitingWords(s);
+function waitingItem(s: WaitingSession, workspaceName: string, limitAccountName: string | null = null): InboxItem {
+  const words = waitingWords(s, limitAccountName);
   return {
     id: s.id,
     // P3 walk: a tile asking (trust, a limit, bypass) has the amber a card
@@ -580,6 +582,7 @@ export function InboxPanel() {
   // 1.173.0 (B2): a card's row names its area beside the workspace, where
   // the workspace has two areas or more.
   const areaViews = useAreas((s) => s.views);
+  const accountRows = useClaudeAccountRows();
   useEffect(() => {
     if (visible) ensureAreasRead(workspaces.map((w) => w.id));
   }, [visible, workspaces]);
@@ -591,7 +594,11 @@ export function InboxPanel() {
     const map: Record<InboxPageGroup, InboxItem[]> = {
       needs_you: [
         ...waiting.map((s) => {
-          const item = waitingItem(s, nameOf(s.workspaceId));
+          // 1.179.0 (C2): a Builder's usage limit names its account (a
+          // tile's row carries none, so it is never named Main by mistake).
+          const limitAccount =
+            s.question === "usage-limit" && s.target.kind === "card" ? shownAccountName(accountRows, s.account) : null;
+          const item = waitingItem(s, nameOf(s.workspaceId), limitAccount);
           // (Challenger) A card's session row is that card's row in the
           // Inbox (its Rust row is folded into it): it carries the rule.
           const card =
@@ -683,7 +690,7 @@ export function InboxPanel() {
     // workspace; it opens the Board, where each card has its Resume.
     map.on_hold = groupPaused(map.on_hold);
     return map;
-  }, [feed, open, waiting, workspaces, boards, licensed, fixSent, cleanupPending, cleanupBusy, presentOf, merging, runMerge, updating, runUpToDate, areaViews]);
+  }, [feed, open, waiting, workspaces, boards, licensed, fixSent, cleanupPending, cleanupBusy, presentOf, merging, runMerge, updating, runUpToDate, areaViews, accountRows]);
 
   // F1: Clear the news takes only the news rows; what needs you stays.
   const newsIds = newsRowIds(feed?.events ?? []);

@@ -31,6 +31,7 @@ import { intakeStoppedWords, type StoppedIntake } from "./intakeStopped.ts";
 import { planInboxWords } from "./planExchangeView.ts";
 import { tileHeaderStatusFor, type Readiness } from "./tileHeaderStatus.ts";
 import { SESSION_WORDS } from "./deliveryWords.ts";
+import { inboxLimitWords } from "./claudeAccountNames.ts";
 
 /** A live session waiting for an answer. */
 export type WaitingSession = {
@@ -69,6 +70,9 @@ export type WaitingSession = {
   /** QoL 1.168 (D7): listed grey, not counted — a session at its usage
    *  limit (nothing to do until it resets). */
   muted?: "usage-limit";
+  /** 1.179.0 (C2): a Builder at its usage limit — the Claude account it
+   *  runs on (absent: Main). */
+  account?: string;
   /** QoL 1.168 (D7): a tile's finished turn (`tileTurnEpisode`) — what
    *  marking the row seen records. */
   episode?: string;
@@ -307,6 +311,7 @@ export function waitingSessions(input: {
       target: lane ? { kind: "card", cardId: card, lane } : { kind: "card", cardId: card },
       question: q.kind === "usageLimit" ? "usage-limit" : "bypass",
       ...(q.kind === "usageLimit" ? { resetsAt: q.resetsAt, muted: "usage-limit" as const } : {}),
+      ...(q.kind === "usageLimit" && q.account ? { account: q.account } : {}),
     });
   }
   for (const [cardId, b] of Object.entries(input.builders)) {
@@ -426,8 +431,16 @@ export function askedTitle(agent: string): string {
 }
 
 /** The Inbox row's words for a waiting session. */
-export function waitingWords(s: WaitingSession): { title: string; detail: string } {
+export function waitingWords(
+  s: WaitingSession,
+  /** 1.179.0 (C2): the name of the account a usage limit is on, when
+   *  accounts are named (more than one). */
+  limitAccountName: string | null = null,
+): { title: string; detail: string } {
   const tile = s.target.kind === "tile";
+  if (s.question === "usage-limit" && s.agent === "Claude" && limitAccountName) {
+    return { title: inboxLimitWords(limitAccountName, s.resetsAt), detail: `In “${s.where}”` };
+  }
   if (s.question === "trust") {
     return trustWords(s.agent === "Codex" ? "codex" : "claude", s.where, tile ? "tile" : s.intake === true ? "intake" : "builder");
   }

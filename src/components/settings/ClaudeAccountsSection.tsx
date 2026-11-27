@@ -25,6 +25,7 @@ import {
   type ClaudeAccountRow,
 } from "../../ipc";
 import { useSetupRun } from "../../store/setupRunStore";
+import { useClaudeAccounts } from "../../store/claudeAccountsStore";
 import { platform } from "../../lib/platform";
 import {
   ADD_BODY,
@@ -104,6 +105,12 @@ export function ClaudeAccountsSection() {
       live = false;
     };
   }, [readAgain]);
+
+  // 1.179.0 (C2): the tiles, cards and lists that name an account read
+  // the rows this section has, after every change it makes.
+  useEffect(() => {
+    if (rows) useClaudeAccounts.getState().setRows(rows);
+  }, [rows]);
 
   const refresh = () => setReadAgain((n) => n + 1);
 

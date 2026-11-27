@@ -1585,6 +1585,9 @@ export type TileTitle = {
   followed?: boolean;
   /** The CLI's files give that conversation a title of its own. */
   conversationNamed?: boolean;
+  /** 1.179.0 (C2): the Claude account the tile runs on (an
+   *  `ai_accounts_list` id); absent: Main. */
+  account?: string;
 };
 
 export function terminalTileTitle(ptyId: string) {
@@ -1623,6 +1626,9 @@ export type TerminalSession = {
   openAtQuit?: number;
   /** Its tile runs in this launch. */
   live: boolean;
+  /** 1.179.0 (C2): the Claude account the tile ran on; absent: Main. A
+   *  resume runs there. */
+  account?: string;
 };
 
 /** QoL 1.168 (block 4, D11): by workspace, the Claude and Codex sessions open
@@ -1648,7 +1654,8 @@ export function terminalLinkTarget(workspaceId: string, cwd: string, path: strin
 export type TerminalHistorySession = TerminalSession & {
   workspaceId: string;
   resumable: boolean;
-  gone?: "folder" | "conversation";
+  /** 1.179.0 (C2) "account": its Claude account was removed from Plyloft. */
+  gone?: "folder" | "conversation" | "account";
   /** 1.174.0 E9 round 1: when its conversation's transcript was last
    *  written (unix ms), from the lookup that decides `resumable`. */
   lastWriteAt?: number;
@@ -1681,6 +1688,8 @@ export type TerminalConversation = {
   /** 1.174.0 walk G3b: the copy's folder it ran in, for a conversation of
    *  one of the project's copies; absent for the project folder's own. */
   cwd?: string;
+  /** 1.179.0 (C2): the Claude account whose folder keeps it; absent: Main. */
+  account?: string;
 };
 
 export function terminalConversations(workspaceId: string) {
@@ -1693,10 +1702,14 @@ export type ResumeCheck =
   | { kind: "inTile"; workspaceId: string; ptyId: string }
   | { kind: "elsewhere" }
   | { kind: "folderGone" }
-  | { kind: "conversationGone" };
+  | { kind: "conversationGone" }
+  /** 1.179.0 (C2): the Claude account it was kept on was removed. */
+  | { kind: "accountRemoved" };
 
-export function terminalResumeCheck(kind: "claude" | "codex", cliSessionId: string, cwd: string) {
-  return invoke<ResumeCheck>("terminal_resume_check", { kind, cliSessionId, cwd });
+/** 1.179.0 (C2): `account` is the one the conversation is kept on (its
+ *  row's); absent: Main, and then not sent at all. */
+export function terminalResumeCheck(kind: "claude" | "codex", cliSessionId: string, cwd: string, account?: string | null) {
+  return invoke<ResumeCheck>("terminal_resume_check", account ? { kind, cliSessionId, cwd, account } : { kind, cliSessionId, cwd });
 }
 
 /** Terminals block P3: what stops a tile's session, from its drawn screen. */
@@ -3496,6 +3509,9 @@ export interface BuilderState {
    *  (`builderPermissions.ts`). Absent on sessions started before it and
    *  on the tour card's own bounded start. */
   permissions?: "editsCopy" | "asks" | "neverAsks" | null;
+  /** 1.179.0 (C2): the Claude account this session was started on (an
+   *  `ai_accounts_list` id); absent: Main. Resume runs there. */
+  account?: string | null;
   ptyId?: string | null;
   sessionLost: boolean;
   /** 1.169.0 (A3): lost because Plyloft quit or restarted (Resume's case). */
@@ -10437,6 +10453,9 @@ export type SessionBlock = {
   kind: "trust" | "bypass" | "usageLimit";
   /** A usage limit's reset time as Claude wrote it ("3pm"), when it did. */
   resetsAt?: string;
+  /** 1.179.0 (C2): the Claude account the stopped session runs on; absent:
+   *  Main (and every intake). */
+  account?: string;
 };
 
 export function builderSessionBlocks() {
@@ -11492,6 +11511,9 @@ export type ChatSnapshot = {
   usage: ChatTokenUsage;
   attachments: ChatAttachment[];
   ptyId?: string | null;
+  /** 1.179.0 (C2): the Claude account the conversation's session was
+   *  started on; absent: Main. */
+  account?: string;
 };
 
 export type ChatStateEvent = {

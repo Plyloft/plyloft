@@ -2399,6 +2399,13 @@ and models › Who builds new cards**, or per card. That row shows the AI a new
 card starts with: picking an AI on a card makes it the choice there too, and
 choosing there again sets it for the next cards.
 
+**A second Claude subscription.** You can add one in **Settings › Cards ›
+AI and models › Claude accounts**; it signs in with Claude's own login.
+New sessions start on the account you choose there. A session that is
+already running keeps its account, and resuming a conversation uses the
+account it was started on. With more than one account, a Claude terminal
+and a card's Builder say which one they run on.
+
 **Models.** Each role runs on the model and effort set for it in **Settings ›
 Cards › AI and models › Models**: one row per AI, whose **Change…** opens its
 Builder and Reviewer for **Every project**, and **Only in** the open project

@@ -88,6 +88,8 @@ import { FINISH_WITHOUT_REVIEW_HINT, FINISH_WITHOUT_REVIEW_LABEL, LEAVE_LINE, SE
 import { modelSentenceWords } from "../lib/roleModels";
 import { openRepair } from "../lib/openRepair";
 import { pushErrorToast } from "../lib/errorToast";
+import { useClaudeAccountRows } from "../store/claudeAccountsStore";
+import { ACCOUNT_REMOVED, accountRemoved, buildsOnWords, resumeNoteFor, shownAccountName } from "../lib/claudeAccountNames";
 
 /**
  * v1.106.0 (Builder/Challenger): the Run step when a card is built by a
@@ -309,6 +311,9 @@ export function BuilderRunStep({
   const settingsVendor = useSettings((s) => s.settings.behavior.builderVendor);
   const vendorPick = useBuilder((s) => s.vendorPref[card.id]);
   const freshVendor = effectiveBuilderVendor(vendorPick, card, settingsVendor);
+  // 1.179.0 (C2): the Claude account the Builder runs on, named only with
+  // more than one; Resume runs on it (`builder.account`; absent: Main).
+  const accountRows = useClaudeAccountRows();
 
   // Walk of #386 (step 7): a pull request's card has a Builder record from
   // the start (its reviews live there) though no session ever ran — a start
@@ -380,6 +385,15 @@ export function BuilderRunStep({
   const who = builder.vendor === "claude" ? "Claude" : "Codex";
   // Walk 2026-10-23: "builds on gpt-6-astra with high effort".
   const sessionModel = modelSentenceWords(builder.model);
+  const accountName = builder.vendor === "claude" ? shownAccountName(accountRows, builder.account) : null;
+  // A closed Claude session resumes on its own account: said when that
+  // isn't the one new sessions start on, or when it was removed.
+  const resumable = !builder.ptyId && !inTodo && !shippedClosed && builder.vendor === "claude";
+  const resumeAccountNote = !resumable
+    ? null
+    : accountRemoved(accountRows, builder.account)
+      ? ACCOUNT_REMOVED
+      : resumeNoteFor(accountRows, builder.account);
 
   const finishOff = busy || !live || Boolean(selfCheck) || doneBusy || asking;
   const finishTitle = limited
@@ -416,7 +430,7 @@ export function BuilderRunStep({
         {/* #74: the model this session was actually spawned on. Absent
             when the Builder row is blank — then the CLI chose. */}
         <span title={sessionModel ? `This session runs on ${sessionModel}.` : undefined}>
-          {who} builds{sessionModel ? ` on ${sessionModel}` : ""}
+          {accountName ? buildsOnWords(accountName, sessionModel) : `${who} builds${sessionModel ? ` on ${sessionModel}` : ""}`}
         </span>
         {/* 1.171.0 (D1): the choice this session started in. */}
         {sessionPermissionsWords(builder.permissions, builder.vendor) ? (
@@ -530,6 +544,11 @@ export function BuilderRunStep({
             : builder.sessionLost
             ? "The Builder's session ended (Plyloft restarted, or it crashed). The card's copy is safe; Resume opens a new session that continues the same conversation."
             : "The Builder session was closed. The card's copy is safe; Resume opens a new session in it."}
+        </p>
+      )}
+      {resumeAccountNote && (
+        <p className="ux-card-muted" data-ply-builder-resume-account="">
+          {resumeAccountNote}
         </p>
       )}
       {builder.ptyId ? (

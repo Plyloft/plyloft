@@ -53,6 +53,8 @@ import { CARD_TRUST_TILE_LINE, copyTrustRefusedLine, copyTrustTileLine, isCardFo
 import { useKanban } from "../store/kanbanStore";
 import { copyForCwd, useWorkspaceCopies } from "../store/copiesStore";
 import { pushErrorToast } from "../lib/errorToast";
+import { useClaudeAccountRows } from "../store/claudeAccountsStore";
+import { shownAccountName, tileAccountTitle, tileAccountWords } from "../lib/claudeAccountNames";
 
 type Props = {
   tile: TileT;
@@ -161,6 +163,10 @@ export function Tile({ tile, env, workspaceCwd, hidden, span }: Props) {
 
   // v1.0 R1: when this tile is part of a swarm, surface a chip in the header
   // and rewrite the close-confirm copy to warn that closing aborts the swarm.
+  // 1.179.0 (C2): a Claude tile names its account, only with more than one.
+  const accountRows = useClaudeAccountRows();
+  const accountName =
+    tile.kind === "claude" && tile.account !== undefined ? shownAccountName(accountRows, tile.account) : null;
   const swarm = useSwarms((s) => {
     const swarmId = liveRun?.swarmId ?? null;
     if (!swarmId) return null;
@@ -640,6 +646,11 @@ export function Tile({ tile, env, workspaceCwd, hidden, span }: Props) {
             )}
           </>
         )}
+        {accountName && (
+          <span className="tile-chip" title={tileAccountTitle(accountName)} data-ply-tile-account="">
+            <span className="tile-chip-text">{tileAccountWords(accountName)}</span>
+          </span>
+        )}
         {/* 1.173.0 (A3): a terminal in a copy says so, and its setup. */}
         <CopyTileMark tile={tile} />
         {swarm && (
@@ -795,6 +806,7 @@ export function Tile({ tile, env, workspaceCwd, hidden, span }: Props) {
           workspaceId={tile.workspaceId}
           onPtyId={onPtyId}
           tryOf={tile.tryOf}
+          account={tile.kind === "claude" && typeof tile.account === "string" ? tile.account : undefined}
         />
         {/* E6: over the chat, never in the way (no pointer events). */}
         {refusal && (
@@ -843,6 +855,9 @@ interface TileBodyProps {
   /** Try it (TI-2): a shell tile that is a card copy's Try session. Fixed
    *  for the tile's life, like its kind. */
   tryOf?: TryOf;
+  /** 1.179.0 (C2): the Claude account the tile was asked to run on. Fixed
+   *  for the tile's life, like its kind: read once at the spawn. */
+  account?: string;
 }
 
 /**
@@ -862,6 +877,7 @@ const TileBody = memo(
     onPtyId,
     tileId,
     tryOf,
+    account,
   }: TileBodyProps) {
     if (kind === "codex-chat") {
       return (
@@ -897,6 +913,7 @@ const TileBody = memo(
         workspaceId={workspaceId}
         onPtyId={onPtyId}
         cli={kind === "claude" || kind === "codex" ? kind : undefined}
+        account={kind === "claude" ? account : undefined}
         screenTileId={kind === "claude" || kind === "codex" ? tileId : undefined}
         tryTarget={kind === "shell" && tryOf ? { cardId: tryOf.cardId, lane: tryOf.lane ?? null } : undefined}
         dictation={
