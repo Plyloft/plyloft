@@ -2410,7 +2410,11 @@ AI and models › Claude accounts**; it signs in with Claude's own login.
 New sessions start on the account you choose there. A session that is
 already running keeps its account, and resuming a conversation uses the
 account it was started on. With more than one account, a Claude terminal
-and a card's Builder say which one they run on.
+and a card's Builder say which one they run on. When a card's Builder
+reaches its usage limit, the card offers **Start fresh on** and the name of
+another of your accounts: only when you press it, it starts a new Builder on
+that account in the same copy, and new sessions still start on the account
+you chose.
 
 **Models.** Each role runs on the model and effort set for it in **Settings ›
 Cards › AI and models › Models**: one row per AI, whose **Change…** opens its

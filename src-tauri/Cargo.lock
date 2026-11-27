@@ -234,7 +234,7 @@ dependencies = [
 
 [[package]]
 name = "atelier"
-version = "1.178.0"
+version = "1.179.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",

@@ -53,6 +53,27 @@ export const FIRST_HIGHLIGHTS = "1.167.0";
 /** Newest first. Every release from 1.167.0 on has one. */
 export const RELEASE_HIGHLIGHTS: readonly ReleaseHighlights[] = [
   {
+    version: "1.179.0",
+    date: "2026-11-28",
+    title: "Two pairs in Compare, and a second Claude subscription",
+    points: [
+      {
+        text: "Compare two pairs at once: one in the project folder and one in a copy. Each pair has its own bar, named after its project or copy, and the shortcut passes in the pair you are working in. New › Compare in a new copy… opens the second.",
+        action: { nav: { mode: "terminals" }, label: "Open Terminals" },
+      },
+      {
+        text: "Include my question: when you pass an answer, Plyloft can put what you asked in that turn before it, so the other session has the context. You can turn it off for one pass.",
+      },
+      {
+        text: "Add a second Claude subscription and choose which one new sessions use. A running session keeps its account, Resume uses the account the conversation started on, and at a usage limit a card offers to start fresh on your other account. Nothing switches by itself.",
+        action: { nav: { settings: "claude-codex" }, label: "Open AI and models" },
+      },
+      {
+        text: "Compare is safer and fixed: the plan you pass after Esc is Claude's latest, a held answer no longer goes out stale, and the app says when it cannot read a plan. Security updates to the app's building blocks close 13 open alerts.",
+      },
+    ],
+  },
+  {
     version: "1.178.0",
     date: "2026-11-26",
     title: "Free for one person, and open source",
