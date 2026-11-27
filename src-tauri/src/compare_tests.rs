@@ -1325,3 +1325,97 @@ fn the_second_plan_s_menu_is_pending_like_the_first() {
     let got = tile_answer(Some(l));
     assert!(got.from_plan_file && got.plan_pending);
 }
+
+// ── The plan file is tied to the session, never guessed from a folder ────
+// Measured (2.1.332): a session's first ExitPlanMode can come with an empty
+// input (no `plan`, no `planFilePath`); every later one names the same file,
+// `<claude config>/plans/<slug>-of-<session id>.md`. A project's own
+// `docs/plans/*.md` written in the same span is not that file.
+
+const ROADMAP_PATH: &str = "/Users/someone/notes-app/docs/plans/roadmap.md";
+const ROADMAP: &str = "# Roadmap\n1. Ship the list.";
+
+/// The first plan of `STALE_AFTER_FEEDBACK` (its Write's result after its
+/// ExitPlanMode), ended by Esc, with an empty ExitPlanMode input; its Write
+/// goes to `path` with `content` when given.
+fn first_plan_with_empty_input(write: Option<(&str, &str)>) -> Vec<Value> {
+    let t = entries(STALE_AFTER_FEEDBACK);
+    let mut t = t[..=line_of(&t, 18)].to_vec();
+    let exit = line_of(&t, 15);
+    t[exit]["message"]["content"][0]["input"] = json!({});
+    if let Some((path, content)) = write {
+        let w = line_of(&t, 14);
+        t[w]["message"]["content"][0]["input"] = json!({"file_path": path, "content": content});
+        let r = line_of(&t, 16);
+        t[r]["toolUseResult"]["filePath"] = json!(path);
+        t[r]["toolUseResult"]["content"] = json!(content);
+    }
+    t.push(interrupt("u9", "msg_02"));
+    t
+}
+
+#[test]
+fn a_project_plans_folder_write_is_never_offered_as_a_plan_less_exit_plan_mode_s_plan() {
+    let mut t = finished_turn();
+    t.extend(first_plan_with_empty_input(Some((ROADMAP_PATH, ROADMAP))));
+    let p = whole(&lines(&t));
+    assert_ne!(text_of(&p), Some(ROADMAP));
+    // As a plan-less ExitPlanMode with no write of its plan: the turn has no
+    // answer of its own, the earlier one stands.
+    assert_eq!((p.turn, text_of(&p), p.earlier, p.plan_unread), (TurnState::Done, Some("Answer one."), true, false));
+    let alone = whole(&lines(&first_plan_with_empty_input(Some((ROADMAP_PATH, ROADMAP)))));
+    assert_eq!((text_of(&alone), alone.plan_unread), (None, false));
+}
+
+#[test]
+fn a_plan_less_exit_plan_mode_is_rebuilt_from_the_session_s_own_plan_file() {
+    // Rule (b): `plans/<slug>-of-<session id>.md`, the fixture's own file.
+    let p = whole(&lines(&first_plan_with_empty_input(None)));
+    assert_eq!(plan_of(&p), Some((PLAN_V1, AnswerKind::Plan)));
+    // Named for another session: not this one's plan.
+    let other = "/Users/someone/.claude/plans/tidy-the-list-of-00000000-0000-4000-8000-000000000002.md";
+    let p = whole(&lines(&first_plan_with_empty_input(Some((other, PLAN_V1)))));
+    assert_eq!((text_of(&p), p.plan_unread), (None, false));
+    // No session id on the entries: nothing ties the file to the session.
+    let mut t = first_plan_with_empty_input(None);
+    for e in &mut t {
+        if let Some(map) = e.as_object_mut() {
+            map.remove("sessionId");
+        }
+    }
+    assert_eq!(text_of(&whole(&lines(&t))), None);
+}
+
+#[test]
+fn a_plan_less_exit_plan_mode_is_rebuilt_from_the_file_a_later_exit_plan_mode_names() {
+    // Rule (a): the file name doesn't end in the session id, but a later
+    // turn's ExitPlanMode names it.
+    let path = "/Users/someone/.claude/plans/tidy-the-list.md";
+    let first = first_plan_with_empty_input(Some((path, PLAN_V1)));
+    assert_eq!(text_of(&whole(&lines(&first))), None, "alone, nothing ties it to the session");
+    let mut t = first;
+    t.extend([
+        in_mode(prompt("u5", None, json!("Plan it again.")), "plan"),
+        tool("a5", "m5", "toolu_p5", "ExitPlanMode", json!({"planFilePath": path})),
+        refused("r5", "toolu_p5", None),
+        interrupt("u6", "m5"),
+    ]);
+    let p = whole(&lines(&t));
+    assert_eq!((plan_of(&p), p.earlier), (Some((PLAN_V1, AnswerKind::Plan)), true));
+}
+
+#[test]
+fn the_plan_file_s_write_wins_over_a_later_write_to_a_project_plans_folder() {
+    let base = entries(STALE_AFTER_FEEDBACK);
+    let mut t = base[..=line_of(&base, 18)].to_vec();
+    let w = line_of(&t, 14);
+    t.insert(w + 1, tool("a9", "msg_09", "toolu_09", "Write", json!({"file_path": ROADMAP_PATH, "content": ROADMAP})));
+    let r = line_of(&t, 16);
+    t.insert(r + 1, result("r9", "toolu_09", false));
+    t.push(interrupt("u9", "msg_02"));
+    assert_eq!(plan_of(&whole(&lines(&t))), Some((PLAN_V1, AnswerKind::Plan)), "the ExitPlanMode names its file");
+    // The same with an empty input: the session's file still wins.
+    let exit = line_of(&t, 15);
+    t[exit]["message"]["content"][0]["input"] = json!({});
+    assert_eq!(plan_of(&whole(&lines(&t))), Some((PLAN_V1, AnswerKind::Plan)), "rule (b)");
+}

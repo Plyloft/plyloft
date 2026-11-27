@@ -1,7 +1,6 @@
 //! Compare (1.177.0): the last finished answer of a Claude or Codex tile,
 //! read from the CLI's own file, and the one cleaned text the window pastes
-//! into the other tile on the member's press. Spike:
-//! `~/ply-build/next-1177/SPIKE-backend.md`.
+//! into the other tile on the member's press.
 //!
 //! - **Which conversation.** The tile's record is looked at again first
 //!   (`terminal_sessions::live_conversation`, through `refresh_title`: a
@@ -487,6 +486,8 @@ struct ClaudeSide {
     plan_paths: std::collections::HashMap<String, String>,
     /// The ExitPlanModes refused with the member's feedback: the refusal's time.
     refused_with_feedback: std::collections::HashMap<String, Option<i64>>,
+    /// The `sessionId` the transcript's entries carry (the last one seen).
+    session_id: Option<String>,
 }
 
 /// Two spellings of one file path (Windows separators, letter case).
@@ -495,13 +496,21 @@ fn same_path(a: &str, b: &str) -> bool {
     norm(a) == norm(b)
 }
 
-/// A `.md` file in a `plans` folder: Claude's plan file, for an ExitPlanMode
-/// that doesn't name it.
-fn in_plans_folder(path: &str) -> bool {
-    let path = path.replace('\\', "/");
+/// Whether `path` is this session's plan file, for an ExitPlanMode that
+/// doesn't name it (measured, 2.1.332: a session's first ExitPlanMode can come
+/// with an empty input; every later one names the same file). Tied to the
+/// session, never guessed from a folder: the file another ExitPlanMode in
+/// the tail names, or `plans/<slug>-of-<session id>.md` (the name Claude gives
+/// it, in its config folder). A project's own `docs/plans/*.md` is neither.
+fn is_session_plan_file(path: &str, side: &ClaudeSide) -> bool {
+    if side.plan_paths.values().any(|named| same_path(path, named)) {
+        return true;
+    }
+    let Some(session) = side.session_id.as_deref().filter(|s| !s.is_empty()) else { return false };
+    let path = path.replace('\\', "/").to_lowercase();
     let mut parts = path.rsplit('/');
     let name = parts.next().unwrap_or("");
-    name.to_lowercase().ends_with(".md") && parts.next() == Some("plans")
+    name.ends_with(&format!("-of-{}.md", session.to_lowercase())) && parts.next() == Some("plans")
 }
 
 /// The file's content after a successful `Write` or `Edit`, from its result
@@ -546,6 +555,9 @@ fn claude_side(text: &str) -> ClaudeSide {
         let Ok(entry) = serde_json::from_str::<Value>(line.trim()) else { continue };
         if let Some(at) = line_ms(&entry) {
             side.last_at = Some(at);
+        }
+        if let Some(session) = entry.get("sessionId").and_then(Value::as_str).filter(|s| !s.is_empty()) {
+            side.session_id = Some(session.to_string());
         }
         let sidechain = entry.get("isSidechain").and_then(Value::as_bool) == Some(true);
         if entry.get("type").and_then(Value::as_str) == Some("user") && !sidechain {
@@ -829,7 +841,9 @@ enum TurnPlan<'a> {
 /// after it; a write whose result came first left `input.plan` right, and so
 /// does no write at all. A write whose content can't be read (no result yet,
 /// an error, an Edit that can't be applied) makes the plan unknown: never
-/// `input.plan`, never an older ExitPlanMode's.
+/// `input.plan`, never an older ExitPlanMode's. The plan file is the one the
+/// ExitPlanMode names, else one tied to this session
+/// ([`is_session_plan_file`]); any other file is no write of the plan.
 fn turn_plan<'a>(body: &'a [ChatItem], side: &ClaudeSide) -> TurnPlan<'a> {
     let tools: Vec<(&str, &str)> = body
         .iter()
@@ -844,7 +858,7 @@ fn turn_plan<'a>(body: &'a [ChatItem], side: &ClaudeSide) -> TurnPlan<'a> {
     let plan_file = side.plan_paths.get(exit);
     let is_plan_file = |path: &str| match plan_file {
         Some(file) => same_path(path, file),
-        None => in_plans_folder(path),
+        None => is_session_plan_file(path, side),
     };
     let until = side.result_lines.get(exit).copied().unwrap_or(usize::MAX);
     let write = tools[since..]
@@ -862,7 +876,13 @@ fn turn_plan<'a>(body: &'a [ChatItem], side: &ClaudeSide) -> TurnPlan<'a> {
                 (Some(result), Some(call)) if result < call
             );
             if came_first {
-                from_input
+                // The write landed first, so `input.plan` is that write's
+                // content; an ExitPlanMode that carries none still has it
+                // in the write.
+                from_input.or_else(|| match side.written.get(id) {
+                    Some(Some(content)) => Some(content.trim().to_string()).filter(|c| !c.is_empty()),
+                    _ => None,
+                })
             } else {
                 match side.written.get(id) {
                     Some(Some(content)) => Some(content.trim().to_string()).filter(|c| !c.is_empty()),
