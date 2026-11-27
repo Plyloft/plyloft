@@ -366,6 +366,36 @@ describe("ClaudeAccountsSection", () => {
     expect(screen.queryByText(/is removed/)).toBeNull();
   });
 
+  it("says before any press that sessions run on the account, and offers only Cancel", async () => {
+    const r = renderUi(<ClaudeAccountsSection />, {
+      fixtures: fixtures(() => [MAIN, WORK], {
+        ai_account_remove_blocked: "Close 1 session running on Work first.",
+      }),
+    });
+    const sheet = await openRemove(r);
+    expect(await within(sheet).findByText("Close 1 session running on Work first.")).toBeTruthy();
+    expect(r.tauri.callsOf("ai_account_remove_blocked").map((c) => c.args)).toEqual([{ id: "acct01" }]);
+    const only = within(sheet).getByRole("button", { name: "Remove without signing out" }) as HTMLButtonElement;
+    const signOut = within(sheet).getByRole("button", { name: "Sign out and remove" }) as HTMLButtonElement;
+    await waitFor(() => expect(only.disabled).toBe(true));
+    expect(signOut.disabled).toBe(true);
+    expect((within(sheet).getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(false);
+    await r.user.click(only);
+    await r.user.click(signOut);
+    expect(r.tauri.callsOf("ai_account_remove")).toHaveLength(0);
+    expect(r.tauri.callsOf("setup_run")).toHaveLength(0);
+    expect(rowOf("Work")).toBeTruthy();
+  });
+
+  it("with no session running, the sheet is as before: both actions offered, nothing said", async () => {
+    const r = renderUi(<ClaudeAccountsSection />, { fixtures: fixtures(() => [MAIN, WORK]) });
+    const sheet = await openRemove(r);
+    await waitFor(() => expect(r.tauri.callsOf("ai_account_remove_blocked")).toHaveLength(1));
+    expect((within(sheet).getByRole("button", { name: "Remove without signing out" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((within(sheet).getByRole("button", { name: "Sign out and remove" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(within(sheet).queryByText(/running on Work/)).toBeNull();
+  });
+
   it("shows Remove's refusal as Rust returns it, and keeps the account", async () => {
     const r = renderUi(<ClaudeAccountsSection />, {
       fixtures: fixtures(() => [MAIN, WORK], {

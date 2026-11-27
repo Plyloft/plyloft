@@ -17,6 +17,7 @@ import { SetupTerminal } from "../SetupTerminal";
 import {
   aiAccountAdd,
   aiAccountRemove,
+  aiAccountRemoveBlocked,
   aiAccountRename,
   aiAccountShowFolder,
   aiAccountsList,
@@ -451,6 +452,10 @@ function RemoveSheet({
   const [step, setStep] = useState<"ask" | "signing-out" | "removing">("ask");
   const [runId, setRunId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Remove's own refusal, read when the sheet opens, so the member knows
+  // before pressing that sessions still run on the account. The removal
+  // checks again: a session can start in between.
+  const [blocked, setBlocked] = useState<string | null>(null);
   const run = useSetupRun((s) => s.run);
   const phase = useSetupRun((s) => s.phase);
   const signedOut = step === "signing-out" && runId !== null && run?.runId === runId && phase === "done";
@@ -480,6 +485,19 @@ function RemoveSheet({
     setRunId(started.runId);
   }
 
+  useEffect(() => {
+    let live = true;
+    aiAccountRemoveBlocked(row.id)
+      .then((words) => {
+        if (live) setBlocked(words ?? null);
+      })
+      // Unread: the sheet stays as it was; the removal refuses if it must.
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [row.id]);
+
   // The sign-out's end, whatever it was, then the removal: Claude's login
   // that is still saved is said after it (`loginLeft`).
   useEffect(() => {
@@ -490,6 +508,8 @@ function RemoveSheet({
   }, [signedOut]);
 
   const asking = step === "ask";
+  const canRemove = asking && blocked === null;
+  const said = error ?? blocked;
   return (
     <Sheet
       size="confirm"
@@ -503,10 +523,10 @@ function RemoveSheet({
           <CBtn tone="quiet" onClick={onClose} disabled={!asking}>
             Cancel
           </CBtn>
-          <CBtn onClick={() => void remove(false)} disabled={!asking}>
+          <CBtn onClick={() => void remove(false)} disabled={!canRemove}>
             {REMOVE_ONLY}
           </CBtn>
-          <CBtn tone="danger" onClick={() => void signOutAndRemove()} disabled={!asking}>
+          <CBtn tone="danger" onClick={() => void signOutAndRemove()} disabled={!canRemove}>
             {REMOVE_SIGN_OUT}
           </CBtn>
         </>
@@ -515,7 +535,7 @@ function RemoveSheet({
       {step === "signing-out" && runId !== null && (
         <SetupTerminal quiet />
       )}
-      {error && <StatusLine state="aborted">{<>{error}</>}</StatusLine>}
+      {said && <StatusLine state="aborted">{<>{said}</>}</StatusLine>}
     </Sheet>
   );
 }

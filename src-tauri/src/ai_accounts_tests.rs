@@ -420,6 +420,17 @@ fn an_account_with_no_session_has_none_running() {
     assert_eq!(registry.sessions_on_account("a1b2c3d4"), 0);
 }
 
+/// The sheet's read before Remove and the removal's refusal are one
+/// sentence: one running session gives it, none gives nothing.
+#[test]
+fn removal_is_blocked_with_the_refusal_only_while_sessions_run() {
+    let registry = crate::pty::PtyRegistry::default();
+    assert_eq!(removal_blocked(registry.sessions_on_account("a1b2c3d4"), "Work"), None);
+    assert_eq!(removal_blocked(0, "Work"), None);
+    assert_eq!(removal_blocked(1, "Work").as_deref(), Some("Close 1 session running on Work first."));
+    assert_eq!(removal_blocked(2, "Work"), Some(sessions_running(2, "Work")));
+}
+
 // ── C3: Main by its id, and Start fresh on another account ─────────────
 
 /// The new-session menu's `Claude on Main` while another account is current

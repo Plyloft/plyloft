@@ -2135,6 +2135,7 @@ pub fn run() {
             ai_accounts::ai_account_rename,
             ai_accounts::ai_account_use_for_new,
             ai_accounts::ai_account_remove,
+            ai_accounts::ai_account_remove_blocked,
             ai_accounts::ai_account_show_folder,
             setup_last_run::setup_last_run,
             project_setup::project_inspect,

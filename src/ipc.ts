@@ -2469,6 +2469,13 @@ export function aiAccountRemove(id: string, signOut: boolean) {
   return invoke<ClaudeAccountRemoved>("ai_account_remove", { id, signOut });
 }
 
+/** Remove's refusal while sessions run on the account ("Close 1 session
+ *  running on Work first."), worded by the same Rust function, or null. Read
+ *  when Remove's sheet opens; the removal still checks again. */
+export function aiAccountRemoveBlocked(id: string) {
+  return invoke<string | null>("ai_account_remove_blocked", { id });
+}
+
 /** Opens the account's folder in Finder or File Explorer (`id` null: Main's). */
 export function aiAccountShowFolder(id: string | null) {
   return invoke<null>("ai_account_show_folder", { id });

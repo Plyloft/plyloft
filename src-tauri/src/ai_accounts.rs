@@ -83,6 +83,14 @@ pub fn sessions_running(n: usize, name: &str) -> String {
     format!("Close {n} {sessions} running on {name} first.")
 }
 
+/// Remove's refusal while `running` sessions run on account `name`, or
+/// `None` when none do. One function for the removal and for the sheet's
+/// read before it ([`ai_account_remove_blocked`]), so the two can't word it
+/// differently.
+pub fn removal_blocked(running: usize, name: &str) -> Option<String> {
+    (running > 0).then(|| sessions_running(running, name))
+}
+
 /// Not in the approved table (C1 report): an empty name.
 pub const NAME_EMPTY: &str = "Give this account a name.";
 /// Not in the approved table (C1 report): a name over [`NAME_MAX_CHARS`].
@@ -736,9 +744,8 @@ pub fn ai_account_remove(app: AppHandle, id: String, sign_out: bool) -> Result<R
     let accounts = store.snapshot().ai_accounts.claude;
     let entry = find(&accounts, &id).cloned().ok_or_else(|| UNKNOWN_ACCOUNT.to_string())?;
     let config = &config_root().ok_or_else(|| folder_not_deleted(&entry.name))?;
-    let running = sessions_running_on(&app, &id);
-    if running > 0 {
-        return Err(sessions_running(running, &entry.name));
+    if let Some(words) = removal_blocked(sessions_running_on(&app, &id), &entry.name) {
+        return Err(words);
     }
     if let Some(runner) = app.try_state::<crate::setup_run::SetupRunner>() {
         let account_step = runner
@@ -766,6 +773,20 @@ pub fn ai_account_remove(app: AppHandle, id: String, sign_out: bool) -> Result<R
         sign_out,
         login_left: signed_in_at(&claude_accounts_root(config).join(&id)),
     })
+}
+
+/// What Remove would refuse on account `id` now because sessions run on it
+/// (the same sentence), or `None`. Read when Remove's sheet opens so the
+/// member knows before pressing; the removal still checks again, since a
+/// session can start in between. Reads only; an id no account has gives
+/// `None` and is left to the removal's own refusal.
+#[tauri::command(async)]
+pub fn ai_account_remove_blocked(app: AppHandle, id: String) -> Result<Option<String>, String> {
+    let accounts = store(&app)?.snapshot().ai_accounts.claude;
+    let Some(entry) = find(&accounts, &id) else {
+        return Ok(None);
+    };
+    Ok(removal_blocked(sessions_running_on(&app, &id), &entry.name))
 }
 
 /// "Show folder": the account's folder in Finder or Explorer (`id` `None`:
