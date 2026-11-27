@@ -32,6 +32,11 @@ import { useTiles } from "../store/tileStore";
 import { openCodexTile } from "../store/openCodexTile";
 import { showNewTile } from "../store/tileActions";
 import { CBtn, Segmented, Sheet, TextField } from "./ux";
+import { COMPARE_PAIR_CHOICE } from "../lib/compareWords";
+
+/** What the sheet opens: one tile, or (1.179.0) a Claude and a Codex tile
+ *  together, for a second Compare pair. */
+export type NewCopyOpen = NewCopyProvider | "pair";
 
 /** One labelled row of the sheet (1.174.0 E2: one place for its classes). */
 function SheetField({ label, children }: { label: string; children: ReactNode }) {
@@ -59,7 +64,10 @@ function SheetHint({ children, role, failure }: { children: ReactNode; role?: "s
 export function newCopyChoices(
   env: ShellEnvInfo | null | undefined,
   broken: readonly TileCli[] = [],
-): Array<{ value: NewCopyProvider; label: string; disabled?: boolean; title?: string }> {
+  /** 1.179.0: offer "Claude and Codex" (asked from New); off while either
+   *  isn't installed or doesn't start. */
+  offerPair = false,
+): Array<{ value: NewCopyOpen; label: string; disabled?: boolean; title?: string }> {
   const choice = (value: TileCli, label: string, path: string | null | undefined, healthy: boolean) => {
     if (!path) return { value, label, disabled: true, title: machineWords(`${label} isn't installed on this Mac.`) };
     if (!healthy)
@@ -71,20 +79,27 @@ export function newCopyChoices(
       };
     return { value, label, disabled: false, title: undefined };
   };
-  return [
-    choice("claude", "Claude", env?.claudePath, !broken.includes("claude")),
-    choice("codex", "Codex", env?.codexPath, !broken.includes("codex") && env?.codexHealthy !== false),
-    { value: "shell" as const, label: "Shell" },
-  ];
+  const claude = choice("claude", "Claude", env?.claudePath, !broken.includes("claude"));
+  const codex = choice("codex", "Codex", env?.codexPath, !broken.includes("codex") && env?.codexHealthy !== false);
+  // Shown off, never hidden (OB-14), with the reason of the one that can't open.
+  const off = claude.disabled ? claude : codex.disabled ? codex : null;
+  const pair = offerPair
+    ? [{ value: "pair" as const, label: COMPARE_PAIR_CHOICE, disabled: off !== null, title: off?.title }]
+    : [];
+  return [claude, codex, { value: "shell" as const, label: "Shell" }, ...pair];
 }
 
 export function firstOpenable(
   env: ShellEnvInfo | null | undefined,
-  wanted: NewCopyProvider,
+  wanted: NewCopyOpen,
   broken: readonly TileCli[] = [],
-): NewCopyProvider {
-  const choices = newCopyChoices(env, broken);
-  if (!choices.find((c) => c.value === wanted)?.disabled) return wanted;
+  offerPair = false,
+): NewCopyOpen {
+  const choices = newCopyChoices(env, broken, offerPair);
+  const found = choices.find((c) => c.value === wanted);
+  if (found && !found.disabled) return wanted;
+  // 1.179.0: the pair not offered (one of the two missing or broken): the
+  // one of the two that is, before a shell.
   return choices.find((c) => !c.disabled)?.value ?? "shell";
 }
 
@@ -100,12 +115,15 @@ export function NewCopySheet({
   workspaceId,
   env,
   provider,
+  offerPair = false,
   onClose,
   onMade,
 }: {
   workspaceId: string;
   env: ShellEnvInfo | null;
-  provider: NewCopyProvider;
+  provider: NewCopyOpen;
+  /** 1.179.0: offer "Claude and Codex" (asked from New). */
+  offerPair?: boolean;
   onClose: () => void;
   /** After the copy is made and its tile opened (1.174.0 E1: that tile). */
   onMade?: (tile: { id: string; label: string } | null) => void;
@@ -118,7 +136,7 @@ export function NewCopySheet({
   }, []);
   const [name, setName] = useState("");
   const broken = useBrokenClis();
-  const [open, setOpen] = useState<NewCopyProvider>(() => firstOpenable(env, provider, broken));
+  const [open, setOpen] = useState<NewCopyOpen>(() => firstOpenable(env, provider, broken, offerPair));
   const [start, setStart] = useState<CopyStartPoint | null>(null);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -141,22 +159,30 @@ export function NewCopySheet({
 
   const startsFrom = startsFromWords(start, Date.now());
   const notInCopy = notInCopyWords(start);
-  const trustHint = copyTrustSheetHint(open, start?.claudeTrusted);
+  // 1.179.0: both tiles ask, each in its own words.
+  const trustHint =
+    open === "pair"
+      ? [copyTrustSheetHint("claude", start?.claudeTrusted), copyTrustSheetHint("codex")].filter(Boolean).join(" ") || null
+      : copyTrustSheetHint(open, start?.claudeTrusted);
 
   async function make() {
     if (busy) return;
     setBusy(true);
     setFailure(null);
     try {
-      const row = await copyCreate(workspaceId, name, open, target);
+      // 1.179.0: a pair's copy is recorded as Claude's (Copies' Open offers
+      // Codex beside it); the backend's record is unchanged.
+      const row = await copyCreate(workspaceId, name, open === "pair" ? "claude" : open, target);
       useCopies.getState().upsert(workspaceId, row);
       const tiles = useTiles.getState();
       const tile =
-        open === "claude"
+        open === "claude" || open === "pair"
           ? tiles.addClaudeTile(workspaceId, row.path)
           : open === "codex"
             ? openCodexTile(workspaceId, row.path, env, "codex")
             : tiles.addShellTile(workspaceId, row.path);
+      // The pair's Codex tile opens beside it; the keyboard goes to Claude.
+      if (open === "pair") openCodexTile(workspaceId, row.path, env, "codex");
       showNewTile(tile);
       // E2 (P20): what the sheet said before isn't said again; only what
       // turned up while it was made — GitHub unreachable, or this Mac's
@@ -222,7 +248,7 @@ export function NewCopySheet({
         </SheetField>
       )}
       <SheetField label="Open">
-        <Segmented<NewCopyProvider> label="Open" value={open} onChange={setOpen} options={newCopyChoices(env, broken)} />
+        <Segmented<NewCopyOpen> label="Open" value={open} onChange={setOpen} options={newCopyChoices(env, broken, offerPair)} />
       </SheetField>
       {/* E2 (P19, D12 a): the trust question, announced. */}
       {trustHint && !busy && <SheetHint>{trustHint}</SheetHint>}

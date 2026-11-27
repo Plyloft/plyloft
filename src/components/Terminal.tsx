@@ -66,6 +66,7 @@ import {
   choiceMenuInView,
 } from "../lib/attention";
 import { useCompare } from "../store/compareStore";
+import { comparePassNow } from "../store/compareActions";
 import { effectiveCenterMode, useUi } from "../store/uiStore";
 import { codexScreenFacts, liveScreenFacts, noteTileInput, registerTileScreen, workStamp } from "../lib/tileScreen";
 import { inputRowCells } from "../lib/inputRow";
@@ -500,10 +501,13 @@ export function Terminal({
       // 1.177.0 (N3): Compare's chord is the app's only while Compare is on
       // here; off, Ctrl+Shift+Y stays the program's as before.
       const formId = terminalFormShortcut(e);
+      // 1.179.0: with two pairs, only inside a paired place (the tile with
+      // the keyboard is this one); outside both it stays the program's.
       if (formId && (formId !== "comparePass" ||
           (workspaceId &&
             useCompare.getState().byWorkspace[workspaceId]?.on &&
-            effectiveCenterMode(useUi.getState().centerMode, workspaceId) === "terminals"))) {
+            effectiveCenterMode(useUi.getState().centerMode, workspaceId) === "terminals" &&
+            comparePassNow(workspaceId).swallow))) {
         return false;
       }
       const action = terminalKeyAction(e, term.hasSelection());

@@ -24,6 +24,7 @@ import { choiceMenuInView, matchesClaudePromptIdle, promptInputEmpty, settledTai
 import { liveWorking } from "./tileScreen.ts";
 import { questionFor, questionReasonWords, type QuestionState } from "./compareView.ts";
 import type { CompareTurnAsks } from "./compareIpc.ts";
+import { PROJECT_PLACE, pairTileOrder, pairsOf, placeOfCwd, placesOf } from "./compareView.ts";
 import { STALE_OPEN_QUIET_MS, answerToPass, heldIsProvisional, heldLapsed, heldOffered, nextHeld, openTurnStale, passDropped, type ReturnHeld } from "./compareView.ts";
 
 const NOW = 10_000_000;
@@ -902,3 +903,159 @@ console.log("compareView cleared Put: ok");
   assert.equal("questionLabel" in pasteParts("claude", "just-pass", "A", ""), false);
 }
 console.log("compareView include my question: ok");
+
+// ── 1.179.0 Two pairs ────────────────────────────────────────────────────
+{
+  const PROJ = "/Users/someone/code/orders-api";
+  const copy = (id: string, name: string, createdAt: number, state = "active") => ({
+    id,
+    name,
+    path: `${PROJ}/.plyloft-worktrees/${id}`,
+    createdAt,
+    state,
+  });
+  const c1 = copy("copy-1", "retry-on-timeout", 100);
+  const c2 = copy("copy-2", "queue-empty", 200);
+  const copies = [c2, c1];
+
+  // A tile's place: the copy whose folder holds it, else the project.
+  assert.equal(placeOfCwd(PROJ, copies, false), PROJECT_PLACE);
+  assert.equal(placeOfCwd(`${PROJ}/src`, copies, false), PROJECT_PLACE);
+  assert.equal(placeOfCwd(c1.path, copies, false), "copy-1");
+  assert.equal(placeOfCwd(`${c1.path}/`, copies, false), "copy-1");
+  assert.equal(placeOfCwd(`${c1.path}/src/lib`, copies, false), "copy-1");
+  assert.equal(placeOfCwd(`${c1.path}-other`, copies, false), PROJECT_PLACE, "a sibling folder is not inside");
+  assert.equal(placeOfCwd(null, copies, false), PROJECT_PLACE);
+  assert.equal(placeOfCwd(c1.path, [{ ...c1, state: "trashed" }], false), PROJECT_PLACE, "a thrown-away copy holds no tile");
+  // The Mac's disk may be case-sensitive: case counts there.
+  assert.equal(placeOfCwd(c1.path.toUpperCase(), copies, false), PROJECT_PLACE);
+  // Windows: the same folder as C:\ and c:\, with either separator.
+  const winCopy = { id: "copy-w", name: "w", path: "C:\\Users\\someone\\code\\orders-api\\.plyloft-worktrees\\copy-w", createdAt: 1, state: "active" };
+  assert.equal(placeOfCwd("c:\\Users\\someone\\code\\orders-api\\.plyloft-worktrees\\copy-w", [winCopy], true), "copy-w");
+  assert.equal(placeOfCwd("c:/Users/someone/code/orders-api/.plyloft-worktrees/copy-w/src", [winCopy], true), "copy-w");
+  assert.equal(placeOfCwd("C:\\Users\\someone\\code\\orders-api", [winCopy], true), PROJECT_PLACE);
+
+  // Bar order: the project, then the active copies by age.
+  assert.deepEqual(placesOf("orders-api", [...copies, copy("copy-3", "gone", 50, "trashed")]), [
+    { id: PROJECT_PLACE, name: "orders-api" },
+    { id: "copy-1", name: "retry-on-timeout" },
+    { id: "copy-2", name: "queue-empty" },
+  ]);
+
+  const places = placesOf("orders-api", copies);
+  const t = (id: string, vendor: "claude" | "codex", place: string) => ({ id, vendor, place });
+  const A = [t("ca", "claude", PROJECT_PLACE), t("xa", "codex", PROJECT_PLACE)];
+  const B = [t("cb", "claude", "copy-1"), t("xb", "codex", "copy-1")];
+  const C = [t("cc", "claude", "copy-2"), t("xc", "codex", "copy-2")];
+  const none = { claudeId: null, codexId: null };
+
+  // One place with both kinds: single-pair mode, today's bar over every tile.
+  let v = pairsOf({ tiles: [...A, t("cb", "claude", "copy-1")], places, single: none, held: [] });
+  assert.equal(v.mode, "single");
+  assert.deepEqual(v.pairs, [{ place: "", name: "", slot: "a", tileIds: ["ca", "xa", "cb"] }]);
+  assert.equal(v.crossPlace, false);
+  assert.equal(pairsOf({ tiles: [], places, single: none, held: [] }).mode, "single");
+
+  // A second place with both: two pairs, project first; the single pair's
+  // state goes to the place holding both its tiles.
+  v = pairsOf({ tiles: [...A, ...B], places, single: { claudeId: "ca", codexId: "xa" }, held: [] });
+  assert.equal(v.mode, "two");
+  assert.deepEqual(
+    v.pairs.map((p) => [p.place, p.name, p.slot, p.tileIds]),
+    [
+      [PROJECT_PLACE, "orders-api", "a", ["ca", "xa"]],
+      ["copy-1", "retry-on-timeout", "b", ["cb", "xb"]],
+    ],
+  );
+  assert.equal(v.moveTo, PROJECT_PLACE);
+  assert.equal(v.extra, null);
+  // …or to the copy, when its tiles were the pair (still drawn second).
+  v = pairsOf({ tiles: [...A, ...B], places, single: { claudeId: "cb", codexId: "xb" }, held: [] });
+  assert.equal(v.moveTo, "copy-1");
+  assert.deepEqual(v.pairs.map((p) => p.place), [PROJECT_PLACE, "copy-1"]);
+
+  // A 1.178.0 pair across two places stays the one pair, and says how to get two.
+  v = pairsOf({ tiles: [...A, ...B], places, single: { claudeId: "ca", codexId: "xb" }, held: [] });
+  assert.equal(v.mode, "single");
+  assert.equal(v.crossPlace, true);
+  // …but says nothing when no second place could pair.
+  v = pairsOf({ tiles: [...A, t("xb", "codex", "copy-1")], places, single: { claudeId: "ca", codexId: "xb" }, held: [] });
+  assert.equal(v.mode, "single");
+  assert.equal(v.crossPlace, false);
+
+  // Three places with both: the first two get bars, the second names the third.
+  v = pairsOf({ tiles: [...C, ...B, ...A], places, single: none, held: [] });
+  assert.deepEqual(v.pairs.map((p) => p.place), [PROJECT_PLACE, "copy-1"]);
+  assert.equal(v.extra, "queue-empty");
+  // The single pair's own place gets a bar first, even when it is the third.
+  v = pairsOf({ tiles: [...A, ...B, ...C], places, single: { claudeId: "cc", codexId: "xc" }, held: [] });
+  assert.deepEqual(v.pairs.map((p) => p.place), [PROJECT_PLACE, "copy-2"]);
+  assert.equal(v.moveTo, "copy-2");
+  assert.equal(v.extra, "retry-on-timeout");
+
+  // A pair of two-pair mode keeps its bar while any of its tiles is open.
+  v = pairsOf({ tiles: [...A, t("cb", "claude", "copy-1")], places, single: none, held: [PROJECT_PLACE, "copy-1"] });
+  assert.equal(v.mode, "two");
+  assert.deepEqual(v.pairs.map((p) => [p.place, p.tileIds]), [[PROJECT_PLACE, ["ca", "xa"]], ["copy-1", ["cb"]]]);
+  assert.equal(v.moveTo, null);
+  // Both of its tiles gone: back to one pair, on the pair that is left.
+  v = pairsOf({ tiles: A, places, single: none, held: [PROJECT_PLACE, "copy-1"] });
+  assert.equal(v.mode, "single");
+  assert.equal(v.backFrom, PROJECT_PLACE);
+  // Its copy thrown away: the same.
+  v = pairsOf({ tiles: [...A, ...B], places: placesOf("orders-api", [c2]), single: none, held: [PROJECT_PLACE, "copy-1"] });
+  assert.equal(v.mode, "single");
+  assert.equal(v.backFrom, PROJECT_PLACE);
+  // A pair that is left keeps its bar when a new place pairs.
+  v = pairsOf({ tiles: [...B, ...C], places, single: none, held: [PROJECT_PLACE, "copy-1"] });
+  assert.deepEqual(v.pairs.map((p) => [p.place, p.slot]), [["copy-1", "a"], ["copy-2", "b"]]);
+  // Every tile gone: one empty pair.
+  v = pairsOf({ tiles: [], places, single: none, held: [PROJECT_PLACE, "copy-1"] });
+  assert.equal(v.mode, "single");
+  assert.equal(v.backFrom, null);
+
+  // Auto layout: a pair's two tiles side by side, place by place; the rest after.
+  const order = pairTileOrder(
+    [
+      { id: "cb", place: "copy-1" },
+      { id: "sh1", place: PROJECT_PLACE },
+      { id: "ca", place: PROJECT_PLACE },
+      { id: "sh2", place: "copy-1" },
+      { id: "xb", place: "copy-1" },
+      { id: "xa", place: PROJECT_PLACE },
+    ],
+    [
+      { place: PROJECT_PLACE, claudeId: "ca", codexId: "xa" },
+      { place: "copy-1", claudeId: "cb", codexId: "xb" },
+    ],
+  );
+  assert.deepEqual([...order.entries()].sort((a, b) => a[1] - b[1]).map(([id]) => id), ["ca", "xa", "sh1", "cb", "xb", "sh2"]);
+
+  // The bar of a pair: a closed tile names its place; the other pair's
+  // composer holds the pass.
+  const named = bar(input({ tiles: [tile("c1", "claude")], pairName: "retry-on-timeout" }));
+  assert.equal(named.kind, "no-pair");
+  assert.equal(named.line, "Codex's tile in retry-on-timeout is closed. Open one there to compare again.");
+  assert.equal(
+    bar(input({ tiles: [tile("x1", "codex")], pairName: "orders-api" })).line,
+    "Claude's tile in orders-api is closed. Open one there to compare again.",
+  );
+  const both = { claude: ans("claude"), codex: fresh("codex") };
+  const ready = bar(input({ answers: both }));
+  assert.equal(ready.kind, "ready");
+  assert.equal(ready.button?.disabled, false);
+  const held = bar(input({ answers: both, otherComposer: "orders-api" }));
+  assert.equal(held.button?.disabled, true);
+  assert.equal(held.button?.reason, "Finish or cancel the pass in orders-api first.");
+  // A reason of its own stays.
+  const busy = bar(input({ tiles: [tile("c1", "claude"), tile("x1", "codex", { working: true })], answers: both, otherComposer: "orders-api" }));
+  assert.equal(busy.button?.reason, W.targetWorkingWords("codex"));
+  // With one pair nothing of this is said.
+  assert.equal(bar(input({ tiles: [tile("c1", "claude")], closed: "codex" })).line, "Codex's tile is closed.");
+
+  // The words.
+  assert.equal(W.pairRegionLabel("orders-api"), "Compare · orders-api");
+  assert.equal(W.thirdPlaceWords("queue-empty"), "Compare shows two pairs at most. Close a pair's tiles to compare the ones in queue-empty.");
+  assert.equal(W.COMPARE_CROSS_PLACE, "To compare two pairs, keep each pair's Claude and Codex tiles in one place: the project folder or a copy.");
+}
+console.log("compareView two pairs: ok");

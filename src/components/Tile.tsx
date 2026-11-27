@@ -62,7 +62,23 @@ type Props = {
   /** 1.174.0 E8 (T16): the last tile takes the columns left in its row
    *  (`lastTileSpan`), so the grid leaves no empty cell. */
   span?: number;
+  /** 1.179.0 Compare with two pairs: this tile is one of a pair's two. */
+  comparePair?: TileComparePair | null;
+  /** 1.179.0: Auto layout's visual place (CSS `order`), so a pair's two
+   *  tiles sit side by side; the DOM order, and the terminal, stay. */
+  order?: number;
 };
+
+/** 1.179.0: a paired tile's marks — the pair's dot, and its name for the
+ *  project folder's pair (a copy's tiles already say "Copy · name") — and
+ *  the quiet outline while its pair is pointed at. */
+export interface TileComparePair {
+  slot: "a" | "b";
+  name: string;
+  inProject: boolean;
+  linked: boolean;
+  onHover: (slot: "a" | "b" | null) => void;
+}
 
 /** UX-8.2: the mono kind glyph at the header's start. */
 const NO_ARGS: string[] = [];
@@ -133,7 +149,7 @@ export function TileStatus({ line }: { line: TileStatusLine }) {
   );
 }
 
-export function Tile({ tile, env, workspaceCwd, hidden, span }: Props) {
+export function Tile({ tile, env, workspaceCwd, hidden, span, comparePair = null, order }: Props) {
   const setPtyId = useTiles((s) => s.setPtyId);
   const closeTile = useTiles((s) => s.closeTile);
   const setExpanded = useTiles((s) => s.setExpanded);
@@ -549,7 +565,10 @@ export function Tile({ tile, env, workspaceCwd, hidden, span }: Props) {
       ref={dropRef}
       data-tile-id={tile.id}
       data-tile-workspace={tile.workspaceId}
-      className={`tile tile-kind-${tile.kind}${tile.pendingClose ? " pending-close" : ""}${isExpanded ? " expanded" : ""}${statusLine.tone === "asks" ? " tile--asks" : ""}`}
+      className={`tile tile-kind-${tile.kind}${tile.pendingClose ? " pending-close" : ""}${isExpanded ? " expanded" : ""}${statusLine.tone === "asks" ? " tile--asks" : ""}${comparePair?.linked ? " tile--pair-linked" : ""}`}
+      data-compare-pair={comparePair?.slot}
+      onMouseEnter={comparePair ? () => comparePair.onHover(comparePair.slot) : undefined}
+      onMouseLeave={comparePair ? () => comparePair.onHover(null) : undefined}
       // GH #138: the tile's own listener writes a dropped path into the PTY
       // (external files are the terminal pane's, inside). 1.174.0 E6: a
       // `codex-chat` tile is a zone that takes nothing and refuses in its own
@@ -563,11 +582,14 @@ export function Tile({ tile, env, workspaceCwd, hidden, span }: Props) {
         hidden
           ? { display: "none" }
           : span && span > 1
-            ? { ...expandedBorderStyle, gridColumn: `span ${span}` }
-            : expandedBorderStyle
+            ? { ...expandedBorderStyle, gridColumn: `span ${span}`, ...(order !== undefined ? { order } : {}) }
+            : order !== undefined
+              ? { ...expandedBorderStyle, order }
+              : expandedBorderStyle
       }
     >
       <div className="tile-header">
+        {comparePair && <span className={comparePair.slot === "a" ? "ux-pair-dot ux-pair-dot--a" : "ux-pair-dot ux-pair-dot--b"} aria-hidden="true" />}
         <span
           className={`tile-kind-icon kind-${tile.kind}`}
           title={KIND_NAME[tile.kind]}
@@ -642,6 +664,8 @@ export function Tile({ tile, env, workspaceCwd, hidden, span }: Props) {
         )}
         {/* 1.173.0 (A3): a terminal in a copy says so, and its setup. */}
         <CopyTileMark tile={tile} />
+        {/* 1.179.0: the project folder's pair is named as a copy's is. */}
+        {comparePair?.inProject && <span className="tile-copy-mark tile-pair-mark">{comparePair.name}</span>}
         {swarm && (
           <span className="tile-chip" title={`Part of a multi-AI run: ${swarm.goal}`}>
             <span className="tile-chip-text">Multi-AI</span>

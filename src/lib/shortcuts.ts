@@ -199,7 +199,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   // extending a text selection by line in every field (the note, the editor)
   // and Ctrl+Shift+arrows with word selection on Windows; Y is free on both
   // (nothing binds ⌘⇧Y or Ctrl+Shift+Y here, in xterm, or in the editor).
-  { id: "comparePass", keys: "⌘⇧Y", label: "Compare: pass the last answer to the other tile (when Compare is on, in Terminals)", group: "Terminals and files", chord: { key: "y", shift: true, alt: false }, windowsInTerminal: { keys: "⌘⇧Y", chord: { key: "y", shift: true, alt: false } } },
+  { id: "comparePass", keys: "⌘⇧Y", label: "Compare: pass the last answer to the other tile (when Compare is on, in Terminals; with two pairs, in the pair you're working in)", group: "Terminals and files", chord: { key: "y", shift: true, alt: false }, windowsInTerminal: { keys: "⌘⇧Y", chord: { key: "y", shift: true, alt: false } } },
   { id: "resume", keys: "⌘⇧R", label: "Resume an earlier conversation", group: "Terminals and files", chord: { key: "r", shift: true, alt: false } },
   // QoL 1.168 E4: ⌘S anywhere in Code (the text answers it itself), and
   // Save all. ⌥ is matched on `code`: with it held, `key` is the alt letter.

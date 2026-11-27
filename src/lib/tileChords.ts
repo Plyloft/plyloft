@@ -36,3 +36,21 @@ export function tileChordAction(id: ShortcutId, where: TileChordWhere): { act: b
   if (id === "closeTile") return { act: false, swallow: !(where.windows && where.inTerminal) };
   return { act: false, swallow: false };
 }
+
+/**
+ * 1.179.0 Compare with two pairs: the pair ⌘⇧Y (Ctrl+Shift+Y) acts on, from
+ * the place the keyboard is in (`focusPlace`: the focused tile's place, or
+ * the bar's; null anywhere else). One pair: its one bar (`""`), from
+ * anywhere in Terminals, as before. Two: only the pair the keyboard is in;
+ * elsewhere nothing, and the key is not Plyloft's — on Windows a terminal's
+ * program gets it, as any key Plyloft does not answer.
+ */
+export function comparePassTarget(
+  mode: "single" | "two",
+  focusPlace: string | null,
+  places: readonly string[],
+): { place: string | null; swallow: boolean } {
+  if (mode === "single") return { place: "", swallow: true };
+  const place = focusPlace !== null && places.includes(focusPlace) ? focusPlace : null;
+  return { place, swallow: place !== null };
+}

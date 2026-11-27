@@ -177,3 +177,24 @@ export const COMPARE_PASS_AGAIN = "Pass it again";
 export function historyDirection(from: CompareVendor, to: CompareVendor): string {
   return `${compareVendorName(from)} → ${compareVendorName(to)}`;
 }
+
+// 1.179.0 Two pairs: a pair is named after its place (the project's name,
+// or the copy's).
+export function pairRegionLabel(name: string): string {
+  return `Compare · ${name}`;
+}
+export function pairTileClosedWords(v: CompareVendor, name: string): string {
+  return `${compareVendorName(v)}'s tile in ${name} is closed. Open one there to compare again.`;
+}
+export function otherPassOpenWords(name: string): string {
+  return `Finish or cancel the pass in ${name} first.`;
+}
+export function thirdPlaceWords(name: string): string {
+  return `Compare shows two pairs at most. Close a pair's tiles to compare the ones in ${name}.`;
+}
+export const COMPARE_CROSS_PLACE =
+  "To compare two pairs, keep each pair's Claude and Codex tiles in one place: the project folder or a copy.";
+export const COMPARE_NEW_COPY_MENU = "Compare in a new copy…";
+export const COMPARE_NEW_COPY_HINT = "a Claude and a Codex tile";
+/** The copy sheet's choice that opens both tiles. */
+export const COMPARE_PAIR_CHOICE = "Claude and Codex";

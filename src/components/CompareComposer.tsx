@@ -2,7 +2,7 @@
 // two ways to hand over. One filled primary: "Send to {B}". Its own file, so
 // the bar at rest (whose one primary is "Pass to {B} →") and this are two
 // views, never drawn together.
-import { useEffect, type RefObject } from "react";
+import { useEffect, type ReactNode, type RefObject } from "react";
 import { useCompare, type Composer } from "../store/compareStore";
 import { closeComposer, deliver, refreshPreview } from "../store/compareActions";
 import { questionReasonWords } from "../lib/compareView";
@@ -39,6 +39,10 @@ export function CompareComposer({
   putReason,
   answerGone = false,
   noteRef,
+  place = "",
+  label = "Compare",
+  hidden = false,
+  lead = null,
 }: {
   workspaceId: string;
   composer: Composer;
@@ -48,6 +52,12 @@ export function CompareComposer({
    *  new conversation): its text and length aren't shown as if it were. */
   answerGone?: boolean;
   noteRef: RefObject<HTMLTextAreaElement | null>;
+  /** 1.179.0 two pairs: the pair's place, its region's name, hidden while
+   *  the other pair's tile is expanded, and its dot and name first. */
+  place?: string;
+  label?: string;
+  hidden?: boolean;
+  lead?: ReactNode;
 }) {
   const store = useCompare.getState();
   // F2: why a button is off, as soon as it is — Send's, else Put's (only Put
@@ -84,8 +94,17 @@ export function CompareComposer({
   };
 
   return (
-    <div className="ux-relay ux-relay--open" role="region" aria-label="Compare" data-compare-ws={workspaceId} onKeyDown={onKeyDown}>
+    <div
+      className="ux-relay ux-relay--open"
+      role="region"
+      aria-label={label}
+      data-compare-ws={workspaceId}
+      data-compare-place={place}
+      hidden={hidden || undefined}
+      onKeyDown={onKeyDown}
+    >
       <div className="ux-relay-line">
+        {lead}
         <RelayWho vendor={composer.from}>
           <b>{composerTitleWords(composer.from, composer.to, composer.answerKind)}</b>
         </RelayWho>

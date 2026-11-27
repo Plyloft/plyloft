@@ -13,11 +13,16 @@ import {
   lastAskInto,
   plannedSincePass,
   pasteParts,
+  pairsOf,
+  placeOfCwd,
+  placesOf,
   questionFor,
   resolvePair,
+  type PairsView,
   type QuestionState,
   type TileFacts,
 } from "../lib/compareView";
+import { comparePassTarget } from "../lib/tileChords";
 import {
   compareOtherVendor,
   conversationUnknownWords,
@@ -36,16 +41,80 @@ import { tileHeaderStatusFor } from "../lib/tileHeaderStatus";
 import { PASTE_SETTLE_MS_PER_CHAR, PASTE_SETTLE_QUIET_MS } from "../lib/builderInject";
 import { pasteIntoTile } from "../lib/pasteIntoTile";
 import { screenProvesTurnOver, tileLastOutputAt, tileScreenNow, type TileScreenNow } from "../lib/tileScreen";
-import { useCompare, type Composer, type WsCompare } from "./compareStore";
+import { pairState, SINGLE_PAIR, useCompare, type Composer, type PairCompare, type WsCompare } from "./compareStore";
 import { useTiles, type Tile } from "./tileStore";
+import { useCopies } from "./copiesStore";
+import { useWorkspaces } from "./workspaceStore";
+import type { CopyView } from "../ipc";
 import { focusTile } from "./tileActions";
 
 const ENDED = new Set(["done", "error", "killed", "crashed"]);
 
-function liveTilesOf(workspaceId: string): Tile[] {
-  return (useTiles.getState().byWorkspace[workspaceId]?.tiles ?? []).filter(
+/** 1.179.0: a pair's tiles are the ones in its place; the single pair's,
+ *  every Claude and Codex tile of the workspace, as before. */
+function liveTilesOf(workspaceId: string, place: string = SINGLE_PAIR): Tile[] {
+  const all = (useTiles.getState().byWorkspace[workspaceId]?.tiles ?? []).filter(
     (t) => (t.kind === "claude" || t.kind === "codex") && !t.pendingClose,
   );
+  return place === SINGLE_PAIR ? all : all.filter((t) => tilePlace(workspaceId, t.cwd) === place);
+}
+
+function copiesOf(workspaceId: string): CopyView[] {
+  return useCopies.getState().byWorkspace[workspaceId] ?? [];
+}
+
+/** 1.179.0: the place a tile's folder is in (the project, or a copy's id). */
+export function tilePlace(workspaceId: string, cwd: string | null | undefined): string {
+  return placeOfCwd(cwd, copiesOf(workspaceId), isWindows());
+}
+
+/** 1.179.0: the bars `pairsOf` gives for these tiles and this state. */
+export function pairsFor(
+  tiles: readonly Tile[],
+  copies: readonly CopyView[],
+  projectName: string,
+  w: WsCompare | undefined,
+  win: boolean = isWindows(),
+): PairsView {
+  return pairsOf({
+    tiles: tiles
+      .filter((t) => (t.kind === "claude" || t.kind === "codex") && !t.pendingClose)
+      .map((t) => ({ id: t.id, vendor: t.kind === "codex" ? ("codex" as const) : ("claude" as const), place: placeOfCwd(t.cwd, copies, win) })),
+    places: placesOf(projectName, copies),
+    single: { claudeId: w?.claudeId ?? null, codexId: w?.codexId ?? null },
+    held: Object.keys(w?.pairs ?? {}),
+  });
+}
+
+/** The workspace's bars now, from the stores. */
+export function currentPairs(workspaceId: string): PairsView {
+  const name = useWorkspaces.getState().workspaces.find((x) => x.id === workspaceId)?.name ?? "";
+  return pairsFor(
+    useTiles.getState().byWorkspace[workspaceId]?.tiles ?? [],
+    copiesOf(workspaceId),
+    name,
+    useCompare.getState().byWorkspace[workspaceId],
+  );
+}
+
+/** 1.179.0: the place the keyboard is in — a bar's, or the focused tile's
+ *  (any kind: a shell in a copy belongs to that copy's pair) — or null. */
+export function placeOfFocus(workspaceId: string): string | null {
+  const at = typeof document !== "undefined" && document.activeElement instanceof Element ? document.activeElement : null;
+  if (!at) return null;
+  const barEl = at.closest<HTMLElement>("[data-compare-ws]");
+  if (barEl) return barEl.dataset.compareWs === workspaceId ? (barEl.dataset.comparePlace ?? SINGLE_PAIR) : null;
+  const tileEl = at.closest<HTMLElement>("[data-tile-id]");
+  if (!tileEl || tileEl.dataset.tileWorkspace !== workspaceId) return null;
+  const tile = useTiles.getState().byWorkspace[workspaceId]?.tiles.find((t) => t.id === tileEl.dataset.tileId);
+  return tile ? tilePlace(workspaceId, tile.cwd) : null;
+}
+
+/** 1.179.0: what ⌘⇧Y does here now (`comparePassTarget`): the pair it acts
+ *  on, or none, and whether the key is Plyloft's. */
+export function comparePassNow(workspaceId: string): { place: string | null; swallow: boolean } {
+  const view = currentPairs(workspaceId);
+  return comparePassTarget(view.mode, view.mode === "two" ? placeOfFocus(workspaceId) : null, view.pairs.map((p) => p.place));
 }
 
 /** What the store says about a tile; `screen` (read just now) overrides the
@@ -148,9 +217,9 @@ export function liveFacts(workspaceId: string): TileFacts[] {
   return liveTilesOf(workspaceId).map((t) => factsOfTile(t));
 }
 
-function pairedTiles(workspaceId: string): Record<CompareVendor, Tile | null> {
-  const w = useCompare.getState().byWorkspace[workspaceId];
-  const tiles = liveTilesOf(workspaceId);
+function pairedTiles(workspaceId: string, place: string = SINGLE_PAIR): Record<CompareVendor, Tile | null> {
+  const w = pairState(useCompare.getState().byWorkspace[workspaceId], place);
+  const tiles = liveTilesOf(workspaceId, place);
   const pair = resolvePair(tiles.map((t) => factsOfTile(t)), w?.claudeId ?? null, w?.codexId ?? null);
   const byId = (f: TileFacts | null) => tiles.find((t) => t.id === f?.id) ?? null;
   return { claude: byId(pair.claude), codex: byId(pair.codex) };
@@ -184,9 +253,11 @@ const reads = new Map<string, { p: Promise<void>; dirty: boolean }>();
  *  the composer opens, right before a send). One read is in flight at a time;
  *  a request meanwhile marks it dirty and one more read follows. The returned
  *  promise settles after a read that started after the call. */
-export function refreshAnswers(workspaceId: string): Promise<void> {
+export function refreshAnswers(workspaceId: string, place: string = SINGLE_PAIR): Promise<void> {
   if (!useCompare.getState().byWorkspace[workspaceId]?.on) return Promise.resolve();
-  const cur = reads.get(workspaceId);
+  // 1.179.0: one read in flight per pair.
+  const key = place === SINGLE_PAIR ? workspaceId : `${workspaceId}\u0000${place}`;
+  const cur = reads.get(key);
   if (cur) {
     cur.dirty = true;
     return cur.p;
@@ -195,20 +266,25 @@ export function refreshAnswers(workspaceId: string): Promise<void> {
   entry.p = (async () => {
     do {
       entry.dirty = false;
-      await readOnce(workspaceId);
+      await readOnce(workspaceId, place);
     } while (entry.dirty);
-  })().finally(() => reads.delete(workspaceId));
-  reads.set(workspaceId, entry);
+  })().finally(() => reads.delete(key));
+  reads.set(key, entry);
   return entry.p;
 }
 
-async function readOnce(workspaceId: string): Promise<void> {
-  const tiles = pairedTiles(workspaceId);
+async function readOnce(workspaceId: string, place: string): Promise<void> {
+  if (!pairState(useCompare.getState().byWorkspace[workspaceId], place)) return;
+  const tiles = pairedTiles(workspaceId, place);
   const [claude, codex] = await Promise.all([readAnswer(tiles.claude), readAnswer(tiles.codex)]);
   if (!useCompare.getState().byWorkspace[workspaceId]?.on) return;
+  // 1.179.0: a pair of two-pair mode may have changed meanwhile (a mode
+  // switch): only the same tiles' answers go to it (`setAnswer` ignores a
+  // pair that is gone). The single pair's reads land as before.
+  const now = place === SINGLE_PAIR ? tiles : pairedTiles(workspaceId, place);
   const set = useCompare.getState().setAnswer;
-  if (tiles.claude) set(workspaceId, "claude", claude);
-  if (tiles.codex) set(workspaceId, "codex", codex);
+  if (tiles.claude && now.claude?.id === tiles.claude.id) set(workspaceId, "claude", claude, place);
+  if (tiles.codex && now.codex?.id === tiles.codex.id) set(workspaceId, "codex", codex, place);
 }
 
 /** The tile that has the keyboard now, so it gets it back when the bar closes. */
@@ -232,7 +308,7 @@ if (typeof window !== "undefined") {
 /** The keyboard back where it was: the tile that had it, else the bar's
  *  Pass button (a composer opened by mouse). `afterKeyUp`: a held Enter must
  *  not reach the tile's terminal as a repeat, so focus waits for its release. */
-function giveFocusBack(workspaceId: string, back: string | null | undefined, _afterKeyUp: boolean): void {
+function giveFocusBack(workspaceId: string, back: string | null | undefined, _afterKeyUp: boolean, place: string = SINGLE_PAIR): void {
   /** Focus is where the member left it: the page, or this bar. */
   const parked = () => {
     const at = document.activeElement;
@@ -248,7 +324,8 @@ function giveFocusBack(workspaceId: string, back: string | null | undefined, _af
       // Only when focus fell to the page (never over a popover or field in the bar).
       const at = document.activeElement;
       if (at && at !== document.body) return;
-      document.querySelector<HTMLElement>(`[data-compare-ws="${workspaceId}"] .cbtn--accent:not(:disabled)`)?.focus();
+      // 1.179.0: the bar of the pair the composer was on.
+      document.querySelector<HTMLElement>(`[data-compare-ws="${workspaceId}"][data-compare-place="${place}"] .cbtn--accent:not(:disabled)`)?.focus();
     });
   };
   // Nothing held: back at once; Enter or Space still held: their release.
@@ -273,15 +350,19 @@ export function closeComposer(workspaceId: string, afterKeyUp = false, focusTile
   const c = useCompare.getState().byWorkspace[workspaceId]?.composer;
   useCompare.getState().closeComposer(workspaceId);
   // Cancel and Esc go back to where the member was; a pass goes to its target.
-  giveFocusBack(workspaceId, focusTileId ?? c?.returnTileId, afterKeyUp);
+  giveFocusBack(workspaceId, focusTileId ?? c?.returnTileId, afterKeyUp, c?.place ?? SINGLE_PAIR);
 }
 
 /** Open the composer on `from`'s last finished answer (read afresh). */
-export async function openComposer(workspaceId: string, from: CompareVendor): Promise<void> {
+export async function openComposer(workspaceId: string, from: CompareVendor, place: string = SINGLE_PAIR): Promise<void> {
+  // 1.179.0: one composer at a time; the other pair's stays as it is.
+  const open = () => useCompare.getState().byWorkspace[workspaceId]?.composer;
+  if (open() && (open()!.place ?? SINGLE_PAIR) !== place) return;
   const returnTileId = tileWithKeyboard(workspaceId);
-  await refreshAnswers(workspaceId);
-  const w = useCompare.getState().byWorkspace[workspaceId];
-  const fromTile = pairedTiles(workspaceId)[from];
+  await refreshAnswers(workspaceId, place);
+  if (open() && (open()!.place ?? SINGLE_PAIR) !== place) return;
+  const w = pairState(useCompare.getState().byWorkspace[workspaceId], place);
+  const fromTile = pairedTiles(workspaceId, place)[from];
   // 1.177.1: the answer held for a pass is the one on offer from its tile.
   const heldHere = w?.returnHeld?.from === from && fromTile ? heldOffered(w.returnHeld, () => factsOfTile(currentTile(fromTile))) : null;
   const a = heldHere ? heldHere.answer : fromTile ? answerSeen(factsOfTile(currentTile(fromTile)), w?.answers[from]) : w?.answers[from];
@@ -308,13 +389,14 @@ export async function openComposer(workspaceId: string, from: CompareVendor): Pr
     ...(heldHere ? { held: true } : {}),
     returnTileId,
     ...questionOpening(questionOf(w, from, a)),
+    ...(place !== SINGLE_PAIR ? { place } : {}),
   };
   useCompare.getState().openComposer(workspaceId, composer);
 }
 
 /** 1.179.0: the member's question in `a`'s turn, against the passes into
  *  its tile held in memory. */
-function questionOf(w: WsCompare, from: CompareVendor, a: CompareAnswer): QuestionState {
+function questionOf(w: PairCompare, from: CompareVendor, a: CompareAnswer): QuestionState {
   return questionFor(
     a.turnAsks,
     w.history.filter((p) => p.to === from),
@@ -330,7 +412,7 @@ function questionOpening(question: QuestionState | null): Pick<Composer, "questi
 /** The question for an answer read again in an open composer: the member's
  *  "off" stays off for this composer; otherwise on when there is one. */
 function questionAgain(workspaceId: string, c: Composer, a: CompareAnswer): Pick<Composer, "question" | "includeQuestion" | "preview"> {
-  const w = useCompare.getState().byWorkspace[workspaceId];
+  const w = pairState(useCompare.getState().byWorkspace[workspaceId], c.place ?? SINGLE_PAIR);
   const question: QuestionState = w ? questionOf(w, c.from, a) : { state: "unknown", why: "not-read" };
   const turnedOff = c.question?.state === "ok" && c.includeQuestion === false;
   return { question, includeQuestion: question.state === "ok" && !turnedOff, preview: null };
@@ -344,8 +426,10 @@ export function questionParts(c: Composer | null | undefined): { text: string; c
 }
 
 /** Pass a past pass's answer again, in the same direction. */
-export function reopenFromPass(workspaceId: string, passN: number): void {
-  const w = useCompare.getState().byWorkspace[workspaceId];
+export function reopenFromPass(workspaceId: string, passN: number, place: string = SINGLE_PAIR): void {
+  const open = useCompare.getState().byWorkspace[workspaceId]?.composer;
+  if (open && (open.place ?? SINGLE_PAIR) !== place) return;
+  const w = pairState(useCompare.getState().byWorkspace[workspaceId], place);
   const p = w?.history.find((x) => x.n === passN);
   if (!w || !p) return;
   useCompare.getState().openComposer(workspaceId, {
@@ -364,15 +448,22 @@ export function reopenFromPass(workspaceId: string, passN: number): void {
     returnTileId: tileWithKeyboard(workspaceId),
     // 1.179.0: it carries the question it went with, or none.
     ...questionOpening(p.question !== undefined ? { state: "ok", text: p.question, cut: p.questionCut === true } : null),
+    ...(place !== SINGLE_PAIR ? { place } : {}),
   });
-  void refreshAnswers(workspaceId);
+  void refreshAnswers(workspaceId, place);
 }
 
 /** After a pass into `to`, whether its terminal printed within the paste's
  *  quiet window (`PASTE_SETTLE_QUIET_MS`): ConPTY replays a long paste to
  *  Codex as keys, and the box is not settled until the output is. */
-export function outputActiveAfterPass(workspaceId: string, to: CompareVendor, tileId: string | null, now = Date.now()): boolean {
-  const sent = useCompare.getState().byWorkspace[workspaceId]?.sent;
+export function outputActiveAfterPass(
+  workspaceId: string,
+  to: CompareVendor,
+  tileId: string | null,
+  now = Date.now(),
+  place: string = SINGLE_PAIR,
+): boolean {
+  const sent = pairState(useCompare.getState().byWorkspace[workspaceId], place)?.sent;
   if (!sent || sent.to !== to || !tileId) return false;
   // Only within the expected replay of THAT paste (2 ms a character): an idle
   // tile that prints now and then (an animation) doesn't block for ever.
@@ -391,6 +482,9 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
   const store = useCompare.getState();
   const c0 = store.byWorkspace[workspaceId]?.composer;
   if (!c0 || c0.busy) return;
+  // 1.179.0: bound to the pair it was opened on — a press in one bar never
+  // writes into the other pair's tiles.
+  const place = c0.place ?? SINGLE_PAIR;
   store.patchComposer(workspaceId, { busy: true, error: null });
   const c = useCompare.getState().byWorkspace[workspaceId]!.composer!;
   const mine = c;
@@ -401,7 +495,7 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
   const fail = (error: string) => {
     if (useCompare.getState().byWorkspace[workspaceId]?.composer === mine) store.patchComposer(workspaceId, { busy: false, error });
   };
-  const tiles = pairedTiles(workspaceId);
+  const tiles = pairedTiles(workspaceId, place);
   const fromTile = tiles[c.from];
   const toTile = tiles[c.to];
   if (!fromTile) return fail(tileClosedWords(c.from));
@@ -409,8 +503,8 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
   // Still this press: the same composer, Compare on, the same pair.
   const wanted = () => {
     const w = useCompare.getState().byWorkspace[workspaceId];
-    if (!w?.on || w.composer !== mine) return false;
-    const now = pairedTiles(workspaceId);
+    if (!w?.on || w.composer !== mine || !pairState(w, place)) return false;
+    const now = pairedTiles(workspaceId, place);
     return now[c.from]?.id === fromTile.id && now[c.to]?.id === toTile.id;
   };
   const toPty = toTile.ptyId;
@@ -433,8 +527,8 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
   // open, replaced by plan v2 or the turn's final answer): the press stops
   // and shows it, as for a newer answer.
   if (c.held) {
-    if (src) store.setAnswer(workspaceId, c.from, src);
-    const h = useCompare.getState().byWorkspace[workspaceId]?.returnHeld;
+    if (src) store.setAnswer(workspaceId, c.from, src, place);
+    const h = pairState(useCompare.getState().byWorkspace[workspaceId], place)?.returnHeld;
     // 1.179.0: the hold lapsed with this read (its tile finished a newer
     // answer of the member's own, `heldLapsed`): the held text no longer goes;
     // the press stops and shows that newer answer, as an ordinary composer.
@@ -489,7 +583,7 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
   // Review round 3 (L1): the bar's facts take this fresh read too, so the
   // composer's refusal-clearing never clears a still-true refusal ("Codex is
   // working" from its open rollout turn) from an older answer.
-  if (wanted()) store.setAnswer(workspaceId, c.to, dst);
+  if (wanted()) store.setAnswer(workspaceId, c.to, dst, place);
 
   // A menu, trust or limit screen is the member's: read on the drawn screen
   // (the same 40 rows the scan reads).
@@ -541,7 +635,7 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
         if (live.lastInputAt > dstReadAt) return targetUnknownWords(c.to);
         // A paste Plyloft made here is still being replayed as keys: no
         // second write until the tile's output is quiet.
-        if (outputActiveAfterPass(workspaceId, c.to, now.id)) return targetUnknownWords(c.to);
+        if (outputActiveAfterPass(workspaceId, c.to, now.id, Date.now(), place)) return targetUnknownWords(c.to);
         return deliveryGate(c.to, factsOfTile(now, live), dst, mode);
       },
     },
@@ -556,7 +650,7 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
     if (result.words === CANCELLED) return;
     // Text that reached the box and wasn't sent is said even after Cancel.
     if (result.written && useCompare.getState().byWorkspace[workspaceId]?.composer !== mine) {
-      store.setNotice(workspaceId, { words: result.words, to: c.to, at: Date.now() });
+      store.setNotice(workspaceId, { words: result.words, to: c.to, at: Date.now() }, place);
       return;
     }
     return fail(result.words);
@@ -577,11 +671,11 @@ export async function deliver(workspaceId: string, mode: "send" | "put", byKey =
     // same question; whether the text held it. Memory only.
     ...(question ? { question: question.text, questionCut: question.cut } : {}),
     withQuestion: prepared.question !== undefined,
-  });
+  }, place);
   // Only this press's own composer closes (another may be open by now).
   if (useCompare.getState().byWorkspace[workspaceId]?.composer === mine) closeComposer(workspaceId, byKey, toTile.id);
   // The target works now (Send) or holds the text (Put): read it again soon.
-  void refreshAnswers(workspaceId);
+  void refreshAnswers(workspaceId, place);
 }
 
 /** The guard's own marker for "this press is no longer wanted": nothing is

@@ -483,6 +483,12 @@
 .tile:focus-within {
   border-color: var(--claude-accent);
 }
+/* 1.179.0 two pairs: pointing at a bar or at a paired tile outlines that
+   pair's two tiles, quietly — 1 px, the neutral strong border, no fill, never
+   the pair's colour or the accent (the focused tile keeps its own). */
+.tile.tile--pair-linked:not(:focus-within):not(.expanded) {
+  border-color: var(--border-strong);
+}
 .tile.pending-close {
   opacity: 0.55;
 }
@@ -1237,6 +1243,11 @@
   white-space: nowrap;
   color: var(--muted);
   font-size: var(--type-caption);
+}
+/* 1.179.0: the project folder's pair is named as a copy's is; a narrow head
+   shortens the name before the title. */
+.tile-pair-mark {
+  flex-shrink: 10;
 }
 .tile-copy-setup {
   display: inline-flex;

@@ -64,6 +64,7 @@ type Baseline = { file: string; component: string; count: number; possible?: num
 /** Components that drew more than one filled primary when the guard landed
  *  (1.174.0, B2). Each is fixed by a card with an approved mockup. */
 const BASELINE: Baseline[] = [
+  { file: "components/CompareBar.tsx", component: "CompareBars", count: 1, perRow: 1, reason: "Compare's relay bars (1.179.0 two pairs): one CompareBar with one pair, or one per pair in a .map with two — branches that never show together. The .map draws at most two bars, each its own view of its own pair (its own tiles, passes and composer) with its own Pass, as one pair's bar has today; at rest both Pass buttons can be on, and while one pair's composer is open the other's Pass is off (bar(), otherComposer)" },
   { file: "components/CardTroubles.tsx", component: "ShipRefusalBlocks", count: 0, possible: 2, reason: "the refused ship's two blocks (LocalBranchBlock, UnpublishedReleaseBlock), each with its own primary way out; each draws only for this card's refusal, so at most one shows (1.175.0 F8, drawn once by the card page)" },
   { file: "components/CardReviewPanel.tsx", component: "CardReviewPanel", count: 2, reason: "the conflict block's Ask the Builder / Retry merge: card-review-btn primary in branches that never show together (the class is a ternary)" },
   { file: "components/CardShipStep.tsx", component: "CardShipStep", count: 0, possible: 2, reason: "the Shipping section's LocalBranchBlock and UnpublishedReleaseBlock, error blocks, each with its own primary way out" },

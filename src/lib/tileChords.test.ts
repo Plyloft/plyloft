@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { tileChordAction } from "./tileChords.ts";
+import { comparePassTarget, tileChordAction } from "./tileChords.ts";
 
 const off = { onTerminals: false, windows: false, inTerminal: false };
 // ⌘⇧W off Terminals: inert, swallowed (never the window's close).
@@ -15,4 +15,15 @@ for (const id of ["nextTile", "previousTile", "nextTilePage", "previousTilePage"
   assert.deepEqual(tileChordAction(id, { onTerminals: true, windows: true, inTerminal: true }), { act: true, swallow: true });
 }
 assert.equal(tileChordAction("resume", off).act, true);
+// 1.179.0 Compare with two pairs: ⌘⇧Y's pair comes from where the keyboard is.
+// One pair: its one bar, from anywhere, swallowed as before.
+assert.deepEqual(comparePassTarget("single", null, [""]), { place: "", swallow: true });
+assert.deepEqual(comparePassTarget("single", "copy-1", [""]), { place: "", swallow: true });
+// Two: the pair the keyboard is in.
+assert.deepEqual(comparePassTarget("two", "project", ["project", "copy-1"]), { place: "project", swallow: true });
+assert.deepEqual(comparePassTarget("two", "copy-1", ["project", "copy-1"]), { place: "copy-1", swallow: true });
+// Outside both (a tile in a third place, the page): nothing, and not
+// swallowed, so on Windows a terminal's program gets the key.
+assert.deepEqual(comparePassTarget("two", null, ["project", "copy-1"]), { place: null, swallow: false });
+assert.deepEqual(comparePassTarget("two", "copy-2", ["project", "copy-1"]), { place: null, swallow: false });
 console.log("tileChords: all assertions passed");

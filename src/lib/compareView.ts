@@ -11,6 +11,7 @@
 import type { CompareAnswer, CompareAsksUnknown, ComparePasteParts, CompareTurnAsks } from "./compareIpc.ts";
 import { agoWords } from "./copyWords.ts";
 import { plainForKeys } from "./builderInject.ts";
+import { relativeTo, samePath } from "./paths.ts";
 import {
   COMPARE_ASK_LEAD,
   COMPARE_CODEX_SEARCH_OPEN,
@@ -43,6 +44,8 @@ import {
   targetUnknownWords,
   targetWorkingWords,
   tileClosedWords,
+  otherPassOpenWords,
+  pairTileClosedWords,
   type CompareAsk,
   type CompareVendor,
 } from "./compareWords.ts";
@@ -278,19 +281,25 @@ export function deliveryGate(
   return null;
 }
 
-export interface PairResolved {
-  claude: TileFacts | null;
-  codex: TileFacts | null;
-  claudeOptions: TileFacts[];
-  codexOptions: TileFacts[];
+export interface PairResolved<T extends { id: string; vendor: CompareVendor } = TileFacts> {
+  claude: T | null;
+  codex: T | null;
+  claudeOptions: T[];
+  codexOptions: T[];
 }
 
 /** The pair from the member's choice: exactly one tile of a kind pairs by
- *  itself, more than one needs the choice, a choice that closed is gone. */
-export function resolvePair(tiles: readonly TileFacts[], claudeId: string | null, codexId: string | null): PairResolved {
+ *  itself, more than one needs the choice, a choice that closed is gone.
+ *  1.179.0: any tile with an id and a kind (the pair markers place them
+ *  without reading a screen). */
+export function resolvePair<T extends { id: string; vendor: CompareVendor } = TileFacts>(
+  tiles: readonly T[],
+  claudeId: string | null,
+  codexId: string | null,
+): PairResolved<T> {
   const claudeOptions = tiles.filter((t) => t.vendor === "claude");
   const codexOptions = tiles.filter((t) => t.vendor === "codex");
-  const pick = (options: TileFacts[], id: string | null) =>
+  const pick = (options: T[], id: string | null) =>
     options.find((t) => t.id === id) ?? (options.length === 1 ? options[0] : null);
   return { claude: pick(claudeOptions, claudeId), codex: pick(codexOptions, codexId), claudeOptions, codexOptions };
 }
@@ -318,6 +327,11 @@ export interface BarInput {
   /** 1.177.1: the answer to the last pass, held (`ReturnHeld`). */
   held?: ReturnHeld | null;
   now: number;
+  /** 1.179.0 two-pair mode: the pair's name (its place's); absent with one
+   *  pair. A kind with no tile left in its place says where to open one. */
+  pairName?: string | null;
+  /** 1.179.0: the other pair's composer is open (one at a time): its name. */
+  otherComposer?: string | null;
 }
 
 export type BarKind = "no-pair" | "choose" | "nothing" | "ready" | "sent" | "blocked";
@@ -569,6 +583,17 @@ export function heldOffered(
 }
 
 export function bar(input: BarInput): BarView {
+  const view = barOf(input);
+  // 1.179.0: one composer at a time — while the other pair's is open, this
+  // bar's pass waits for it (a reason of its own stays: it is truer).
+  if (input.otherComposer && view.button && !view.button.disabled) {
+    const reason = otherPassOpenWords(input.otherComposer);
+    return { ...view, button: { ...view.button, disabled: true, reason } };
+  }
+  return view;
+}
+
+function barOf(input: BarInput): BarView {
   const pair = resolvePair(input.tiles, input.claudeId, input.codexId);
   const count = passCountWords(input.history.length);
   const pickers: Picker[] = [];
@@ -600,6 +625,11 @@ export function bar(input: BarInput): BarView {
       ? tileClosedWords(v)
       : null;
   if (pair.claudeOptions.length === 0 || pair.codexOptions.length === 0) {
+    // 1.179.0: a pair of two-pair mode always had both tiles in its place.
+    if (input.pairName) {
+      const gone: CompareVendor = pair.claudeOptions.length === 0 ? "claude" : "codex";
+      return { ...base, kind: "no-pair", line: pairTileClosedWords(gone, input.pairName) };
+    }
     return { ...base, kind: "no-pair", line: closedWords(input.closed) ?? COMPARE_NO_PAIR };
   }
   if (!pair.claude || !pair.codex) {
@@ -699,6 +729,169 @@ export function bar(input: BarInput): BarView {
     canSwap: dir.both,
     muted: ambiguousVendor ? ambiguousQuietWords(ambiguousVendor) : null,
   };
+}
+
+// ── 1.179.0 Two pairs ────────────────────────────────────────────────────
+// A pair is implied by its place: the project folder, or one copy. Two
+// Codex tiles in one folder can't be told apart (their conversations are
+// claimed by folder), so a second pair needs a place of its own.
+
+/** The project folder's place. A copy's place is its id. */
+export const PROJECT_PLACE = "project";
+
+/** What a place needs of a copy (`CopyView`). */
+export interface CopyPlace {
+  id: string;
+  name: string;
+  path: string;
+  createdAt: number;
+  state?: string;
+}
+
+/** A place, as the bars are ordered: the project first, then copies by age. */
+export interface PlaceDef {
+  id: string;
+  name: string;
+}
+
+function trimSeparators(path: string, win: boolean): string {
+  return path.replace(win ? /[\\/]+$/ : /\/+$/, "");
+}
+
+/** The place a folder is in: the active copy whose folder holds it, else the
+ *  project. On Windows the same folder shows as `C:\` and `c:\`, with either
+ *  separator: compared as the app compares paths there (`paths.ts`). */
+export function placeOfCwd(cwd: string | null | undefined, copies: readonly CopyPlace[], win: boolean): string {
+  if (!cwd) return PROJECT_PLACE;
+  const at = trimSeparators(cwd, win);
+  for (const c of copies) {
+    if ((c.state !== undefined && c.state !== "active") || !c.path) continue;
+    const root = trimSeparators(c.path, win);
+    if (root && (samePath(at, root, win) || relativeTo(at, root, win) !== null)) return c.id;
+  }
+  return PROJECT_PLACE;
+}
+
+/** The places in bar order: the project (named after it), then the active
+ *  copies, oldest first. */
+export function placesOf(projectName: string, copies: readonly CopyPlace[]): PlaceDef[] {
+  const active = copies.filter((c) => (c.state === undefined || c.state === "active") && !!c.path);
+  return [
+    { id: PROJECT_PLACE, name: projectName },
+    ...[...active].sort((a, b) => a.createdAt - b.createdAt).map((c) => ({ id: c.id, name: c.name })),
+  ];
+}
+
+export interface PairsInput {
+  /** The workspace's Claude and Codex tiles (not closing), with their place. */
+  tiles: readonly { id: string; vendor: CompareVendor; place: string }[];
+  places: readonly PlaceDef[];
+  /** The single pair's choice (`WsCompare.claudeId`/`codexId`). */
+  single: { claudeId: string | null; codexId: string | null };
+  /** The places that hold a pair of two-pair mode now (`WsCompare.pairs`). */
+  held: readonly string[];
+}
+
+/** One bar: its place (`""` with one pair), its name, its dot. */
+export interface PairPlace {
+  place: string;
+  name: string;
+  slot: "a" | "b";
+  /** The Claude and Codex tiles the bar picks from. */
+  tileIds: string[];
+}
+
+export interface PairsView {
+  mode: "single" | "two";
+  pairs: PairPlace[];
+  /** Two-pair mode: a third place holding both kinds, which gets no bar. */
+  extra: string | null;
+  /** Single: the pair spans two places while a second place could pair. */
+  crossPlace: boolean;
+  /** Into two-pair mode: the place the single pair's state goes to. */
+  moveTo: string | null;
+  /** Out of it: the pair whose state becomes the single pair's. */
+  backFrom: string | null;
+}
+
+/**
+ * The bars a workspace shows. One place holding both a Claude and a Codex
+ * tile (or none): single-pair mode, exactly 1.178.0's bar over every tile.
+ * A second such place: two pairs, one bar each, project first, then copies
+ * by age — unless the single pair spans two places (a 1.178.0 pair across
+ * folders), which stays the one pair (`crossPlace`). A pair of two-pair mode
+ * keeps its bar while any of its tiles is open; with one bar left, it is
+ * single-pair mode again on that pair. At most two bars: a third place is
+ * named (`extra`).
+ */
+export function pairsOf(input: PairsInput): PairsView {
+  const rank = new Map(input.places.map((p, i) => [p.id, i] as const));
+  const nameOf = (id: string) => input.places.find((p) => p.id === id)?.name ?? "";
+  const inPlace = (place: string) => input.tiles.filter((t) => t.place === place);
+  const full = input.places
+    .map((p) => p.id)
+    .filter((id) => {
+      const here = inPlace(id);
+      return here.some((t) => t.vendor === "claude") && here.some((t) => t.vendor === "codex");
+    });
+  const byRank = (a: string, b: string) => (rank.get(a) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b) ?? Number.MAX_SAFE_INTEGER);
+  const single = (over: Partial<PairsView> = {}): PairsView => ({
+    mode: "single",
+    pairs: [{ place: "", name: "", slot: "a", tileIds: input.tiles.map((t) => t.id) }],
+    extra: null,
+    crossPlace: false,
+    moveTo: null,
+    backFrom: null,
+    ...over,
+  });
+  // A pair of two-pair mode stays while its place is there and holds a tile.
+  const kept = input.held.filter((p) => rank.has(p) && inPlace(p).length > 0).sort(byRank).slice(0, 2);
+  let chosen: string[];
+  let moveTo: string | null = null;
+  if (kept.length > 0) {
+    chosen = [...kept];
+    for (const p of full) if (chosen.length < 2 && !chosen.includes(p)) chosen.push(p);
+    if (chosen.length < 2) return single({ backFrom: chosen[0] ?? null });
+  } else {
+    if (full.length < 2) return single();
+    const c = input.single.claudeId ? input.tiles.find((t) => t.id === input.single.claudeId) : undefined;
+    const x = input.single.codexId ? input.tiles.find((t) => t.id === input.single.codexId) : undefined;
+    if (c && x && c.place !== x.place) return single({ crossPlace: true });
+    // The single pair moves with its place, which gets a bar first.
+    const own = c?.place ?? x?.place ?? null;
+    chosen = own !== null && full.includes(own) ? [own] : [];
+    for (const p of full) if (chosen.length < 2 && !chosen.includes(p)) chosen.push(p);
+    moveTo = own !== null && chosen.includes(own) ? own : null;
+  }
+  chosen.sort(byRank);
+  const third = full.find((p) => !chosen.includes(p)) ?? null;
+  return {
+    mode: "two",
+    pairs: chosen.map((p, i) => ({ place: p, name: nameOf(p), slot: i === 0 ? "a" : "b", tileIds: inPlace(p).map((t) => t.id) })),
+    extra: third !== null ? nameOf(third) : null,
+    crossPlace: false,
+    moveTo,
+    backFrom: null,
+  };
+}
+
+/** 1.179.0: Auto layout draws a pair's two tiles next to each other: the
+ *  tiles of each pair's place in bar order, its paired Claude then Codex
+ *  first, then the rest as they were. The visual order only (CSS `order`):
+ *  the DOM order, and every terminal, stay. */
+export function pairTileOrder(
+  tiles: readonly { id: string; place: string }[],
+  pairs: readonly { place: string; claudeId: string | null; codexId: string | null }[],
+): Map<string, number> {
+  const rank = (t: { id: string; place: string }, i: number): [number, number, number] => {
+    const p = pairs.findIndex((x) => x.place === t.place);
+    if (p < 0) return [pairs.length, 2, i];
+    const pair = pairs[p];
+    return [p, t.id === pair.claudeId ? 0 : t.id === pair.codexId ? 1 : 2, i];
+  };
+  const ranked = tiles.map((t, i) => ({ id: t.id, r: rank(t, i) }));
+  ranked.sort((a, b) => a.r[0] - b.r[0] || a.r[1] - b.r[1] || a.r[2] - b.r[2]);
+  return new Map(ranked.map((x, i) => [x.id, i] as const));
 }
 
 /** The ask a pass starts on: a plan is reviewed; then the answer to what
