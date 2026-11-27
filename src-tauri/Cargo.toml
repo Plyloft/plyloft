@@ -35,7 +35,7 @@ parking_lot = "0.12"
 uuid = { version = "1", features = ["v4", "serde"] }
 log = "0.4"
 notify = "6"
-notify-debouncer-full = "0.3"
+notify-debouncer-full = "0.8"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 globset = "0.4"
 # v1.85.0 (team tier): offline license-key verification. Same trust
