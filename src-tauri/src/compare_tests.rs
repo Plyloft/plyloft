@@ -434,10 +434,20 @@ fn two_claude_tiles_on_different_accounts_are_each_read_from_their_own_folder() 
         Some(account.into()),
     )
     .unwrap();
-    let read = |pty: &str| tile_answer(crate::terminal_sessions::live_conversation(pty, None, &homes)).answer;
-    assert_eq!(read("pty-main").as_deref(), Some("Main's answer."));
-    assert_eq!(read("pty-work").as_deref(), Some("The account's answer."));
-    let plans = crate::terminal_sessions::live_conversation("pty-work", None, &homes).unwrap().plans_dir;
+    // Each CLI's per-process file, in its own account's folder: on Windows a
+    // Claude tile without one is never taken on trust (`link_of`), so the
+    // test names the pid as a running tile would.
+    let pid_file = |root: &std::path::Path, pid: u32| {
+        let path = root.join(format!("sessions/{pid}.json"));
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, json!({"pid": pid, "sessionId": "s-same"}).to_string()).unwrap();
+    };
+    pid_file(main.path(), 4101);
+    pid_file(&account_dir, 4202);
+    let read = |pty: &str, pid: u32| tile_answer(crate::terminal_sessions::live_conversation(pty, Some(pid), &homes)).answer;
+    assert_eq!(read("pty-main", 4101).as_deref(), Some("Main's answer."));
+    assert_eq!(read("pty-work", 4202).as_deref(), Some("The account's answer."));
+    let plans = crate::terminal_sessions::live_conversation("pty-work", Some(4202), &homes).unwrap().plans_dir;
     assert_eq!(plans, Some(account_dir.join("plans")), "plan files too");
     crate::ai_accounts::test_root::set(None);
     reset_for_tests();
