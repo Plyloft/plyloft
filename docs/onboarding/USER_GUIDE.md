@@ -2407,7 +2407,8 @@ choosing there again sets it for the next cards.
 
 **A second Claude subscription.** You can add one in **Settings › Cards ›
 AI and models › Claude accounts**; it signs in with Claude's own login.
-New sessions start on the account you choose there. A session that is
+The first time you open Claude on a new account, Claude shows its own
+first-run questions in the tile; answer them once. New sessions start on the account you choose there. A session that is
 already running keeps its account, and resuming a conversation uses the
 account it was started on. With more than one account, a Claude terminal
 and a card's Builder say which one they run on. When a card's Builder
