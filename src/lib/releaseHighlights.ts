@@ -69,7 +69,7 @@ export const RELEASE_HIGHLIGHTS: readonly ReleaseHighlights[] = [
         action: { nav: { settings: "claude-codex" }, label: "Open AI and models" },
       },
       {
-        text: "Compare is safer and fixed: the plan you pass after Esc is Claude's latest, a held answer no longer goes out stale, and the app says when it cannot read a plan. Security updates to the app's building blocks close 13 open alerts.",
+        text: "Compare is safer and fixed: the plan you pass after Esc is Claude's latest, a held answer no longer goes out stale, and the app says when it cannot read a plan. Security updates to the app's building blocks close 12 of the 13 open alerts; the last is in a library only Linux builds use.",
       },
     ],
   },
